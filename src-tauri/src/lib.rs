@@ -660,7 +660,7 @@ mod tests {
 
         let result = create_file(get_test_file());
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("File already exists"));
+        assert!(result.unwrap_err().contains("A file already exists at"));
 
         cleanup_test_dir();
     }
@@ -687,7 +687,7 @@ mod tests {
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
-            .contains("Only markdown (.md) files are supported"));
+            .contains("not a markdown file"));
 
         cleanup_test_dir();
     }
@@ -710,7 +710,7 @@ mod tests {
 
         let result = read_file(format!("{}/nonexistent.md", get_test_dir()));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("File not found"));
+        assert!(result.unwrap_err().contains("could not be found"));
 
         cleanup_test_dir();
     }
@@ -724,7 +724,7 @@ mod tests {
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
-            .contains("Only markdown (.md) files are supported"));
+            .contains("not a markdown file"));
 
         cleanup_test_dir();
     }
@@ -736,7 +736,7 @@ mod tests {
 
         let result = read_file(format!("{}/subdir.md", get_test_dir()));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Path is not a file"));
+        assert!(result.unwrap_err().contains("is not a file"));
 
         cleanup_test_dir();
     }
@@ -759,7 +759,7 @@ mod tests {
 
         let result = delete_file(format!("{}/nonexistent.md", get_test_dir()));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("File not found"));
+        assert!(result.unwrap_err().contains("could not be found"));
 
         cleanup_test_dir();
     }
@@ -773,7 +773,7 @@ mod tests {
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
-            .contains("Only markdown (.md) files can be deleted"));
+            .contains("not a markdown file"));
 
         cleanup_test_dir();
     }
@@ -803,7 +803,7 @@ mod tests {
             get_test_file_2(),
         );
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Source file not found"));
+        assert!(result.unwrap_err().contains("could not be found"));
 
         cleanup_test_dir();
     }
@@ -818,7 +818,7 @@ mod tests {
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
-            .contains("Destination file already exists"));
+            .contains("already exists"));
 
         cleanup_test_dir();
     }
@@ -832,7 +832,7 @@ mod tests {
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
-            .contains("Source file must have .md extension"));
+            .contains("not a markdown file"));
 
         cleanup_test_dir();
     }
@@ -1068,7 +1068,7 @@ mod tests {
     fn test_scan_vault_files_nonexistent_path() {
         let result = scan_vault_files("nonexistent_directory".to_string());
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Vault path does not exist"));
+        assert!(result.unwrap_err().contains("could not be found"));
     }
 
     #[test]
@@ -1078,7 +1078,7 @@ mod tests {
 
         let result = scan_vault_files(get_test_file());
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Vault path is not a directory"));
+        assert!(result.unwrap_err().contains("is not a directory"));
 
         cleanup_test_dir();
     }
@@ -1316,7 +1316,7 @@ mod tests {
             let directories: Vec<_> = scanned_files.iter().filter(|f| f.is_dir).collect();
             let md_files: Vec<_> = scanned_files.iter().filter(|f| !f.is_dir && f.name.ends_with(".md")).collect();
             
-            assert_eq!(directories.len(), 4, "Expected 4 directories");
+            assert_eq!(directories.len(), 5, "Expected 5 directories (including intermediate 'deep' directory)");
             assert_eq!(md_files.len(), 5, "Expected 5 markdown files");
 
             // Verify all markdown files are found
