@@ -595,267 +595,270 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::fs;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
+    use tempfile::TempDir;
 
-    fn get_test_dir() -> String {
-        format!("test_files_{}", std::process::id())
+    /// Test utilities for better isolation and common operations
+    struct TestEnv {
+        #[allow(dead_code)] // Required for automatic cleanup
+        temp_dir: TempDir,
+        pub path: PathBuf,
     }
-    
-    fn get_test_file() -> String {
-        format!("{}/test.md", get_test_dir())
+
+    impl TestEnv {
+        /// Create a new isolated test environment with temporary directory
+        fn new() -> Self {
+            let temp_dir = TempDir::new().expect("Failed to create temporary directory");
+            let path = temp_dir.path().to_path_buf();
+            
+            TestEnv {
+                temp_dir,
+                path,
+            }
+        }
+
+        /// Get path to a test file in the test directory
+        fn get_test_file(&self, name: &str) -> String {
+            self.path.join(name).to_string_lossy().to_string()
+        }
+
+        /// Create a test file with content
+        fn create_test_file(&self, name: &str, content: &str) -> std::io::Result<()> {
+            let file_path = self.path.join(name);
+            if let Some(parent) = file_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(file_path, content)
+        }
+
+        /// Create a test directory structure
+        fn create_directory_structure(&self, dirs: &[&str]) -> std::io::Result<()> {
+            for dir in dirs {
+                let dir_path = self.path.join(dir);
+                fs::create_dir_all(dir_path)?;
+            }
+            Ok(())
+        }
+
+        /// Get the temp directory path as string
+        fn get_path(&self) -> String {
+            self.path.to_string_lossy().to_string()
+        }
     }
-    
-    fn get_test_file_2() -> String {
-        format!("{}/test2.md", get_test_dir())
-    }
+
+    // Automatic cleanup happens when TestEnv is dropped due to TempDir
     
     const TEST_CONTENT: &str = "# Test Content\n\nThis is test content.";
-
-    fn setup_test_dir() {
-        let test_dir = get_test_dir();
-        if Path::new(&test_dir).exists() {
-            fs::remove_dir_all(&test_dir).ok();
-        }
-        fs::create_dir_all(&test_dir).unwrap();
-    }
-
-    fn cleanup_test_dir() {
-        let test_dir = get_test_dir();
-        if Path::new(&test_dir).exists() {
-            fs::remove_dir_all(&test_dir).ok();
-        }
-    }
+    const UTF8_CONTENT: &str = "# UTF-8 Test\n\n✅ Checkmark\n🎉 Emoji\nÀccëntéd characters";
 
     #[test]
     fn test_create_file_success() {
-        setup_test_dir();
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
 
-        let result = create_file(get_test_file());
+        let result = create_file(test_file.clone());
         assert!(result.is_ok());
-        assert!(Path::new(&get_test_file()).exists());
+        assert!(Path::new(&test_file).exists());
 
-        let content = fs::read_to_string(&get_test_file()).unwrap();
+        let content = fs::read_to_string(&test_file).unwrap();
         assert_eq!(content, "# test\n\n");
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_create_file_invalid_extension() {
-        setup_test_dir();
+        let env = TestEnv::new();
+        let invalid_file = env.get_test_file("test.txt");
 
-        let result = create_file(format!("{}/test.txt", get_test_dir()));
+        let result = create_file(invalid_file);
         assert!(result.is_err());
         let error_msg = result.unwrap_err();
-        println!("Actual error message: '{}'", error_msg);
         assert!(error_msg.contains("not a markdown file"));
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_create_file_already_exists() {
-        setup_test_dir();
-        fs::write(&get_test_file(), "existing content").unwrap();
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
+        
+        // Create the file first
+        env.create_test_file("test.md", "existing content").unwrap();
 
-        let result = create_file(get_test_file());
+        let result = create_file(test_file);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("A file already exists at"));
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_write_file_success() {
-        setup_test_dir();
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
 
-        let result = write_file(get_test_file(), TEST_CONTENT.to_string());
+        let result = write_file(test_file.clone(), TEST_CONTENT.to_string());
         assert!(result.is_ok());
-        assert!(Path::new(&get_test_file()).exists());
+        assert!(Path::new(&test_file).exists());
 
-        let content = fs::read_to_string(&get_test_file()).unwrap();
+        let content = fs::read_to_string(&test_file).unwrap();
         assert_eq!(content, TEST_CONTENT);
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_write_file_invalid_extension() {
-        setup_test_dir();
+        let env = TestEnv::new();
+        let invalid_file = env.get_test_file("test.txt");
 
-        let result = write_file(format!("{}/test.txt", get_test_dir()), TEST_CONTENT.to_string());
+        let result = write_file(invalid_file, TEST_CONTENT.to_string());
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .contains("not a markdown file"));
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_read_file_success() {
-        setup_test_dir();
-        fs::write(&get_test_file(), TEST_CONTENT).unwrap();
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
+        env.create_test_file("test.md", TEST_CONTENT).unwrap();
 
-        let result = read_file(get_test_file());
+        let result = read_file(test_file);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), TEST_CONTENT);
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_read_file_not_found() {
-        setup_test_dir();
+        let env = TestEnv::new();
 
-        let result = read_file(format!("{}/nonexistent.md", get_test_dir()));
+        let result = read_file(format!("{}/nonexistent.md", env.get_path()));
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("could not be found"));
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_read_file_invalid_extension() {
-        setup_test_dir();
-        fs::write(&format!("{}/test.txt", get_test_dir()), "content").unwrap();
+        let env = TestEnv::new();
+        env.create_test_file("test.txt", "content").unwrap();
 
-        let result = read_file(format!("{}/test.txt", get_test_dir()));
+        let result = read_file(env.get_test_file("test.txt"));
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .contains("not a markdown file"));
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_read_file_is_directory() {
-        setup_test_dir();
-        fs::create_dir_all(&format!("{}/subdir.md", get_test_dir())).unwrap();
+        let env = TestEnv::new();
+        env.create_directory_structure(&["subdir.md"]).unwrap();
 
-        let result = read_file(format!("{}/subdir.md", get_test_dir()));
+        let result = read_file(env.get_test_file("subdir.md"));
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("is not a file"));
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_delete_file_success() {
-        setup_test_dir();
-        fs::write(&get_test_file(), TEST_CONTENT).unwrap();
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
+        env.create_test_file("test.md", TEST_CONTENT).unwrap();
 
-        let result = delete_file(get_test_file());
+        let result = delete_file(test_file.clone());
         assert!(result.is_ok());
-        assert!(!Path::new(&get_test_file()).exists());
-
-        cleanup_test_dir();
+        assert!(!Path::new(&test_file).exists());
     }
 
     #[test]
     fn test_delete_file_not_found() {
-        setup_test_dir();
+        let env = TestEnv::new();
 
-        let result = delete_file(format!("{}/nonexistent.md", get_test_dir()));
+        let result = delete_file(format!("{}/nonexistent.md", env.get_path()));
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("could not be found"));
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_delete_file_invalid_extension() {
-        setup_test_dir();
-        fs::write(&format!("{}/test.txt", get_test_dir()), "content").unwrap();
+        let env = TestEnv::new();
+        env.create_test_file("test.txt", "content").unwrap();
 
-        let result = delete_file(format!("{}/test.txt", get_test_dir()));
+        let result = delete_file(env.get_test_file("test.txt"));
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .contains("not a markdown file"));
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_rename_file_success() {
-        setup_test_dir();
-        fs::write(&get_test_file(), TEST_CONTENT).unwrap();
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
+        let test_file_2 = env.get_test_file("test2.md");
+        env.create_test_file("test.md", TEST_CONTENT).unwrap();
 
-        let result = rename_file(get_test_file(), get_test_file_2());
+        let result = rename_file(test_file.clone(), test_file_2.clone());
         assert!(result.is_ok());
-        assert!(!Path::new(&get_test_file()).exists());
-        assert!(Path::new(&get_test_file_2()).exists());
+        assert!(!Path::new(&test_file).exists());
+        assert!(Path::new(&test_file_2).exists());
 
-        let content = fs::read_to_string(&get_test_file_2()).unwrap();
+        let content = fs::read_to_string(&test_file_2).unwrap();
         assert_eq!(content, TEST_CONTENT);
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_rename_file_source_not_found() {
-        setup_test_dir();
+        let env = TestEnv::new();
 
         let result = rename_file(
-            format!("{}/nonexistent.md", get_test_dir()),
-            get_test_file_2(),
+            format!("{}/nonexistent.md", env.get_path()),
+            env.get_test_file("test2.md"),
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("could not be found"));
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_rename_file_destination_exists() {
-        setup_test_dir();
-        fs::write(&get_test_file(), TEST_CONTENT).unwrap();
-        fs::write(&get_test_file_2(), "other content").unwrap();
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
+        let test_file_2 = env.get_test_file("test2.md");
+        env.create_test_file("test.md", TEST_CONTENT).unwrap();
+        env.create_test_file("test2.md", "other content").unwrap();
 
-        let result = rename_file(get_test_file(), get_test_file_2());
+        let result = rename_file(test_file, test_file_2);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .contains("already exists"));
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_rename_file_invalid_extension() {
-        setup_test_dir();
-        fs::write(&format!("{}/test.txt", get_test_dir()), "content").unwrap();
+        let env = TestEnv::new();
+        env.create_test_file("test.txt", "content").unwrap();
 
-        let result = rename_file(format!("{}/test.txt", get_test_dir()), get_test_file_2());
+        let result = rename_file(env.get_test_file("test.txt"), env.get_test_file("test2.md"));
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .contains("not a markdown file"));
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_utf8_encoding() {
-        setup_test_dir();
-        let utf8_content = "# UTF-8 Test\n\n✅ Checkmark\n🎉 Emoji\nÀccëntéd characters";
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
 
-        let write_result = write_file(get_test_file(), utf8_content.to_string());
+        let write_result = write_file(test_file.clone(), UTF8_CONTENT.to_string());
         assert!(write_result.is_ok());
 
-        let read_result = read_file(get_test_file());
+        let read_result = read_file(test_file);
         assert!(read_result.is_ok());
-        assert_eq!(read_result.unwrap(), utf8_content);
-
-        cleanup_test_dir();
+        assert_eq!(read_result.unwrap(), UTF8_CONTENT);
     }
 
     #[test]
     fn test_nested_directory_creation() {
-        setup_test_dir();
-        let nested_file = format!("{}/nested/deep/file.md", get_test_dir());
+        let env = TestEnv::new();
+        let nested_file = env.get_test_file("nested/deep/file.md");
 
         let result = create_file(nested_file.clone());
         assert!(result.is_ok());
@@ -863,34 +866,30 @@ mod tests {
 
         let content = fs::read_to_string(&nested_file).unwrap();
         assert_eq!(content, "# file\n\n");
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_file_info_from_path() {
-        setup_test_dir();
-        fs::write(&get_test_file(), TEST_CONTENT).unwrap();
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
+        env.create_test_file("test.md", TEST_CONTENT).unwrap();
 
-        let test_file = get_test_file();
         let path = Path::new(&test_file);
         let file_info = FileInfo::from_path(path).unwrap();
 
         assert_eq!(file_info.name, "test.md");
-        assert_eq!(file_info.path, get_test_file());
+        assert_eq!(file_info.path, test_file);
         assert!(!file_info.is_dir);
         assert!(file_info.size > 0);
         assert!(file_info.modified > 0);
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_file_info_from_dir_entry() {
-        setup_test_dir();
-        fs::write(&get_test_file(), TEST_CONTENT).unwrap();
+        let env = TestEnv::new();
+        env.create_test_file("test.md", TEST_CONTENT).unwrap();
 
-        let entries: Vec<_> = fs::read_dir(&get_test_dir()).unwrap().collect();
+        let entries: Vec<_> = fs::read_dir(&env.get_path()).unwrap().collect();
         let entry = entries.into_iter().find(|e| {
             e.as_ref().unwrap().file_name() == "test.md"
         }).unwrap().unwrap();
@@ -900,8 +899,6 @@ mod tests {
         assert_eq!(file_info.name, "test.md");
         assert!(!file_info.is_dir);
         assert!(file_info.size > 0);
-
-        cleanup_test_dir();
     }
 
     #[test]
@@ -1001,26 +998,24 @@ mod tests {
 
     #[test]
     fn test_scan_vault_files_empty_directory() {
-        setup_test_dir();
+        let env = TestEnv::new();
 
-        let result = scan_vault_files(get_test_dir());
+        let result = scan_vault_files(env.get_path());
         assert!(result.is_ok());
         let files = result.unwrap();
         assert_eq!(files.len(), 0);
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_scan_vault_files_with_markdown_files() {
-        setup_test_dir();
+        let env = TestEnv::new();
         
         // Create test files
-        fs::write(format!("{}/note1.md", get_test_dir()), "# Note 1").unwrap();
-        fs::write(format!("{}/note2.md", get_test_dir()), "# Note 2").unwrap();
-        fs::write(format!("{}/readme.txt", get_test_dir()), "Not a markdown file").unwrap(); // Should be ignored
+        env.create_test_file("note1.md", "# Note 1").unwrap();
+        env.create_test_file("note2.md", "# Note 2").unwrap();
+        env.create_test_file("readme.txt", "Not a markdown file").unwrap(); // Should be ignored
 
-        let result = scan_vault_files(get_test_dir());
+        let result = scan_vault_files(env.get_path());
         assert!(result.is_ok());
         
         let files = result.unwrap();
@@ -1031,21 +1026,19 @@ mod tests {
         
         // Check that files are sorted alphabetically
         assert!(md_files[0].name <= md_files[1].name);
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_scan_vault_files_nested_directories() {
-        setup_test_dir();
+        let env = TestEnv::new();
         
         // Create nested structure
-        fs::create_dir_all(format!("{}/subdir/deep", get_test_dir())).unwrap();
-        fs::write(format!("{}/root.md", get_test_dir()), "# Root note").unwrap();
-        fs::write(format!("{}/subdir/sub.md", get_test_dir()), "# Sub note").unwrap();
-        fs::write(format!("{}/subdir/deep/deep.md", get_test_dir()), "# Deep note").unwrap();
+        env.create_directory_structure(&["subdir/deep"]).unwrap();
+        env.create_test_file("root.md", "# Root note").unwrap();
+        env.create_test_file("subdir/sub.md", "# Sub note").unwrap();
+        env.create_test_file("subdir/deep/deep.md", "# Deep note").unwrap();
 
-        let result = scan_vault_files(get_test_dir());
+        let result = scan_vault_files(env.get_path());
         assert!(result.is_ok());
         
         let files = result.unwrap();
@@ -1060,8 +1053,6 @@ mod tests {
         // Verify directories come first due to sorting
         let first_items: Vec<_> = files.iter().take(dirs.len()).collect();
         assert!(first_items.iter().all(|f| f.is_dir));
-
-        cleanup_test_dir();
     }
 
     #[test]
@@ -1073,27 +1064,26 @@ mod tests {
 
     #[test]
     fn test_scan_vault_files_file_instead_of_directory() {
-        setup_test_dir();
-        fs::write(&get_test_file(), TEST_CONTENT).unwrap();
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
+        env.create_test_file("test.md", TEST_CONTENT).unwrap();
 
-        let result = scan_vault_files(get_test_file());
+        let result = scan_vault_files(test_file);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("is not a directory"));
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_scan_vault_files_performance_target() {
-        setup_test_dir();
+        let env = TestEnv::new();
         
         // Create many files to test performance
         for i in 0..100 {
-            fs::write(format!("{}/note_{:03}.md", get_test_dir(), i), format!("# Note {}", i)).unwrap();
+            env.create_test_file(&format!("note_{:03}.md", i), &format!("# Note {}", i)).unwrap();
         }
 
         let start = std::time::Instant::now();
-        let result = scan_vault_files(get_test_dir());
+        let result = scan_vault_files(env.get_path());
         let duration = start.elapsed();
 
         assert!(result.is_ok());
@@ -1102,22 +1092,20 @@ mod tests {
         
         // Performance target: <500ms for 1000+ files, so 100 files should be much faster
         assert!(duration.as_millis() < 100, "Scanning took too long: {:?}", duration);
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_scan_vault_files_mixed_file_types() {
-        setup_test_dir();
+        let env = TestEnv::new();
         
         // Create various file types
-        fs::write(format!("{}/note.md", get_test_dir()), "# Markdown note").unwrap();
-        fs::write(format!("{}/document.txt", get_test_dir()), "Text document").unwrap();
-        fs::write(format!("{}/script.js", get_test_dir()), "console.log('hello')").unwrap();
-        fs::write(format!("{}/data.json", get_test_dir()), "{}").unwrap();
-        fs::write(format!("{}/README", get_test_dir()), "No extension").unwrap();
+        env.create_test_file("note.md", "# Markdown note").unwrap();
+        env.create_test_file("document.txt", "Text document").unwrap();
+        env.create_test_file("script.js", "console.log('hello')").unwrap();
+        env.create_test_file("data.json", "{}").unwrap();
+        env.create_test_file("README", "No extension").unwrap();
 
-        let result = scan_vault_files(get_test_dir());
+        let result = scan_vault_files(env.get_path());
         assert!(result.is_ok());
         
         let files = result.unwrap();
@@ -1126,18 +1114,16 @@ mod tests {
         // Only the .md file should be included
         assert_eq!(file_files.len(), 1);
         assert_eq!(file_files[0].name, "note.md");
-
-        cleanup_test_dir();
     }
 
     #[test]
     fn test_scan_vault_files_cross_platform_paths() {
-        setup_test_dir();
+        let env = TestEnv::new();
         
         // Create a file and test that paths are handled properly
-        fs::write(&get_test_file(), TEST_CONTENT).unwrap();
+        env.create_test_file("test.md", TEST_CONTENT).unwrap();
 
-        let result = scan_vault_files(get_test_dir());
+        let result = scan_vault_files(env.get_path());
         assert!(result.is_ok());
         
         let files = result.unwrap();
@@ -1153,8 +1139,6 @@ mod tests {
         assert!(path.contains("\\"));
         #[cfg(unix)]
         assert!(path.contains("/"));
-
-        cleanup_test_dir();
     }
 
     // Error handling and integration tests
@@ -1187,7 +1171,7 @@ mod tests {
 
         #[test]
         fn test_validation_functions() {
-            setup_test_dir();
+            let env = TestEnv::new();
             
             // Test markdown extension validation
             let md_path = Path::new("test.md");
@@ -1199,11 +1183,11 @@ mod tests {
             assert!(validation::validate_markdown_extension(no_ext_path).is_err());
 
             // Test path existence validation
-            let test_file_path = get_test_file();
-            let test_dir_path = get_test_dir();
+            let test_file_path = env.get_test_file("test.md");
+            let test_dir_path = env.get_path();
             let non_existing_file = format!("{}/nonexistent.md", test_dir_path);
             
-            fs::write(&test_file_path, "test").unwrap();
+            env.create_test_file("test.md", "test").unwrap();
             let existing_path = Path::new(&test_file_path);
             let non_existing_path = Path::new(&non_existing_file);
             let test_dir = Path::new(&test_dir_path);
@@ -1222,8 +1206,6 @@ mod tests {
             // Test file not exists validation
             assert!(validation::validate_file_not_exists(non_existing_path).is_ok());
             assert!(validation::validate_file_not_exists(existing_path).is_err());
-
-            cleanup_test_dir();
         }
 
         #[test]
@@ -1239,8 +1221,8 @@ mod tests {
 
         #[test]
         fn test_complete_file_lifecycle() {
-            setup_test_dir();
-            let file_path = get_test_file();
+            let env = TestEnv::new();
+            let file_path = env.get_test_file("test.md");
             
             // 1. Create file
             let result = create_file(file_path.clone());
@@ -1261,7 +1243,7 @@ mod tests {
             assert_eq!(updated_content, new_content);
 
             // 5. Rename file
-            let new_path = get_test_file_2();
+            let new_path = env.get_test_file("test2.md");
             let result = rename_file(file_path.clone(), new_path.clone());
             assert!(result.is_ok(), "Failed to rename file: {:?}", result);
             assert!(!Path::new(&file_path).exists());
@@ -1271,13 +1253,11 @@ mod tests {
             let result = delete_file(new_path.clone());
             assert!(result.is_ok(), "Failed to delete file: {:?}", result);
             assert!(!Path::new(&new_path).exists());
-
-            cleanup_test_dir();
         }
 
         #[test]
         fn test_vault_scanning_comprehensive() {
-            setup_test_dir();
+            let env = TestEnv::new();
             
             // Create complex directory structure
             let dirs = vec![
@@ -1287,9 +1267,7 @@ mod tests {
                 "folder2/deep/nested"
             ];
             
-            for dir in &dirs {
-                fs::create_dir_all(format!("{}/{}", get_test_dir(), dir)).unwrap();
-            }
+            env.create_directory_structure(&dirs).unwrap();
 
             // Create various files
             let files = vec![
@@ -1303,11 +1281,11 @@ mod tests {
             ];
 
             for (path, content) in &files {
-                fs::write(format!("{}/{}", get_test_dir(), path), content).unwrap();
+                env.create_test_file(path, content).unwrap();
             }
 
             // Scan vault
-            let result = scan_vault_files(get_test_dir());
+            let result = scan_vault_files(env.get_path());
             assert!(result.is_ok(), "Failed to scan vault: {:?}", result);
             
             let scanned_files = result.unwrap();
@@ -1325,16 +1303,14 @@ mod tests {
                 assert!(md_files.iter().any(|f| f.name == *expected), 
                        "Missing file: {}", expected);
             }
-
-            cleanup_test_dir();
         }
 
         #[test]
         fn test_error_propagation_consistency() {
-            setup_test_dir();
+            let env = TestEnv::new();
             
-            let non_existent = format!("{}/nonexistent.md", get_test_dir());
-            let invalid_ext = format!("{}/test.txt", get_test_dir());
+            let non_existent = format!("{}/nonexistent.md", env.get_path());
+            let invalid_ext = env.get_test_file("test.txt");
             
             // Test that all commands handle missing files consistently
             assert!(read_file(non_existent.clone()).is_err());
@@ -1345,8 +1321,6 @@ mod tests {
             assert!(write_file(invalid_ext.clone(), "content".to_string()).is_err());
             assert!(create_file(invalid_ext.clone()).is_err());
             assert!(delete_file(invalid_ext.clone()).is_err());
-
-            cleanup_test_dir();
         }
     }
 
@@ -1355,22 +1329,22 @@ mod tests {
 
         #[test]
         fn test_large_vault_performance() {
-            setup_test_dir();
+            let env = TestEnv::new();
             
             // Create a larger test set (500 files in 10 directories)
             for dir_i in 0..10 {
-                let dir_path = format!("{}/dir_{:02}", get_test_dir(), dir_i);
-                fs::create_dir_all(&dir_path).unwrap();
+                let dir_name = format!("dir_{:02}", dir_i);
+                env.create_directory_structure(&[&dir_name]).unwrap();
                 
                 for file_i in 0..50 {
-                    let file_path = format!("{}/note_{:03}.md", dir_path, file_i);
-                    fs::write(&file_path, format!("# Note {} in Directory {}", file_i, dir_i)).unwrap();
+                    let file_path = format!("{}/note_{:03}.md", dir_name, file_i);
+                    env.create_test_file(&file_path, &format!("# Note {} in Directory {}", file_i, dir_i)).unwrap();
                 }
             }
 
             // Measure scanning performance
             let start = std::time::Instant::now();
-            let result = scan_vault_files(get_test_dir());
+            let result = scan_vault_files(env.get_path());
             let scan_duration = start.elapsed();
 
             assert!(result.is_ok());
@@ -1388,7 +1362,7 @@ mod tests {
                    "Scanning 500 files took too long: {:?}", scan_duration);
 
             // Test individual file operations performance
-            let test_file = format!("{}/dir_01/note_001.md", get_test_dir());
+            let test_file = env.get_test_file("dir_01/note_001.md");
             
             // Read performance
             let start = std::time::Instant::now();
@@ -1402,24 +1376,22 @@ mod tests {
             let write_duration = start.elapsed();
             assert!(result.is_ok());
             assert!(write_duration.as_millis() < 50, "File write took too long: {:?}", write_duration);
-
-            cleanup_test_dir();
         }
 
         #[test] 
         fn test_memory_efficiency() {
-            setup_test_dir();
+            let env = TestEnv::new();
             
             // Create files with larger content to test memory usage
             for i in 0..20 {
                 let large_content = "# Large File\n\n".to_string() + 
                     &"This is a line of content that repeats many times to create a larger file.\n".repeat(100);
-                let file_path = format!("{}/large_file_{:02}.md", get_test_dir(), i);
-                fs::write(&file_path, large_content).unwrap();
+                let file_name = format!("large_file_{:02}.md", i);
+                env.create_test_file(&file_name, &large_content).unwrap();
             }
 
             // Test that scanning doesn't load all file contents into memory
-            let result = scan_vault_files(get_test_dir());
+            let result = scan_vault_files(env.get_path());
             assert!(result.is_ok());
             
             let files = result.unwrap();
@@ -1432,8 +1404,6 @@ mod tests {
                 assert!(file.modified > 0); // Should have valid timestamp
                 // FileInfo should not contain actual file content
             }
-
-            cleanup_test_dir();
         }
     }
 
@@ -1453,10 +1423,10 @@ mod tests {
 
         #[test]
         fn test_unicode_file_handling() {
-            setup_test_dir();
+            let env = TestEnv::new();
             
             // Test with unicode filenames and content
-            let unicode_filename = format!("{}/测试文档_émojis_🎉.md", get_test_dir());
+            let unicode_filename = env.get_test_file("测试文档_émojis_🎉.md");
             let unicode_content = "# Unicode Test 测试\n\n**Bold text** with émojis 🎉🚀\n\n中文内容测试";
 
             // Create file with unicode name and content
@@ -1472,13 +1442,11 @@ mod tests {
             let file_info = FileInfo::from_path(path).unwrap();
             assert!(file_info.name.contains("测试文档"));
             assert!(file_info.name.contains("🎉"));
-
-            cleanup_test_dir();
         }
 
         #[test]
         fn test_special_characters_in_paths() {
-            setup_test_dir();
+            let env = TestEnv::new();
             
             // Test with various special characters that are valid in filenames
             let special_files = vec![
@@ -1491,7 +1459,7 @@ mod tests {
             ];
 
             for filename in &special_files {
-                let file_path = format!("{}/{}", get_test_dir(), filename);
+                let file_path = env.get_test_file(filename);
                 let content = format!("# {}\n\nContent for file with special characters.", filename);
                 
                 let result = write_file(file_path.clone(), content.clone());
@@ -1502,11 +1470,9 @@ mod tests {
             }
 
             // Test scanning finds all files
-            let scanned = scan_vault_files(get_test_dir()).unwrap();
+            let scanned = scan_vault_files(env.get_path()).unwrap();
             let md_files: Vec<_> = scanned.iter().filter(|f| !f.is_dir).collect();
             assert_eq!(md_files.len(), special_files.len());
-
-            cleanup_test_dir();
         }
     }
 }
