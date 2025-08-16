@@ -2,6 +2,8 @@ use std::fs;
 use std::path::Path;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use std::collections::HashSet;
+use std::sync::{Mutex, LazyLock};
 
 /// Custom error types for file system operations
 #[derive(Error, Debug)]
@@ -41,6 +43,12 @@ pub enum FileSystemError {
     
     #[error("UTF-8 encoding error in file: {path}")]
     EncodingError { path: String },
+    
+    #[error("File too large: {path} ({size} bytes, max {max_size} bytes)")]
+    FileTooLarge { path: String, size: u64, max_size: u64 },
+    
+    #[error("File is locked: {path} (another operation in progress)")]
+    FileLocked { path: String },
 }
 
 impl FileSystemError {
@@ -83,11 +91,18 @@ impl FileSystemError {
             FileSystemError::EncodingError { path } => {
                 format!("The file '{}' contains invalid text encoding.", path)
             }
+            FileSystemError::FileTooLarge { path, size, max_size } => {
+                format!("The file '{}' is too large ({} bytes). Maximum allowed size is {} bytes ({}MB).", 
+                    path, size, max_size, max_size / 1024 / 1024)
+            }
+            FileSystemError::FileLocked { path } => {
+                format!("The file '{}' is currently being modified by another operation. Please try again in a moment.", path)
+            }
         }
     }
 }
 
-/// Convert std::io::Error to FileSystemError
+/// Convert std::io::Error to FileSystemError with context
 impl From<std::io::Error> for FileSystemError {
     fn from(error: std::io::Error) -> Self {
         match error.kind() {
@@ -104,8 +119,72 @@ impl From<std::io::Error> for FileSystemError {
     }
 }
 
+/// Helper trait to add context to IO errors
+pub trait IOErrorContext<T> {
+    fn with_path_context(self, path: &str, operation: &str) -> FileSystemResult<T>;
+}
+
+impl<T> IOErrorContext<T> for Result<T, std::io::Error> {
+    fn with_path_context(self, path: &str, operation: &str) -> FileSystemResult<T> {
+        self.map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => FileSystemError::FileNotFound { 
+                path: path.to_string() 
+            },
+            std::io::ErrorKind::PermissionDenied => FileSystemError::PermissionDenied { 
+                path: path.to_string() 
+            },
+            std::io::ErrorKind::InvalidData => FileSystemError::EncodingError {
+                path: path.to_string()
+            },
+            _ => FileSystemError::IOError { 
+                message: format!("Failed to {} '{}': {}", operation, path, e) 
+            },
+        })
+    }
+}
+
 /// Result type alias for our file system operations
 pub type FileSystemResult<T> = Result<T, FileSystemError>;
+
+/// Global file lock registry to prevent concurrent access
+static FILE_LOCKS: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+
+/// File lock guard that automatically releases the lock when dropped
+pub struct FileLockGuard {
+    path: String,
+}
+
+impl FileLockGuard {
+    /// Acquire a lock on a file path
+    pub fn acquire(path: &str) -> FileSystemResult<Self> {
+        let normalized_path = Path::new(path)
+            .canonicalize()
+            .unwrap_or_else(|_| Path::new(path).to_path_buf())
+            .to_string_lossy()
+            .to_string();
+            
+        let mut locks = FILE_LOCKS.lock().unwrap();
+        
+        if locks.contains(&normalized_path) {
+            return Err(FileSystemError::FileLocked {
+                path: path.to_string(),
+            });
+        }
+        
+        locks.insert(normalized_path.clone());
+        
+        Ok(FileLockGuard {
+            path: normalized_path,
+        })
+    }
+}
+
+impl Drop for FileLockGuard {
+    fn drop(&mut self) {
+        let mut locks = FILE_LOCKS.lock().unwrap();
+        locks.remove(&self.path);
+    }
+}
 
 /// Convert FileSystemError to String for Tauri commands
 impl From<FileSystemError> for String {
@@ -185,6 +264,98 @@ pub mod validation {
                     })?;
             }
         }
+        Ok(())
+    }
+    
+    /// Maximum file size in bytes (10MB for markdown files)
+    pub const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10MB
+    
+    /// Validate file size for content operations
+    pub fn validate_file_size(content: &str, file_path: &str) -> FileSystemResult<()> {
+        let size = content.len() as u64;
+        if size > MAX_FILE_SIZE {
+            return Err(FileSystemError::FileTooLarge {
+                path: file_path.to_string(),
+                size,
+                max_size: MAX_FILE_SIZE,
+            });
+        }
+        Ok(())
+    }
+    
+    /// Validate existing file size
+    pub fn validate_existing_file_size(path: &Path) -> FileSystemResult<()> {
+        if let Ok(metadata) = path.metadata() {
+            let size = metadata.len();
+            if size > MAX_FILE_SIZE {
+                return Err(FileSystemError::FileTooLarge {
+                    path: path.to_string_lossy().to_string(),
+                    size,
+                    max_size: MAX_FILE_SIZE,
+                });
+            }
+        }
+        Ok(())
+    }
+    
+    /// Create a backup of an existing file before modifying it
+    pub fn create_backup(file_path: &Path) -> FileSystemResult<Option<String>> {
+        if !file_path.exists() {
+            return Ok(None);
+        }
+        
+        // Create backup filename with timestamp
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+            
+        let backup_path = file_path.with_extension(format!("md.backup.{}", timestamp));
+        
+        // Copy the original file to backup location
+        fs::copy(file_path, &backup_path)
+            .map_err(|e| FileSystemError::IOError {
+                message: format!("Failed to create backup: {}", e)
+            })?;
+            
+        Ok(Some(backup_path.to_string_lossy().to_string()))
+    }
+    
+    /// Clean up old backup files (keep only the 5 most recent)
+    pub fn cleanup_old_backups(file_path: &Path) -> FileSystemResult<()> {
+        let parent = match file_path.parent() {
+            Some(p) => p,
+            None => return Ok(()),
+        };
+        
+        let file_stem = match file_path.file_stem() {
+            Some(s) => s.to_string_lossy(),
+            None => return Ok(()),
+        };
+        
+        // Find all backup files for this file
+        let entries = fs::read_dir(parent).map_err(|e| FileSystemError::IOError {
+            message: format!("Failed to read directory for cleanup: {}", e)
+        })?;
+        
+        let mut backups = Vec::new();
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&format!("{}.md.backup.", file_stem)) {
+                if let Ok(metadata) = entry.metadata() {
+                    backups.push((entry.path(), metadata.modified().unwrap_or(std::time::UNIX_EPOCH)));
+                }
+            }
+        }
+        
+        // Sort by modification time (newest first)
+        backups.sort_by(|a, b| b.1.cmp(&a.1));
+        
+        // Remove old backups (keep only 5 most recent)
+        for (path, _) in backups.iter().skip(5) {
+            let _ = fs::remove_file(path); // Ignore errors during cleanup
+        }
+        
         Ok(())
     }
 }
@@ -293,6 +464,14 @@ impl FileInfo {
     pub fn normalize_path(path: &str) -> String {
         path.replace('\\', "/")
     }
+    
+    /// Normalize Unicode string for cross-platform compatibility
+    pub fn normalize_unicode(text: &str) -> String {
+        // Basic Unicode normalization - keep all characters as-is for now
+        // This helps with filename compatibility across different filesystems
+        // In the future, we could add more sophisticated normalization
+        text.to_string()
+    }
 
     /// Get file extension if present
     pub fn get_extension(&self) -> Option<String> {
@@ -323,20 +502,82 @@ fn read_file_internal(file_path: &str) -> FileSystemResult<String> {
     validation::validate_path_exists(path)?;
     validation::validate_is_file(path)?;
     validation::validate_markdown_extension(path)?;
+    validation::validate_existing_file_size(path)?;
 
     // Read file content with UTF-8 encoding
     fs::read_to_string(path)
-        .map_err(|e| match e.kind() {
-            std::io::ErrorKind::InvalidData => FileSystemError::EncodingError { 
-                path: file_path.to_string() 
-            },
-            std::io::ErrorKind::PermissionDenied => FileSystemError::PermissionDenied { 
-                path: file_path.to_string() 
-            },
-            _ => FileSystemError::IOError { 
-                message: format!("Failed to read file {}: {}", file_path, e) 
-            },
-        })
+        .with_path_context(file_path, "read")
+}
+
+#[tauri::command]
+fn preview_file(file_path: String, max_length: Option<usize>) -> Result<String, String> {
+    preview_file_internal(&file_path, max_length.unwrap_or(1000)).map_err(|e| e.into())
+}
+
+/// Internal preview file function for large files
+fn preview_file_internal(file_path: &str, max_length: usize) -> FileSystemResult<String> {
+    let path = Path::new(file_path);
+
+    // Validate path exists and is a file
+    validation::validate_path_exists(path)?;
+    validation::validate_is_file(path)?;
+    validation::validate_markdown_extension(path)?;
+
+    // Read file content with UTF-8 encoding
+    let full_content = fs::read_to_string(path)
+        .with_path_context(file_path, "preview")?;
+
+    // Return preview (truncated if necessary)
+    if full_content.len() <= max_length {
+        Ok(full_content)
+    } else {
+        // Find a good break point (end of line or word)
+        let truncated = &full_content[..max_length];
+        if let Some(last_newline) = truncated.rfind('\n') {
+            Ok(format!("{}...\n\n[File preview truncated - full file is {} characters]", 
+                &truncated[..last_newline], full_content.len()))
+        } else if let Some(last_space) = truncated.rfind(' ') {
+            Ok(format!("{}...\n\n[File preview truncated - full file is {} characters]", 
+                &truncated[..last_space], full_content.len()))
+        } else {
+            Ok(format!("{}...\n\n[File preview truncated - full file is {} characters]", 
+                truncated, full_content.len()))
+        }
+    }
+}
+
+#[tauri::command]
+fn auto_save_file(file_path: String, content: String) -> Result<(), String> {
+    auto_save_file_internal(&file_path, &content).map_err(|e| e.into())
+}
+
+/// Internal auto-save file function (optimized for frequent saves)
+fn auto_save_file_internal(file_path: &str, content: &str) -> FileSystemResult<()> {
+    let path = Path::new(file_path);
+
+    // For auto-save, we don't need file locking as aggressively since it's the same user
+    // But we still validate and ensure basic safety
+    
+    // Validate path and extension
+    validation::validate_markdown_extension(path)?;
+    validation::validate_file_size(content, file_path)?;
+
+    // Create parent directory if it doesn't exist
+    validation::ensure_parent_directory(path)?;
+
+    // Only create backup every 10th auto-save to avoid too many backup files
+    let should_backup = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() % 10 == 0;
+    
+    if should_backup {
+        let _backup_path = validation::create_backup(path)?;
+    }
+
+    // Write file content with UTF-8 encoding
+    fs::write(path, content)
+        .with_path_context(file_path, "auto-save")
 }
 
 #[tauri::command]
@@ -348,22 +589,29 @@ fn write_file(file_path: String, content: String) -> Result<(), String> {
 fn write_file_internal(file_path: &str, content: &str) -> FileSystemResult<()> {
     let path = Path::new(file_path);
 
+    // Acquire file lock to prevent concurrent access
+    let _lock = FileLockGuard::acquire(file_path)?;
+
     // Validate path and extension
     validation::validate_markdown_extension(path)?;
+    validation::validate_file_size(content, file_path)?;
 
     // Create parent directory if it doesn't exist
     validation::ensure_parent_directory(path)?;
 
+    // Create backup if file exists
+    let _backup_path = validation::create_backup(path)?;
+
     // Write file content with UTF-8 encoding
-    fs::write(path, content)
-        .map_err(|e| match e.kind() {
-            std::io::ErrorKind::PermissionDenied => FileSystemError::PermissionDenied { 
-                path: file_path.to_string() 
-            },
-            _ => FileSystemError::IOError { 
-                message: format!("Failed to write file {}: {}", file_path, e) 
-            },
-        })
+    let write_result = fs::write(path, content)
+        .with_path_context(file_path, "write");
+
+    // If write was successful, clean up old backups
+    if write_result.is_ok() {
+        let _ = validation::cleanup_old_backups(path); // Don't fail on cleanup errors
+    }
+
+    write_result
 }
 
 #[tauri::command]
@@ -374,6 +622,9 @@ fn create_file(file_path: String) -> Result<(), String> {
 /// Internal create file function using structured error handling
 fn create_file_internal(file_path: &str) -> FileSystemResult<()> {
     let path = Path::new(file_path);
+
+    // Acquire file lock to prevent concurrent access
+    let _lock = FileLockGuard::acquire(file_path)?;
 
     // Validate path and extension
     validation::validate_markdown_extension(path)?;
@@ -414,6 +665,9 @@ fn delete_file(file_path: String) -> Result<(), String> {
 fn delete_file_internal(file_path: &str) -> FileSystemResult<()> {
     let path = Path::new(file_path);
 
+    // Acquire file lock to prevent concurrent access
+    let _lock = FileLockGuard::acquire(file_path)?;
+
     // Validate path exists and is a file
     validation::validate_path_exists(path)?;
     validation::validate_is_file(path)?;
@@ -440,6 +694,10 @@ fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
 fn rename_file_internal(old_path: &str, new_path: &str) -> FileSystemResult<()> {
     let old = Path::new(old_path);
     let new = Path::new(new_path);
+
+    // Acquire locks for both source and destination files
+    let _old_lock = FileLockGuard::acquire(old_path)?;
+    let _new_lock = FileLockGuard::acquire(new_path)?;
 
     // Validate old path exists and is a file
     validation::validate_path_exists(old)?;
@@ -581,11 +839,13 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_file,
             write_file,
+            auto_save_file,
             create_file,
             delete_file,
             rename_file,
             select_vault_folder,
-            scan_vault_files
+            scan_vault_files,
+            preview_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
