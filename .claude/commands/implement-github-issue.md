@@ -274,7 +274,60 @@ Shared Files:
 
 ---
 
-## 2. Project Context Validation
+## 2. Branch Management & Setup (CRITICAL FIRST STEP)
+
+**⚠️ MANDATORY: Create a new branch BEFORE any implementation work begins**
+
+### Branch Creation Process
+
+1. **Check current git status:**
+   ```bash
+   git status
+   git branch -v
+   ```
+
+2. **Ensure clean working directory:**
+   ```bash
+   # Stash any uncommitted changes
+   git stash push -m "Pre-issue-$ARGUMENTS work in progress"
+   ```
+
+3. **Switch to main branch and pull latest:**
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
+
+4. **Create and checkout new branch:**
+   ```bash
+   # Branch naming convention: issue-{number}-{short-kebab-case-description}
+   git checkout -b issue-$ARGUMENTS-$(gh issue view $ARGUMENTS --json title | jq -r '.title' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g' | cut -c1-50)
+   ```
+
+5. **Verify branch creation:**
+   ```bash
+   git branch -v
+   echo "✅ New branch created: $(git branch --show-current)"
+   ```
+
+### Branch Naming Examples
+- Issue #123 "Implement file tree component" → `issue-123-implement-file-tree-component`
+- Issue #45 "Fix editor preview toggle bug" → `issue-45-fix-editor-preview-toggle-bug`
+- Sub-issue #67 "[Sub-issue 2/4] Frontend: Add syntax highlighting" → `issue-67-frontend-add-syntax-highlighting`
+
+### Error Handling for Branch Creation
+- **If branch already exists:** Use `issue-$ARGUMENTS-v2`, `issue-$ARGUMENTS-v3`, etc.
+- **If uncommitted changes:** Force stash and proceed, notify about stashed changes
+- **If main branch outdated:** Pull latest changes before creating branch
+- **If network issues:** Continue with local branch, warn about potential conflicts
+
+### Critical Rules
+- **NEVER implement on main branch**
+- **NEVER implement without creating a branch first**
+- **ALWAYS base new branch on latest main**
+- **ALWAYS verify clean working state before branching**
+
+## 3. Project Context Validation
 
 - Read README.md, CONTRIBUTING.md, and CLAUDE.md for project constraints
 - Validate implementation approach against local-first principles
@@ -282,7 +335,7 @@ Shared Files:
 - Check compatibility with vanilla JS/Rust-only technology stack
 - Consider impact on future AI integration (Ollama)
 
-## 3. Comprehensive Codebase Analysis
+## 4. Comprehensive Codebase Analysis
 
 - Search for existing implementations related to the issue
 - Identify affected files, functions, and components
@@ -291,7 +344,7 @@ Shared Files:
 - Review similar patterns in the codebase for consistency
 - Document current state vs. required changes
 
-## 4. Implementation Planning
+## 5. Implementation Planning
 
 - Create detailed implementation strategy
 - Identify required changes in both Rust backend and JavaScript frontend
@@ -299,13 +352,6 @@ Shared Files:
 - Consider edge cases and error handling scenarios
 - Estimate complexity and potential risks
 - Plan for backward compatibility
-
-## 5. Branch Management & Setup
-
-- Create descriptive branch name following convention: `issue-{number}-{short-description}`
-- Use `gh repo clone` if needed to ensure latest repository state
-- Checkout new branch from main: `git checkout -b issue-{number}-{description}`
-- Verify clean working directory and up-to-date base
 
 ## 6. Implementation & Development
 
@@ -347,6 +393,14 @@ Shared Files:
 
 ## 10. Commit & PR Creation
 
+**⚠️ VERIFY: Ensure you're on the correct feature branch before committing**
+
+```bash
+# Verify current branch
+echo "Current branch: $(git branch --show-current)"
+# Should show: issue-{number}-{description}, NOT main
+```
+
 - Stage changes: `git add .`
 - Create descriptive commit message following format:
 
@@ -358,7 +412,7 @@ Shared Files:
   Fixes #{issue-number}
   ```
 
-- Push branch: `git push -u origin branch-name`
+- Push branch: `git push -u origin $(git branch --show-current)`
 - Create PR using `gh pr create` with comprehensive description:
   - Link to original issue
   - Summary of changes made
@@ -371,6 +425,7 @@ Shared Files:
 - Check that all CI/CD checks pass (if configured)
 - Ensure PR description includes testing checklist
 - Confirm issue will be automatically closed on merge
+- **Verify PR is NOT targeting main with uncommitted changes from main branch**
 
 ### Additional Steps for Sub-Issue Completion
 
@@ -415,10 +470,12 @@ When completing a sub-issue, also perform:
 
 **Abort implementation if:**
 
+- **Branch creation fails or user is working on main branch**
 - Issue requires external dependencies not approved in CONTRIBUTING.md
 - Changes would exceed memory constraints (100MB target)
 - Implementation conflicts with local-first principles
 - Required changes would break existing functionality without migration path
+- **Cannot switch to a clean branch due to unresolvable conflicts**
 
 **For Sub-Issue Management:**
 
