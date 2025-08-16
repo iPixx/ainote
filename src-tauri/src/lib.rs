@@ -2,12 +2,18 @@ use std::fs;
 use std::path::Path;
 use serde::{Deserialize, Serialize};
 
+/// FileInfo struct representing file metadata for frontend communication
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileInfo {
+    /// Full file path as string
     pub path: String,
+    /// File name only (without directory path)
     pub name: String,
+    /// Last modified timestamp (Unix time in seconds)
     pub modified: u64,
+    /// File size in bytes
     pub size: u64,
+    /// Whether the item is a directory
     pub is_dir: bool,
 }
 
@@ -85,6 +91,26 @@ impl FileInfo {
 
     pub fn compare_by_size(&self, other: &Self) -> std::cmp::Ordering {
         self.size.cmp(&other.size)
+    }
+
+    /// Normalize path separators for cross-platform compatibility
+    pub fn normalize_path(path: &str) -> String {
+        path.replace('\\', "/")
+    }
+
+    /// Get file extension if present (returns lowercase)
+    pub fn get_extension(&self) -> Option<String> {
+        Path::new(&self.path)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.to_lowercase())
+    }
+
+    /// Check if this is a markdown file
+    pub fn is_markdown(&self) -> bool {
+        self.get_extension()
+            .map(|ext| ext == "md")
+            .unwrap_or(false)
     }
 }
 
@@ -756,6 +782,78 @@ mod tests {
         assert_eq!(file1.compare_by_name(&file2), std::cmp::Ordering::Less);
         assert_eq!(file1.compare_by_modified(&file2), std::cmp::Ordering::Less);
         assert_eq!(file1.compare_by_size(&file2), std::cmp::Ordering::Less);
+    }
+
+    #[test]
+    fn test_fileinfo_path_utilities() {
+        // Test path normalization
+        assert_eq!(FileInfo::normalize_path("C:\\path\\to\\file"), "C:/path/to/file");
+        assert_eq!(FileInfo::normalize_path("/unix/path/file"), "/unix/path/file");
+        assert_eq!(FileInfo::normalize_path("mixed\\path/file"), "mixed/path/file");
+    }
+
+    #[test]
+    fn test_fileinfo_extension_methods() {
+        let md_file = FileInfo {
+            path: "/path/to/file.md".to_string(),
+            name: "file.md".to_string(),
+            modified: 100,
+            size: 50,
+            is_dir: false,
+        };
+
+        let txt_file = FileInfo {
+            path: "/path/to/file.TXT".to_string(),
+            name: "file.TXT".to_string(),
+            modified: 100,
+            size: 50,
+            is_dir: false,
+        };
+
+        let no_ext_file = FileInfo {
+            path: "/path/to/README".to_string(),
+            name: "README".to_string(),
+            modified: 100,
+            size: 50,
+            is_dir: false,
+        };
+
+        // Test extension extraction (should be lowercase)
+        assert_eq!(md_file.get_extension(), Some("md".to_string()));
+        assert_eq!(txt_file.get_extension(), Some("txt".to_string()));
+        assert_eq!(no_ext_file.get_extension(), None);
+
+        // Test markdown detection
+        assert!(md_file.is_markdown());
+        assert!(!txt_file.is_markdown());
+        assert!(!no_ext_file.is_markdown());
+    }
+
+    #[test]
+    fn test_fileinfo_serialization() {
+        let file_info = FileInfo {
+            path: "/path/to/file.md".to_string(),
+            name: "file.md".to_string(),
+            modified: 1640995200,
+            size: 1024,
+            is_dir: false,
+        };
+
+        // Test serialization to JSON
+        let json = serde_json::to_string(&file_info).unwrap();
+        assert!(json.contains("\"path\":\"/path/to/file.md\""));
+        assert!(json.contains("\"name\":\"file.md\""));
+        assert!(json.contains("\"modified\":1640995200"));
+        assert!(json.contains("\"size\":1024"));
+        assert!(json.contains("\"is_dir\":false"));
+
+        // Test deserialization from JSON
+        let deserialized: FileInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.path, file_info.path);
+        assert_eq!(deserialized.name, file_info.name);
+        assert_eq!(deserialized.modified, file_info.modified);
+        assert_eq!(deserialized.size, file_info.size);
+        assert_eq!(deserialized.is_dir, file_info.is_dir);
     }
 
     #[test]
