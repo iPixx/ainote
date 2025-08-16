@@ -30,12 +30,14 @@ dependencies = [
 name = "ainote"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "rfd",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

@@ -25,3 +25,6 @@ dist-ssr
 
 # Vault
 vault/
+
+# Test files generated during testing
+test_files_*/
