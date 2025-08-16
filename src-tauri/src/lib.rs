@@ -18,26 +18,17 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
+    /// Create FileInfo from std::fs::DirEntry
     pub fn from_dir_entry(entry: &std::fs::DirEntry) -> Result<Self, String> {
         let path = entry.path();
-        let path_str = path.to_string_lossy().to_string();
+        let path_str = Self::path_to_string(&path);
         
-        let name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("Unknown")
-            .to_string();
-
+        let name = Self::extract_name(&path);
+        
         let metadata = entry.metadata()
             .map_err(|e| format!("Failed to read metadata for {}: {}", path_str, e))?;
 
-        let modified = metadata
-            .modified()
-            .map_err(|e| format!("Failed to read modified time for {}: {}", path_str, e))?
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| format!("Invalid modified time for {}: {}", path_str, e))?
-            .as_secs();
-
+        let modified = Self::extract_modified_time(&metadata, &path_str)?;
         let size = metadata.len();
         let is_dir = metadata.is_dir();
 
@@ -50,25 +41,15 @@ impl FileInfo {
         })
     }
 
+    /// Create FileInfo from Path
     pub fn from_path(path: &Path) -> Result<Self, String> {
-        let path_str = path.to_string_lossy().to_string();
+        let path_str = Self::path_to_string(path);
+        let name = Self::extract_name(path);
         
-        let name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("Unknown")
-            .to_string();
-
         let metadata = path.metadata()
             .map_err(|e| format!("Failed to read metadata for {}: {}", path_str, e))?;
 
-        let modified = metadata
-            .modified()
-            .map_err(|e| format!("Failed to read modified time for {}: {}", path_str, e))?
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| format!("Invalid modified time for {}: {}", path_str, e))?
-            .as_secs();
-
+        let modified = Self::extract_modified_time(&metadata, &path_str)?;
         let size = metadata.len();
         let is_dir = metadata.is_dir();
 
@@ -81,14 +62,40 @@ impl FileInfo {
         })
     }
 
+    /// Cross-platform path to string conversion
+    fn path_to_string(path: &Path) -> String {
+        path.to_string_lossy().to_string()
+    }
+
+    /// Extract file/directory name from path
+    fn extract_name(path: &Path) -> String {
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("Unknown")
+            .to_string()
+    }
+
+    /// Extract modified time with proper error handling
+    fn extract_modified_time(metadata: &fs::Metadata, path_str: &str) -> Result<u64, String> {
+        metadata
+            .modified()
+            .map_err(|e| format!("Failed to read modified time for {}: {}", path_str, e))?
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| format!("Invalid modified time for {}: {}", path_str, e))
+            .map(|duration| duration.as_secs())
+    }
+
+    /// Compare by name (case-insensitive alphabetical)
     pub fn compare_by_name(&self, other: &Self) -> std::cmp::Ordering {
         self.name.to_lowercase().cmp(&other.name.to_lowercase())
     }
 
+    /// Compare by modification time (newer first when used with sort)
     pub fn compare_by_modified(&self, other: &Self) -> std::cmp::Ordering {
         self.modified.cmp(&other.modified)
     }
 
+    /// Compare by file size (larger first when used with sort)
     pub fn compare_by_size(&self, other: &Self) -> std::cmp::Ordering {
         self.size.cmp(&other.size)
     }
@@ -98,7 +105,7 @@ impl FileInfo {
         path.replace('\\', "/")
     }
 
-    /// Get file extension if present (returns lowercase)
+    /// Get file extension if present
     pub fn get_extension(&self) -> Option<String> {
         Path::new(&self.path)
             .extension()
