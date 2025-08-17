@@ -9,59 +9,117 @@
   </head>
 
   <body>
-    <main class="container">
-      <h1>aiNote Backend Command Validation</h1>
-      <p>This interface validates that all backend file system commands work correctly.</p>
-
-      <div class="backend-validation">
-        <section class="vault-tests">
-          <h2>Vault Operations</h2>
-          <div class="button-group">
-            <button onclick="testSelectVault()">Select Vault Folder</button>
-            <button onclick="testScanVault()">Scan Vault Files</button>
+    <!-- Three-column layout system -->
+    <div class="app-container">
+      <!-- File Tree Panel -->
+      <aside class="file-tree-panel" id="fileTreePanel">
+        <header class="panel-header">
+          <h2>File Tree</h2>
+          <div class="panel-controls">
+            <button id="selectVaultBtn" class="control-btn" onclick="selectVault()" aria-label="Select vault folder">
+              📁
+            </button>
+            <button id="refreshBtn" class="control-btn" onclick="refreshVault()" aria-label="Refresh vault">
+              🔄
+            </button>
+            <button id="collapseTreeBtn" class="control-btn" onclick="toggleFileTree()" aria-label="Collapse file tree">
+              ⬅
+            </button>
           </div>
-          <div id="vault-results" class="results"></div>
-        </section>
+        </header>
+        <div class="vault-info" id="vaultInfo">
+          <span class="vault-path">No vault selected</span>
+        </div>
+        <div class="file-tree-content" id="fileTreeContent">
+          <div class="empty-state">
+            <p>Select a vault folder to browse files</p>
+            <button onclick="selectVault()" class="btn-primary">Select Vault</button>
+          </div>
+        </div>
+        <!-- Resize handle -->
+        <div class="resize-handle resize-handle-right" data-direction="horizontal" data-panel="file-tree"></div>
+      </aside>
 
-        <section class="file-tests">
-          <h2>File Operations</h2>
-          <div class="input-group">
-            <input id="file-path" placeholder="test.md" value="test.md">
-            <div class="button-group">
-              <button onclick="testCreateFile()">Create File</button>
-              <button onclick="testReadFile()">Read File</button>
-              <button onclick="testWriteFile()">Write File</button>
-              <button onclick="testDeleteFile()">Delete File</button>
+      <!-- Editor/Preview Panel -->
+      <main class="editor-panel" id="editorPanel">
+        <header class="panel-header">
+          <div class="editor-title">
+            <h2 id="currentFileName">Welcome to aiNote</h2>
+            <span class="file-status" id="fileStatus"></span>
+          </div>
+          <div class="panel-controls">
+            <button id="newFileBtn" class="control-btn" onclick="createNewFile()" aria-label="New file">
+              📄
+            </button>
+            <button id="saveFileBtn" class="control-btn" onclick="saveFile()" aria-label="Save file" disabled>
+              💾
+            </button>
+            <button id="toggleModeBtn" class="control-btn" onclick="toggleViewMode()" aria-label="Toggle editor/preview">
+              👁
+            </button>
+          </div>
+        </header>
+        <div class="editor-content" id="editorContent">
+          <div class="welcome-content">
+            <h1>Welcome to aiNote</h1>
+            <p>A local-first, AI-powered markdown note-taking application.</p>
+            <div class="quick-actions">
+              <button onclick="selectVault()" class="btn-primary">Get Started - Select Vault</button>
             </div>
           </div>
-          <div class="input-group">
-            <input id="old-path" placeholder="old-name.md" value="test.md">
-            <input id="new-path" placeholder="new-name.md" value="renamed-test.md">
-            <button onclick="testRenameFile()">Rename File</button>
+        </div>
+        <!-- Resize handle -->
+        <div class="resize-handle resize-handle-right" data-direction="horizontal" data-panel="editor"></div>
+      </main>
+
+      <!-- AI Panel (Hidden in Phase 1) -->
+      <aside class="ai-panel" id="aiPanel" style="display: none;">
+        <header class="panel-header">
+          <h2>AI Assistant</h2>
+          <div class="panel-controls">
+            <button id="closeAiBtn" class="control-btn" onclick="toggleAiPanel()" aria-label="Close AI panel">
+              ✕
+            </button>
           </div>
-          <textarea id="file-content" placeholder="File content for write operations..."># Test Content
-
-This is test content for validation.</textarea>
-          <div id="file-results" class="results"></div>
-        </section>
-
-        <section class="state-tests">
-          <h2>State Management</h2>
-          <div class="button-group">
-            <button onclick="testToggleViewMode()">Toggle View Mode</button>
-            <button onclick="testMarkDirty()">Mark Dirty</button>
-            <button onclick="testMarkClean()">Mark Clean</button>
-            <button onclick="testShowState()">Show State</button>
+        </header>
+        <div class="ai-content" id="aiContent">
+          <div class="ai-placeholder">
+            <p>AI features coming in Phase 2</p>
           </div>
-          <div id="state-results" class="results"></div>
-        </section>
+        </div>
+      </aside>
+    </div>
 
-        <section class="test-all">
-          <h2>Complete Validation</h2>
-          <button onclick="runAllTests()" class="test-all-btn">Run All Backend Tests</button>
-          <div id="all-results" class="results"></div>
-        </section>
+    <!-- Mobile Navigation Overlay -->
+    <div class="mobile-nav-overlay" id="mobileNavOverlay" style="display: none;">
+      <div class="mobile-nav-header">
+        <h3>Navigation</h3>
+        <button class="close-nav" onclick="closeMobileNav()" aria-label="Close navigation">✕</button>
       </div>
-    </main>
+      <div class="mobile-nav-content" id="mobileNavContent">
+        <!-- File tree content will be cloned here on mobile -->
+      </div>
+    </div>
+
+    <!-- Mobile Navigation Toggle -->
+    <button class="mobile-nav-toggle" id="mobileNavToggle" onclick="openMobileNav()" aria-label="Open navigation" style="display: none;">
+      ☰
+    </button>
+
+    <!-- Keyboard Shortcuts Help (Hidden by default) -->
+    <div class="shortcuts-help" id="shortcutsHelp" style="display: none;">
+      <div class="shortcuts-content">
+        <h3>Keyboard Shortcuts</h3>
+        <div class="shortcuts-list">
+          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>N</kbd> - New file</div>
+          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>S</kbd> - Save file</div>
+          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>O</kbd> - Open vault</div>
+          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>E</kbd> - Toggle editor/preview</div>
+          <div class="shortcut"><kbd>F1</kbd> - Toggle file tree</div>
+          <div class="shortcut"><kbd>?</kbd> - Show/hide shortcuts</div>
+        </div>
+        <button onclick="toggleShortcutsHelp()" class="btn-primary">Close</button>
+      </div>
+    </div>
   </body>
 </html>
