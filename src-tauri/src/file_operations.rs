@@ -4,6 +4,7 @@ use crate::errors::{FileSystemError, FileSystemResult, IOErrorContext};
 use crate::validation;
 use crate::file_locks::FileLockGuard;
 use crate::performance::time_operation;
+use crate::types::FileInfo;
 
 /// Internal read file function using structured error handling
 pub fn read_file_internal(file_path: &str) -> FileSystemResult<String> {
@@ -208,6 +209,47 @@ pub fn rename_file_internal(old_path: &str, new_path: &str) -> FileSystemResult<
                 message: format!("Failed to rename file from {} to {}: {}", old_path, new_path, e) 
             },
         })
+}
+
+/// Internal get file info function for retrieving metadata of a specific file
+pub fn get_file_info_internal(file_path: &str) -> FileSystemResult<FileInfo> {
+    time_operation!({
+        let path = Path::new(file_path);
+
+        // Validate path exists
+        validation::validate_path_exists(path)?;
+
+        // Create FileInfo from path
+        FileInfo::from_path(path)
+    }, &format!("get_file_info({})", file_path))
+}
+
+/// Internal create folder function using structured error handling
+pub fn create_folder_internal(folder_path: &str) -> FileSystemResult<()> {
+    time_operation!({
+        let path = Path::new(folder_path);
+
+        // Check if folder already exists
+        if path.exists() {
+            return Err(FileSystemError::FileAlreadyExists { 
+                path: folder_path.to_string() 
+            });
+        }
+
+        // Create parent directories if they don't exist
+        validation::ensure_parent_directory(path)?;
+
+        // Create the directory
+        fs::create_dir_all(path)
+            .map_err(|e| match e.kind() {
+                std::io::ErrorKind::PermissionDenied => FileSystemError::PermissionDenied { 
+                    path: folder_path.to_string() 
+                },
+                _ => FileSystemError::IOError { 
+                    message: format!("Failed to create folder {}: {}", folder_path, e) 
+                },
+            })
+    }, &format!("create_folder({})", folder_path))
 }
 
 #[cfg(test)]
@@ -503,5 +545,83 @@ mod tests {
 
         let content = fs::read_to_string(&test_file).unwrap();
         assert_eq!(content, TEST_CONTENT);
+    }
+
+    #[test]
+    fn test_get_file_info_success() {
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
+        env.create_test_file("test.md", TEST_CONTENT).unwrap();
+
+        let result = get_file_info_internal(&test_file);
+        assert!(result.is_ok());
+        
+        let file_info = result.unwrap();
+        assert_eq!(file_info.name, "test.md");
+        assert_eq!(file_info.path, test_file);
+        assert!(!file_info.is_dir);
+        assert!(file_info.size > 0);
+        assert!(file_info.modified > 0);
+        assert!(file_info.is_markdown());
+    }
+
+    #[test]
+    fn test_get_file_info_directory() {
+        let env = TestEnv::new();
+        env.create_directory_structure(&["test_dir"]).unwrap();
+        let dir_path = env.get_test_file("test_dir");
+
+        let result = get_file_info_internal(&dir_path);
+        assert!(result.is_ok());
+        
+        let file_info = result.unwrap();
+        assert_eq!(file_info.name, "test_dir");
+        assert!(file_info.is_dir);
+        assert!(!file_info.is_markdown());
+    }
+
+    #[test]
+    fn test_get_file_info_not_found() {
+        let env = TestEnv::new();
+        let nonexistent_file = env.get_test_file("nonexistent.md");
+
+        let result = get_file_info_internal(&nonexistent_file);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_create_folder_success() {
+        let env = TestEnv::new();
+        let folder_path = env.get_test_file("new_folder");
+
+        let result = create_folder_internal(&folder_path);
+        assert!(result.is_ok());
+        assert!(Path::new(&folder_path).exists());
+        assert!(Path::new(&folder_path).is_dir());
+    }
+
+    #[test]
+    fn test_create_folder_nested() {
+        let env = TestEnv::new();
+        let nested_folder = env.get_test_file("level1/level2/level3");
+
+        let result = create_folder_internal(&nested_folder);
+        assert!(result.is_ok());
+        assert!(Path::new(&nested_folder).exists());
+        assert!(Path::new(&nested_folder).is_dir());
+    }
+
+    #[test]
+    fn test_create_folder_already_exists() {
+        let env = TestEnv::new();
+        let folder_path = env.get_test_file("existing_folder");
+        
+        // Create the folder first
+        fs::create_dir(&folder_path).unwrap();
+
+        let result = create_folder_internal(&folder_path);
+        assert!(result.is_err());
+        let error_msg = format!("{:?}", result.unwrap_err());
+        assert!(error_msg.contains("FileAlreadyExists"));
     }
 }
