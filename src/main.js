@@ -836,6 +836,52 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.error('❌ Main window instance not available');
   }
   
+  // Add keyboard shortcut handling for macOS
+  document.addEventListener('keydown', async (event) => {
+    // Handle Cmd+Q (quit) on macOS or Ctrl+Q on other platforms
+    if ((event.metaKey && event.key === 'q') || (event.ctrlKey && event.key === 'q')) {
+      event.preventDefault();
+      console.log('🔄 Quit shortcut detected - saving state...');
+      
+      try {
+        await forceSaveAllState();
+        console.log('✅ State saved, closing application');
+        
+        // Close the window which will trigger the quit
+        if (mainWindow) {
+          await mainWindow.close();
+        }
+      } catch (error) {
+        console.error('❌ Error saving state on quit:', error);
+        // Still close even if save fails
+        if (mainWindow) {
+          await mainWindow.close();
+        }
+      }
+    }
+    
+    // Handle Cmd+W (close window) on macOS or Ctrl+W on other platforms
+    if ((event.metaKey && event.key === 'w') || (event.ctrlKey && event.key === 'w')) {
+      event.preventDefault();
+      console.log('🔄 Close window shortcut detected - saving state...');
+      
+      try {
+        await forceSaveAllState();
+        console.log('✅ State saved, closing window');
+        
+        // Close the window
+        if (mainWindow) {
+          await mainWindow.close();
+        }
+      } catch (error) {
+        console.error('❌ Error saving state on close:', error);
+        // Still close even if save fails
+        if (mainWindow) {
+          await mainWindow.close();
+        }
+      }
+    }
+  });
 
   // Show welcome notification
   setTimeout(() => {
