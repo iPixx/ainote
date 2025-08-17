@@ -4,6 +4,7 @@ const { getCurrentWindow } = window.__TAURI__.window;
 // Import modules for application functionality
 import AppState from './js/state.js';
 import { LayoutManager, MobileNavManager } from './js/layout-manager.js';
+import FileTree from './js/components/file-tree.js';
 
 // Initialize global application state
 const appState = new AppState();
@@ -11,6 +12,7 @@ const appState = new AppState();
 // Initialize layout managers (will be initialized after DOM load)
 let layoutManager;
 let mobileNavManager;
+let fileTreeComponent;
 
 // Window instance for state management
 let mainWindow;
@@ -163,25 +165,30 @@ async function refreshVault() {
 }
 
 /**
- * Update file tree display with files
+ * Update file tree display with files using FileTree component
  * @param {Array} files - Array of file objects
  */
 function updateFileTree(files) {
-  const fileTreeContent = document.getElementById('fileTreeContent');
-  
-  if (!files || files.length === 0) {
-    fileTreeContent.innerHTML = `
-      <div class="empty-state">
-        <p>No files found in vault</p>
-        <button onclick="refreshVault()" class="btn-secondary">Refresh</button>
-      </div>
-    `;
-    return;
+  if (fileTreeComponent) {
+    fileTreeComponent.render(files);
+  } else {
+    // Fallback to old method if component not initialized
+    const fileTreeContent = document.getElementById('fileTreeContent');
+    
+    if (!files || files.length === 0) {
+      fileTreeContent.innerHTML = `
+        <div class="empty-state">
+          <p>No files found in vault</p>
+          <button onclick="refreshVault()" class="btn-secondary">Refresh</button>
+        </div>
+      `;
+      return;
+    }
+    
+    // Create file tree structure
+    const treeHTML = createFileTreeHTML(files);
+    fileTreeContent.innerHTML = `<div class="file-tree">${treeHTML}</div>`;
   }
-  
-  // Create file tree structure
-  const treeHTML = createFileTreeHTML(files);
-  fileTreeContent.innerHTML = `<div class="file-tree">${treeHTML}</div>`;
 }
 
 /**
@@ -696,6 +703,22 @@ window.addEventListener('DOMContentLoaded', async () => {
   layoutManager = new LayoutManager();
   mobileNavManager = new MobileNavManager();
   
+  // Initialize FileTree component
+  const fileTreeContent = document.getElementById('fileTreeContent');
+  if (fileTreeContent) {
+    fileTreeComponent = new FileTree(fileTreeContent, appState);
+    
+    // Listen to file selection events from the tree
+    fileTreeContent.addEventListener(FileTree.EVENTS.FILE_SELECTED, async (event) => {
+      const { filePath } = event.detail;
+      await openFile(filePath);
+    });
+    
+    console.log('🌳 FileTree component initialized');
+  } else {
+    console.warn('⚠️ FileTree container not found');
+  }
+  
   // Apply saved layout state if available
   if (savedAppState && savedAppState.layout) {
     if (layoutManager.applyLayoutState) {
@@ -703,58 +726,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }
   
-  // Add file tree styling
-  const fileTreeStyles = document.createElement('style');
-  fileTreeStyles.textContent = `
-    .file-tree {
-      padding: var(--space-2) 0;
-    }
-    
-    .tree-item {
-      display: flex;
-      align-items: center;
-      padding: var(--space-2) var(--space-4);
-      cursor: pointer;
-      border-radius: 0.375rem;
-      margin: 0 var(--space-2);
-      transition: background-color var(--transition-fast);
-    }
-    
-    .tree-item:hover {
-      background-color: var(--color-bg-hover);
-    }
-    
-    .tree-item.tree-file:hover {
-      background-color: var(--color-bg-accent);
-      color: var(--color-text-inverse);
-    }
-    
-    .tree-icon {
-      margin-right: var(--space-2);
-      font-size: var(--font-size-sm);
-    }
-    
-    .tree-name {
-      font-size: var(--font-size-sm);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    
-    .tree-folder .tree-name {
-      font-weight: 500;
-    }
-    
-    .empty-state {
-      padding: var(--space-6);
-    }
-    
-    .empty-state p {
-      margin-bottom: var(--space-4);
-      color: var(--color-text-secondary);
-    }
-  `;
-  document.head.appendChild(fileTreeStyles);
+  // FileTree component styling is now loaded via CSS file
   
   // Load persisted state on startup
   const currentState = appState.getState();
