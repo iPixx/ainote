@@ -1,71 +1,136 @@
 /**
- * FileTree Component Styles
- * Lightweight, accessible styling for the file tree navigation
+ * FileTree Component Styles - VSCode Theme
+ * Dark theme styling matching VSCode's file explorer
  */
 
 /* Container */
 .file-tree-container {
-  padding: var(--space-2, 8px) 0;
+  padding: 4px 0;
   min-height: 200px;
   overflow-y: auto;
   overflow-x: hidden;
-  font-family: var(--font-family-base, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif);
+  font-family: 'Menlo', 'Monaco', 'Cascadia Code', 'Segoe UI Mono', 'Roboto Mono', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 /* Tree Item Base */
 .tree-item {
   display: flex;
   align-items: center;
-  padding: var(--space-2, 6px) var(--space-3, 12px);
+  padding: 0;
   cursor: pointer;
-  border-radius: 0.375rem;
-  margin: 1px var(--space-2, 8px);
-  transition: all var(--transition-fast, 0.15s) ease;
-  min-height: 2rem;
+  margin: 0;
+  transition: background-color 0.1s ease;
+  min-height: 22px;
   position: relative;
   user-select: none;
   outline: none;
+  padding-left: 8px;
+  white-space: nowrap;
 }
 
-/* Hover States */
+/* Hover States - VSCode Style */
 .tree-item:hover {
-  background-color: var(--color-bg-hover, rgba(0, 0, 0, 0.05));
+  background-color: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.31));
 }
 
 .tree-item:focus {
-  background-color: var(--color-bg-hover, rgba(0, 0, 0, 0.05));
-  box-shadow: 0 0 0 2px var(--color-accent, #007AFF);
+  background-color: var(--vscode-list-focusBackground, rgba(90, 93, 94, 0.31));
+  outline: 1px solid var(--vscode-focusBorder, #007ACC);
+  outline-offset: -1px;
 }
 
 .tree-file:hover {
-  background-color: var(--color-bg-accent, #007AFF);
-  color: var(--color-text-inverse, white);
+  background-color: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.31));
 }
 
 .tree-file:focus {
-  background-color: var(--color-bg-accent, #007AFF);
-  color: var(--color-text-inverse, white);
+  background-color: var(--vscode-list-focusBackground, rgba(90, 93, 94, 0.31));
 }
 
-/* Selected State */
+/* Selected State - VSCode Style */
 .tree-item.selected {
-  background-color: var(--color-bg-accent, #007AFF);
-  color: var(--color-text-inverse, white);
-  font-weight: 500;
+  background-color: var(--vscode-list-activeSelectionBackground, rgba(0, 122, 204, 0.18));
+  color: var(--vscode-list-activeSelectionForeground, inherit);
 }
 
 .tree-item.selected:hover {
-  background-color: var(--color-bg-accent-hover, #0056CC);
+  background-color: var(--vscode-list-activeSelectionBackground, rgba(0, 122, 204, 0.25));
 }
 
-/* Tree Icons */
+/* Tree Icons - VSCode Style */
 .tree-icon {
-  margin-right: var(--space-2, 8px);
-  font-size: var(--font-size-sm, 14px);
+  margin-right: 6px;
+  font-size: 16px;
   line-height: 1;
   flex-shrink: 0;
-  width: 1.2em;
-  text-align: center;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* Folder Icons */
+.tree-icon.folder-collapsed::before {
+  content: "▶";
+  font-size: 10px;
+  color: var(--vscode-tree-indentGuidesStroke, #585858);
+}
+
+.tree-icon.folder-expanded::before {
+  content: "▼";
+  font-size: 10px;
+  color: var(--vscode-tree-indentGuidesStroke, #585858);
+}
+
+.tree-icon.folder::after {
+  content: "📁";
+  font-size: 14px;
+  margin-left: 2px;
+}
+
+/* File Type Icons - VSCode Style */
+.tree-icon.file-md::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background-color: #519aba;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+.tree-icon.file-js::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background-color: #f7df1e;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+.tree-icon.file-html::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background-color: #e34c26;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+.tree-icon.file-css::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background-color: #1572b6;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+.tree-icon.file-default::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background-color: var(--vscode-symbolIcon-fileColor, #858585);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z'/%3E%3C/svg%3E") center/contain no-repeat;
 }
 
 /* Tree Names */
@@ -101,21 +166,33 @@
   color: inherit;
 }
 
-/* Indentation for Nested Items */
+/* Indentation for Nested Items - VSCode Style */
 .tree-item.indented {
   position: relative;
 }
 
-/* Visual hierarchy lines (optional) */
-.tree-item.indented::before {
+/* VSCode-style indentation guides */
+.tree-item::before {
   content: '';
   position: absolute;
-  left: calc(var(--space-3, 12px) + (1.5rem * var(--depth, 0)) - 0.75rem);
+  left: 0;
   top: 0;
-  width: 1px;
-  height: 100%;
-  background-color: var(--color-border-light, rgba(0, 0, 0, 0.1));
-  opacity: 0.3;
+  bottom: 0;
+  border-left: 1px solid var(--vscode-tree-indentGuidesStroke, rgba(120, 120, 120, 0.4));
+  pointer-events: none;
+}
+
+/* Remove guide for root level items */
+.tree-item[data-depth="0"]::before {
+  display: none;
+}
+
+/* Folder chevron positioning */
+.tree-folder .tree-icon.folder-collapsed::before,
+.tree-folder .tree-icon.folder-expanded::before {
+  position: absolute;
+  left: -14px;
+  cursor: pointer;
 }
 
 /* Children Container */
@@ -282,8 +359,9 @@
 }
 
 /* Keyboard navigation improvements */
-.tree-item[tabindex="0"] {
+.tree-item[tabindex="0"]:focus {
   /* Make focusable items visually distinct when using keyboard navigation */
+  background-color: var(--vscode-list-focusBackground, rgba(90, 93, 94, 0.31));
 }
 
 .tree-item[aria-selected="true"] {

@@ -158,6 +158,8 @@ class FileTree {
   buildTreeStructure(files) {
     this.treeStructure.clear();
     
+    const vaultPath = this.appState.getState().currentVault || '';
+    
     // Sort files: directories first, then by name
     const sortedFiles = [...files].sort((a, b) => {
       // Directories first
@@ -173,7 +175,13 @@ class FileTree {
 
     // Build parent-child relationships
     sortedFiles.forEach(file => {
-      const parentPath = this.getParentPath(file.path);
+      // Get relative path from vault root
+      let relativePath = file.path;
+      if (vaultPath && file.path.startsWith(vaultPath)) {
+        relativePath = file.path.substring(vaultPath.length).replace(/^\/+/, '');
+      }
+      
+      const parentPath = this.getParentPath(relativePath);
       
       if (!this.treeStructure.has(parentPath)) {
         this.treeStructure.set(parentPath, []);
@@ -198,9 +206,8 @@ class FileTree {
    * @returns {Array} Root level file objects
    */
   getRootItems() {
-    // Find vault root by looking at currentVault
-    const vaultPath = this.appState.getState().currentVault || '';
-    return this.treeStructure.get(vaultPath) || [];
+    // Root items are stored with empty string as key (vault root)
+    return this.treeStructure.get('') || [];
   }
 
   /**
@@ -209,7 +216,14 @@ class FileTree {
    * @returns {Array} Child file objects
    */
   getFolderChildren(folderPath) {
-    return this.treeStructure.get(folderPath) || [];
+    const vaultPath = this.appState.getState().currentVault || '';
+    
+    // Convert absolute path to relative path for lookup
+    const relativePath = folderPath.startsWith(vaultPath) 
+      ? folderPath.substring(vaultPath.length).replace(/^\/+/, '')
+      : folderPath;
+    
+    return this.treeStructure.get(relativePath) || [];
   }
 
   /**
@@ -241,7 +255,7 @@ class FileTree {
   }
 
   /**
-   * Create a tree item element
+   * Create a tree item element - VSCode Style
    * @param {Object} file - File object
    * @param {number} depth - Nesting depth
    * @returns {HTMLElement} Tree item element
@@ -250,18 +264,22 @@ class FileTree {
     const item = document.createElement('div');
     item.className = `${FileTree.CSS_CLASSES.TREE_ITEM} ${file.is_dir ? FileTree.CSS_CLASSES.TREE_FOLDER : FileTree.CSS_CLASSES.TREE_FILE}`;
     
-    // Add indentation for nested items
+    // Add VSCode-style indentation
     if (depth > 0) {
       item.classList.add(FileTree.CSS_CLASSES.INDENTED);
-      item.style.paddingLeft = `${depth * 1.5}rem`;
+      // VSCode uses 16px per level indentation
+      item.style.paddingLeft = `${8 + (depth * 16)}px`;
+    } else {
+      item.style.paddingLeft = '8px';
     }
     
-    // Store file data
+    // Store file data and depth
     item.dataset.filePath = file.path;
     item.dataset.isDir = file.is_dir.toString();
+    item.dataset.depth = depth.toString();
     
     // Accessibility attributes
-    item.setAttribute('role', file.is_dir ? 'treeitem' : 'treeitem');
+    item.setAttribute('role', 'treeitem');
     item.setAttribute('aria-label', `${file.is_dir ? 'Folder' : 'File'}: ${file.name}`);
     item.setAttribute('tabindex', '0');
     
@@ -287,7 +305,7 @@ class FileTree {
   }
 
   /**
-   * Create icon element for file/folder
+   * Create icon element for file/folder - VSCode Style
    * @param {Object} file - File object
    * @returns {HTMLElement} Icon element
    */
@@ -298,9 +316,11 @@ class FileTree {
     
     if (file.is_dir) {
       const isExpanded = this.expandedFolders.has(file.path);
-      icon.textContent = isExpanded ? '📂' : '📁';
+      icon.classList.add('folder');
+      icon.classList.add(isExpanded ? 'folder-expanded' : 'folder-collapsed');
     } else {
-      icon.textContent = this.getFileIcon(file.name);
+      const iconClass = this.getFileIconClass(file.name);
+      icon.classList.add(iconClass);
     }
     
     return icon;
@@ -334,31 +354,31 @@ class FileTree {
   }
 
   /**
-   * Get appropriate icon for file type
+   * Get appropriate CSS class for file type icon - VSCode Style
    * @param {string} fileName - Name of the file
-   * @returns {string} Unicode icon
+   * @returns {string} CSS class name
    */
-  getFileIcon(fileName) {
+  getFileIconClass(fileName) {
     const ext = fileName.split('.').pop().toLowerCase();
-    const icons = {
-      'md': '📝',
-      'txt': '📄',
-      'js': '🟨',
-      'ts': '🔷',
-      'html': '🌐',
-      'css': '🎨',
-      'json': '📋',
-      'py': '🐍',
-      'rs': '🦀',
-      'go': '🐹',
-      'jpg': '🖼️',
-      'jpeg': '🖼️',
-      'png': '🖼️',
-      'gif': '🖼️',
-      'svg': '🎨',
-      'pdf': '📕'
+    const iconClasses = {
+      'md': 'file-md',
+      'txt': 'file-default',
+      'js': 'file-js',
+      'ts': 'file-js',
+      'html': 'file-html',
+      'css': 'file-css',
+      'json': 'file-default',
+      'py': 'file-default',
+      'rs': 'file-default',
+      'go': 'file-default',
+      'jpg': 'file-default',
+      'jpeg': 'file-default',
+      'png': 'file-default',
+      'gif': 'file-default',
+      'svg': 'file-default',
+      'pdf': 'file-default'
     };
-    return icons[ext] || '📄';
+    return iconClasses[ext] || 'file-default';
   }
 
   /**
@@ -435,7 +455,7 @@ class FileTree {
   }
 
   /**
-   * Expand a folder
+   * Expand a folder - VSCode Style
    * @param {string} folderPath - Path to the folder
    */
   expandFolder(folderPath) {
@@ -450,9 +470,12 @@ class FileTree {
       folderElement.classList.add(FileTree.CSS_CLASSES.EXPANDED);
       folderElement.setAttribute('aria-expanded', 'true');
       
-      // Update icon
+      // Update icon classes
       const icon = folderElement.querySelector(`.${FileTree.CSS_CLASSES.TREE_ICON}`);
-      if (icon) icon.textContent = '📂';
+      if (icon) {
+        icon.classList.remove('folder-collapsed');
+        icon.classList.add('folder-expanded');
+      }
       
       // Show children
       const childrenContainer = folderElement.querySelector(`.${FileTree.CSS_CLASSES.TREE_CHILDREN}`);
@@ -472,7 +495,7 @@ class FileTree {
   }
 
   /**
-   * Collapse a folder
+   * Collapse a folder - VSCode Style
    * @param {string} folderPath - Path to the folder
    */
   collapseFolder(folderPath) {
@@ -487,9 +510,12 @@ class FileTree {
       folderElement.classList.add(FileTree.CSS_CLASSES.COLLAPSED);
       folderElement.setAttribute('aria-expanded', 'false');
       
-      // Update icon
+      // Update icon classes
       const icon = folderElement.querySelector(`.${FileTree.CSS_CLASSES.TREE_ICON}`);
-      if (icon) icon.textContent = '📁';
+      if (icon) {
+        icon.classList.remove('folder-expanded');
+        icon.classList.add('folder-collapsed');
+      }
       
       // Hide children
       const childrenContainer = folderElement.querySelector(`.${FileTree.CSS_CLASSES.TREE_CHILDREN}`);
