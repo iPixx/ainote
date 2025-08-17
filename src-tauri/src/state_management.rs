@@ -325,15 +325,19 @@ mod tests {
     #[test]
     fn test_save_session_state_internal() {
         // Test the session state save function
+        // This may write to actual config file in test environment,
+        // but we're testing that it doesn't panic and handles errors gracefully
         let result = save_session_state_internal(
             Some("/test/vault".to_string()),
             Some("/test/vault/file.md".to_string()),
             "preview".to_string(),
         );
         
-        // May fail due to home directory access in test environment,
-        // but function should not panic
+        // Function should complete without panicking, regardless of success/failure
         let _ = result;
+        
+        // In a real test environment, we'd want to mock the file system
+        // or use a temporary directory to avoid affecting user state
     }
 
     #[test]

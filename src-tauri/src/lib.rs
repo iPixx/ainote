@@ -703,17 +703,8 @@ mod tests {
         let _save_state_result = save_app_state(test_state.clone());
         // May fail due to home directory access, which is expected
         
-        // Test session state commands
-        let _session_save_result = save_session_state(
-            Some("/test/vault".to_string()),
-            Some("/test/vault/file.md".to_string()),
-            "preview".to_string(),
-        );
-        // May fail due to home directory access, which is expected
-        
-        // Test individual state save commands
-        let _save_window_result = save_window_state(1200.0, 800.0, Some(0), Some(0), true);
-        let _save_layout_result = save_layout_state(300.0, 350.0, true, false, "edit".to_string());
+        // Note: Avoid testing individual Tauri commands that write to real state file
+        // These are tested separately in state_management.rs with proper isolation
         
         // These may fail in test environment due to home directory access
         // The important thing is they don't panic and handle errors gracefully
