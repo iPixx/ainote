@@ -304,6 +304,16 @@ async function runAllTests() {
   }
 }
 
+// Make functions globally accessible for HTML onclick handlers
+window.testSelectVault = testSelectVault;
+window.testScanVault = testScanVault;
+window.testCreateFile = testCreateFile;
+window.testReadFile = testReadFile;
+window.testWriteFile = testWriteFile;
+window.testDeleteFile = testDeleteFile;
+window.testRenameFile = testRenameFile;
+window.runAllTests = runAllTests;
+
 // Initialize the application
 window.addEventListener('DOMContentLoaded', () => {
   showResult('vault-results', 'Backend validation interface ready');
