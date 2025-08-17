@@ -237,18 +237,23 @@ class FileTree {
       const itemElement = this.createTreeItem(item, depth);
       container.appendChild(itemElement);
       
-      // If it's a folder, create children container
+      // If it's a folder, create children container AFTER the parent item
       if (item.is_dir) {
         const childrenContainer = this.createChildrenContainer();
-        itemElement.appendChild(childrenContainer);
+        container.appendChild(childrenContainer); // Append to same container as parent
         
-        // Render children if folder is expanded
+        // Store reference to children container on the item element
+        itemElement.childrenContainer = childrenContainer;
+        
+        // Only render children if folder is expanded
         if (this.expandedFolders.has(item.path)) {
           const children = this.getFolderChildren(item.path);
           this.renderTreeLevel(children, childrenContainer, depth + 1);
           itemElement.classList.add(FileTree.CSS_CLASSES.EXPANDED);
+          childrenContainer.style.display = 'block';
         } else {
           itemElement.classList.add(FileTree.CSS_CLASSES.COLLAPSED);
+          childrenContainer.style.display = 'none';
         }
       }
     });
@@ -264,13 +269,13 @@ class FileTree {
     const item = document.createElement('div');
     item.className = `${FileTree.CSS_CLASSES.TREE_ITEM} ${file.is_dir ? FileTree.CSS_CLASSES.TREE_FOLDER : FileTree.CSS_CLASSES.TREE_FILE}`;
     
-    // Add VSCode-style indentation
+    // Add proper indentation based on depth
+    // Base padding: 8px, each level adds 16px
+    const indentationPx = 8 + (depth * 16);
+    item.style.paddingLeft = `${indentationPx}px`;
+    
     if (depth > 0) {
       item.classList.add(FileTree.CSS_CLASSES.INDENTED);
-      // VSCode uses 16px per level indentation
-      item.style.paddingLeft = `${8 + (depth * 16)}px`;
-    } else {
-      item.style.paddingLeft = '8px';
     }
     
     // Store file data and depth
@@ -477,8 +482,8 @@ class FileTree {
         icon.classList.add('folder-expanded');
       }
       
-      // Show children
-      const childrenContainer = folderElement.querySelector(`.${FileTree.CSS_CLASSES.TREE_CHILDREN}`);
+      // Show children using stored reference
+      const childrenContainer = folderElement.childrenContainer;
       if (childrenContainer) {
         childrenContainer.style.display = 'block';
         
@@ -517,8 +522,8 @@ class FileTree {
         icon.classList.add('folder-collapsed');
       }
       
-      // Hide children
-      const childrenContainer = folderElement.querySelector(`.${FileTree.CSS_CLASSES.TREE_CHILDREN}`);
+      // Hide children using stored reference
+      const childrenContainer = folderElement.childrenContainer;
       if (childrenContainer) {
         childrenContainer.style.display = 'none';
       }

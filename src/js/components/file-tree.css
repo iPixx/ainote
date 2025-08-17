@@ -26,8 +26,8 @@
   position: relative;
   user-select: none;
   outline: none;
-  padding-left: 8px;
   white-space: nowrap;
+  /* padding-left is set via JavaScript based on depth */
 }
 
 /* Hover States - VSCode Style */
