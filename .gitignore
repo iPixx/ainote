@@ -28,3 +28,6 @@ vault/
 
 # Test files generated during testing
 test_files_*/
+
+# Black hole :-)
+blackhole/
