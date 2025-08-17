@@ -1,4 +1,5 @@
 const { invoke } = window.__TAURI__.core;
+const { getCurrentWindow } = window.__TAURI__.window;
 
 // Import modules for application functionality
 import AppState from './js/state.js';
@@ -10,6 +11,9 @@ const appState = new AppState();
 // Initialize layout managers (will be initialized after DOM load)
 let layoutManager;
 let mobileNavManager;
+
+// Window instance for state management
+let mainWindow;
 
 /**
  * Update vault information display
@@ -443,6 +447,156 @@ function toggleShortcutsHelp() {
   }
 }
 
+// Window and Layout State Management
+
+/**
+ * Load and apply saved window state
+ */
+async function loadWindowState() {
+  try {
+    const appState = await invoke('load_app_state');
+    
+    if (mainWindow && appState && appState.window) {
+      const { width, height, x, y, maximized } = appState.window;
+      
+      console.log('📥 Loading window state:', appState.window);
+      
+      // Ensure window is not maximized before setting size/position
+      if (await mainWindow.isMaximized()) {
+        await mainWindow.unmaximize();
+      }
+      
+      // Set window size with validation (increased limits for larger screens)
+      const validWidth = Math.max(800, Math.min(width || 1920, 6000));
+      const validHeight = Math.max(600, Math.min(height || 1080, 4000));
+      
+      await mainWindow.setSize({ width: validWidth, height: validHeight });
+      
+      // Set position if available and valid
+      if (x !== null && y !== null && x !== undefined && y !== undefined) {
+        // Ensure position is on screen (basic validation) - increased for larger screens
+        const validX = Math.max(-200, Math.min(x, 4000)); // Allow some off-screen
+        const validY = Math.max(-200, Math.min(y, 3000));
+        await mainWindow.setPosition({ x: validX, y: validY });
+      }
+      
+      // Apply maximized state last
+      if (maximized) {
+        await mainWindow.maximize();
+      }
+      
+      console.log('✅ Window state restored successfully');
+    } else {
+      console.log('📋 No saved window state found, using defaults');
+    }
+    
+    return appState;
+  } catch (error) {
+    console.warn('⚠️ Failed to load window state:', error);
+    return null;
+  }
+}
+
+/**
+ * Save current window state
+ */
+async function saveWindowState() {
+  try {
+    if (!mainWindow) {
+      console.warn('⚠️ No main window available for saving state');
+      return;
+    }
+    
+    console.log('🔄 Getting window properties...');
+    
+    const size = await mainWindow.innerSize();
+    console.log('📐 Window size:', size);
+    
+    const position = await mainWindow.outerPosition();
+    console.log('📍 Window position:', position);
+    
+    const isMaximized = await mainWindow.isMaximized();
+    console.log('🔳 Window maximized:', isMaximized);
+    
+    const windowState = {
+      width: size.width,
+      height: size.height,
+      x: position.x,
+      y: position.y,
+      maximized: isMaximized
+    };
+    
+    console.log('💾 Saving window state:', windowState);
+    
+    await invoke('save_window_state', windowState);
+    
+    console.log('✅ Window state saved successfully');
+  } catch (error) {
+    console.error('❌ Failed to save window state:', error);
+    console.error('Error details:', error);
+  }
+}
+
+/**
+ * Save layout state (column widths and visibility)
+ */
+async function saveLayoutState(layoutState) {
+  try {
+    await invoke('save_layout_state', {
+      fileTreeWidth: layoutState.fileTreeWidth,
+      aiPanelWidth: layoutState.aiPanelWidth,
+      fileTreeVisible: layoutState.fileTreeVisible,
+      aiPanelVisible: layoutState.aiPanelVisible,
+      editorMode: layoutState.editorMode
+    });
+    
+    console.log('💾 Layout state saved:', layoutState);
+  } catch (error) {
+    console.warn('⚠️ Failed to save layout state:', error);
+  }
+}
+
+/**
+ * Debounced save function to avoid too frequent saves
+ */
+const debouncedSaveWindowState = debounce(saveWindowState, 500); // Reduced delay for better responsiveness
+const debouncedSaveLayoutState = debounce(saveLayoutState, 300);
+
+/**
+ * Force save all application state (useful for manual triggers)
+ */
+async function forceSaveAllState() {
+  try {
+    console.log('🔄 Force saving all application state...');
+    
+    await saveWindowState();
+    
+    if (layoutManager && layoutManager.getCurrentLayoutState) {
+      const layoutState = layoutManager.getCurrentLayoutState();
+      await saveLayoutState(layoutState);
+    }
+    
+    console.log('✅ All application state saved successfully');
+  } catch (error) {
+    console.error('❌ Failed to save application state:', error);
+  }
+}
+
+/**
+ * Debounce utility function
+ */
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
 // State management event listeners
 appState.addEventListener(AppState.EVENTS.VAULT_CHANGED, (data) => {
   console.log('State: Vault changed', data);
@@ -493,6 +647,8 @@ window.toggleAiPanel = toggleAiPanel;
 window.openMobileNav = openMobileNav;
 window.closeMobileNav = closeMobileNav;
 window.toggleShortcutsHelp = toggleShortcutsHelp;
+window.forceSaveAllState = forceSaveAllState;
+window.debouncedSaveLayoutState = debouncedSaveLayoutState;
 
 // Development and testing functions
 window.runLayoutTest = function() {
@@ -505,12 +661,43 @@ window.runLayoutTest = function() {
 };
 
 // Initialize the application
-window.addEventListener('DOMContentLoaded', () => {
-  console.log('aiNote application initialized');
+window.addEventListener('DOMContentLoaded', async () => {
+  console.log('🚀 aiNote application initializing...');
+  
+  // Test basic Tauri availability
+  console.log('🔍 Tauri available:', !!window.__TAURI__);
+  console.log('🔍 Tauri core:', !!window.__TAURI__?.core);
+  console.log('🔍 Tauri window:', !!window.__TAURI__?.window);
+  
+  // Initialize window instance
+  try {
+    mainWindow = getCurrentWindow();
+    console.log('🪟 Main window instance:', mainWindow);
+    console.log('🪟 Main window type:', typeof mainWindow);
+  } catch (error) {
+    console.error('❌ Failed to get current window:', error);
+  }
+  
+  // Longer delay to ensure window is fully ready on all platforms
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // Load saved window and layout state
+  console.log('📥 Loading saved application state...');
+  const savedAppState = await loadWindowState();
+  
+  // Additional delay after loading state to ensure changes are applied
+  await new Promise(resolve => setTimeout(resolve, 200));
   
   // Initialize layout managers after DOM is ready
   layoutManager = new LayoutManager();
   mobileNavManager = new MobileNavManager();
+  
+  // Apply saved layout state if available
+  if (savedAppState && savedAppState.layout) {
+    if (layoutManager.applyLayoutState) {
+      layoutManager.applyLayoutState(savedAppState.layout);
+    }
+  }
   
   // Add file tree styling
   const fileTreeStyles = document.createElement('style');
@@ -596,6 +783,60 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
   
+  // Set up window state persistence event listeners
+  if (mainWindow) {
+    console.log('🔧 Setting up window event listeners...');
+    
+    try {
+      // Save window state when it changes
+      const resizeUnlisten = await mainWindow.listen('tauri://resize', (event) => {
+        console.log('📏 Window resized:', event.payload);
+        debouncedSaveWindowState();
+      });
+      
+      const moveUnlisten = await mainWindow.listen('tauri://move', (event) => {
+        console.log('📍 Window moved:', event.payload);
+        debouncedSaveWindowState();
+      });
+      
+      // Save state before the window closes
+      const closeUnlisten = await mainWindow.listen('tauri://close-requested', async (event) => {
+        console.log('💾 Window close requested - saving state...');
+        
+        try {
+          // Save state without debouncing for immediate persistence
+          await forceSaveAllState();
+          console.log('✅ State saved successfully before close');
+        } catch (error) {
+          console.error('❌ Error saving state before close:', error);
+        }
+        
+        // Don't prevent the close - let Tauri handle it normally
+      });
+
+      console.log('✅ Window event listeners set up successfully');
+      
+      // Store unlisteners for cleanup if needed
+      window.windowEventUnlisteners = { resizeUnlisten, moveUnlisten, closeUnlisten };
+      
+    } catch (error) {
+      console.error('❌ Failed to set up window event listeners:', error);
+    }
+    
+    // Listen for beforeunload to save state when page unloads
+    window.addEventListener('beforeunload', async (event) => {
+      console.log('🚪 Page unloading - saving state...');
+      try {
+        await forceSaveAllState();
+      } catch (error) {
+        console.warn('Failed to save state on beforeunload:', error);
+      }
+    });
+  } else {
+    console.error('❌ Main window instance not available');
+  }
+  
+
   // Show welcome notification
   setTimeout(() => {
     showNotification('Welcome to aiNote! Select a vault to get started.', 'info');

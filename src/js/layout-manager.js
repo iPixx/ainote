@@ -397,6 +397,17 @@ class LayoutManager {
           e.preventDefault();
           if (window.toggleShortcutsHelp) window.toggleShortcutsHelp();
           break;
+        case 'q':
+        case 'Q':
+          // Ctrl+Q for force save state (useful for testing)
+          e.preventDefault();
+          if (window.forceSaveAllState) {
+            window.forceSaveAllState();
+            if (window.showNotification) {
+              window.showNotification('Application state saved manually', 'success');
+            }
+          }
+          break;
       }
     }
     
@@ -500,6 +511,11 @@ class LayoutManager {
     try {
       localStorage.setItem('aiNote_layoutState', JSON.stringify(state));
       console.log('💾 Layout state saved successfully');
+      
+      // Also trigger the new persistent save function if available
+      if (window.debouncedSaveLayoutState) {
+        window.debouncedSaveLayoutState(this.getCurrentLayoutState());
+      }
     } catch (error) {
       console.error('❌ Failed to save layout state:', error);
     }
@@ -558,6 +574,76 @@ class LayoutManager {
     this.updateLayout();
     this.updateExpandButton();
     console.log('🎨 State applied successfully');
+  }
+
+  /**
+   * Get current layout state for persistence
+   * @returns {Object} Current layout state
+   */
+  getCurrentLayoutState() {
+    const fileTreeWidthValue = getComputedStyle(document.documentElement)
+      .getPropertyValue('--file-tree-default-width').replace('px', '');
+    const aiPanelWidthValue = getComputedStyle(document.documentElement)
+      .getPropertyValue('--ai-panel-default-width').replace('px', '');
+
+    return {
+      fileTreeWidth: parseFloat(fileTreeWidthValue) || 280,
+      aiPanelWidth: parseFloat(aiPanelWidthValue) || 350,
+      fileTreeVisible: !this.panelState.fileTreeCollapsed,
+      aiPanelVisible: this.panelState.aiPanelVisible,
+      editorMode: 'edit' // Default for now, can be extended later
+    };
+  }
+
+  /**
+   * Apply layout state from persistence
+   * @param {Object} layoutState - Saved layout state
+   */
+  applyLayoutState(layoutState) {
+    if (!layoutState) return;
+
+    console.log('📥 Applying saved layout state:', layoutState);
+
+    // Apply panel widths
+    if (layoutState.fileTreeWidth) {
+      document.documentElement.style.setProperty('--file-tree-default-width', `${layoutState.fileTreeWidth}px`);
+    }
+
+    if (layoutState.aiPanelWidth) {
+      document.documentElement.style.setProperty('--ai-panel-default-width', `${layoutState.aiPanelWidth}px`);
+    }
+
+    // Apply panel visibility states
+    this.panelState.fileTreeCollapsed = !layoutState.fileTreeVisible;
+    this.panelState.aiPanelVisible = layoutState.aiPanelVisible || false;
+
+    // Apply DOM states
+    const fileTreePanel = this.getElement('file-tree');
+    const aiPanel = this.getElement('ai-panel');
+    const appContainer = this.getElement('app-container');
+
+    if (fileTreePanel) {
+      if (this.panelState.fileTreeCollapsed) {
+        fileTreePanel.classList.add('collapsed');
+      } else {
+        fileTreePanel.classList.remove('collapsed');
+      }
+    }
+
+    if (aiPanel && appContainer) {
+      if (this.panelState.aiPanelVisible) {
+        aiPanel.style.display = 'flex';
+        appContainer.classList.add('show-ai-panel');
+      } else {
+        aiPanel.style.display = 'none';
+        appContainer.classList.remove('show-ai-panel');
+      }
+    }
+
+    this.updateLayout();
+    this.updateExpandButton();
+    
+    console.log('✅ Layout state applied from persistence');
   }
 
   // Layout reliability test
