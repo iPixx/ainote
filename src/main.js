@@ -1,7 +1,10 @@
 const { invoke } = window.__TAURI__.core;
 
-// Global state for selected vault path
-let selectedVaultPath = null;
+// Import AppState for centralized state management
+import AppState from './js/state.js';
+
+// Initialize global application state
+const appState = new AppState();
 
 /**
  * Display result in the specified element with styling
@@ -41,7 +44,7 @@ async function testSelectVault() {
   try {
     const result = await invoke('select_vault_folder');
     if (result) {
-      selectedVaultPath = result;
+      appState.setVault(result);
       showResult('vault-results', `Vault selected: ${result}`);
     } else {
       showResult('vault-results', 'No vault selected (user cancelled)', true);
@@ -55,15 +58,20 @@ async function testSelectVault() {
  * Test scan_vault_files command
  */
 async function testScanVault() {
-  if (!selectedVaultPath) {
+  const currentVault = appState.getState().currentVault;
+  if (!currentVault) {
     showResult('vault-results', 'Please select a vault folder first', true);
     return;
   }
   
   try {
-    const result = await invoke('scan_vault_files', { vaultPath: selectedVaultPath });
+    const result = await invoke('scan_vault_files', { vaultPath: currentVault });
     const fileCount = result.filter(file => !file.is_dir).length;
     const dirCount = result.filter(file => file.is_dir).length;
+    
+    // Update state with scanned files
+    appState.setFiles(result);
+    
     showResult('vault-results', `Scanned vault: ${fileCount} files, ${dirCount} directories`);
     
     // Show first few files as examples
@@ -86,8 +94,9 @@ async function testScanVault() {
  * @returns {string} - Full file path
  */
 function getFullPath(fileName) {
-  if (selectedVaultPath && !fileName.includes('/') && !fileName.includes('\\')) {
-    return `${selectedVaultPath}/${fileName}`;
+  const currentVault = appState.getState().currentVault;
+  if (currentVault && !fileName.includes('/') && !fileName.includes('\\')) {
+    return `${currentVault}/${fileName}`;
   }
   return fileName;
 }
@@ -220,19 +229,21 @@ async function runAllTests() {
   let testsPassed = 0;
   
   // Test 1: Select vault folder (if not already selected)
-  if (!selectedVaultPath) {
+  const currentVault = appState.getState().currentVault;
+  if (!currentVault) {
     showResult('all-results', 'Test 1: Please select a vault folder first', true);
     return;
   }
   
   testsRun++;
-  showResult('all-results', `Test 1: Using vault: ${selectedVaultPath}`);
+  showResult('all-results', `Test 1: Using vault: ${currentVault}`);
   testsPassed++;
   
   // Test 2: Scan vault files
   testsRun++;
   try {
-    const scanResult = await invoke('scan_vault_files', { vaultPath: selectedVaultPath });
+    const scanResult = await invoke('scan_vault_files', { vaultPath: currentVault });
+    appState.setFiles(scanResult);
     showResult('all-results', `Test 2: ✅ Scanned ${scanResult.length} items`);
     testsPassed++;
   } catch (error) {
@@ -304,6 +315,52 @@ async function runAllTests() {
   }
 }
 
+// State management event listeners for demonstration
+appState.addEventListener(AppState.EVENTS.VAULT_CHANGED, (data) => {
+  console.log('State: Vault changed', data);
+  if (data.vault) {
+    showResult('vault-results', `State updated: Vault set to ${data.vault}`);
+  }
+});
+
+appState.addEventListener(AppState.EVENTS.FILES_UPDATED, (data) => {
+  console.log('State: Files updated', data);
+  showResult('vault-results', `State updated: ${data.count} files in vault`);
+});
+
+appState.addEventListener(AppState.EVENTS.FILE_CHANGED, (data) => {
+  console.log('State: Current file changed', data);
+});
+
+appState.addEventListener(AppState.EVENTS.VIEW_MODE_CHANGED, (data) => {
+  console.log('State: View mode changed', data);
+});
+
+appState.addEventListener(AppState.EVENTS.DIRTY_STATE_CHANGED, (data) => {
+  console.log('State: Dirty state changed', data);
+});
+
+// State management demonstration functions
+function testToggleViewMode() {
+  const newMode = appState.toggleViewMode();
+  showResult('state-results', `View mode toggled to: ${newMode}`);
+}
+
+function testMarkDirty() {
+  appState.markDirty(true);
+  showResult('state-results', 'Marked state as dirty (unsaved changes)');
+}
+
+function testMarkClean() {
+  appState.markDirty(false);
+  showResult('state-results', 'Marked state as clean (no unsaved changes)');
+}
+
+function testShowState() {
+  const state = appState.getState();
+  showResult('state-results', `Current state: ${JSON.stringify(state, null, 2)}`);
+}
+
 // Make functions globally accessible for HTML onclick handlers
 window.testSelectVault = testSelectVault;
 window.testScanVault = testScanVault;
@@ -314,8 +371,27 @@ window.testDeleteFile = testDeleteFile;
 window.testRenameFile = testRenameFile;
 window.runAllTests = runAllTests;
 
+// State management demo functions
+window.testToggleViewMode = testToggleViewMode;
+window.testMarkDirty = testMarkDirty;
+window.testMarkClean = testMarkClean;
+window.testShowState = testShowState;
+
 // Initialize the application
 window.addEventListener('DOMContentLoaded', () => {
   showResult('vault-results', 'Backend validation interface ready');
   showResult('file-results', 'File operations ready - select a vault first for easier testing');
+  showResult('state-results', 'State management system initialized');
+  
+  // Load persisted state on startup
+  const currentState = appState.getState();
+  if (currentState.currentVault) {
+    showResult('vault-results', `Restored vault from localStorage: ${currentState.currentVault}`);
+  }
+  if (currentState.viewMode !== AppState.VIEW_MODES.EDITOR) {
+    showResult('state-results', `Restored view mode: ${currentState.viewMode}`);
+  }
+  
+  // Show initial state
+  showResult('state-results', `Initial state: ${JSON.stringify(currentState, null, 2)}`);
 });

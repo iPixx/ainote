@@ -45,6 +45,17 @@ This is test content for validation.</textarea>
           <div id="file-results" class="results"></div>
         </section>
 
+        <section class="state-tests">
+          <h2>State Management</h2>
+          <div class="button-group">
+            <button onclick="testToggleViewMode()">Toggle View Mode</button>
+            <button onclick="testMarkDirty()">Mark Dirty</button>
+            <button onclick="testMarkClean()">Mark Clean</button>
+            <button onclick="testShowState()">Show State</button>
+          </div>
+          <div id="state-results" class="results"></div>
+        </section>
+
         <section class="test-all">
           <h2>Complete Validation</h2>
           <button onclick="runAllTests()" class="test-all-btn">Run All Backend Tests</button>
