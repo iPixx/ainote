@@ -75,6 +75,21 @@ fn scan_vault_files(vault_path: String) -> Result<Vec<FileInfo>, String> {
 }
 
 #[tauri::command]
+fn get_file_info(file_path: String) -> Result<FileInfo, String> {
+    file_operations::get_file_info_internal(&file_path).map_err(|e| e.into())
+}
+
+#[tauri::command]
+fn create_folder(folder_path: String) -> Result<(), String> {
+    file_operations::create_folder_internal(&folder_path).map_err(|e| e.into())
+}
+
+#[tauri::command]
+fn watch_vault(vault_path: String) -> Result<(), String> {
+    vault_operations::watch_vault_internal(&vault_path).map_err(|e| e.into())
+}
+
+#[tauri::command]
 fn scan_vault_files_chunked(
     vault_path: String, 
     page: usize, 
@@ -203,6 +218,9 @@ pub fn run() {
             select_vault_folder,
             scan_vault_files,
             scan_vault_files_chunked,
+            get_file_info,
+            create_folder,
+            watch_vault,
             preview_file,
             load_app_state,
             save_app_state,

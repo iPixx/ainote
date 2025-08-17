@@ -26,6 +26,7 @@ pub(crate) use time_operation;
 
 /// Performance tracker for detailed metrics
 pub struct PerformanceTracker {
+    #[allow(dead_code)] // Used in debug prints
     operation: String,
     start: Instant,
 }
@@ -47,10 +48,10 @@ impl PerformanceTracker {
         duration
     }
     
-    pub fn checkpoint(&self, checkpoint_name: &str) {
-        let duration = self.start.elapsed();
+    pub fn checkpoint(&self, _checkpoint_name: &str) {
+        let _duration = self.start.elapsed();
         #[cfg(debug_assertions)]
-        eprintln!("PERF: {} - {} at {:.3}ms", self.operation, checkpoint_name, duration.as_secs_f64() * 1000.0);
+        eprintln!("PERF: {} - {} at {:.3}ms", self.operation, _checkpoint_name, _duration.as_secs_f64() * 1000.0);
     }
 }
 
