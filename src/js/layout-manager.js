@@ -57,11 +57,20 @@ class LayoutManager {
       return;
     }
     
-    // Bind resize handle events
+    // Remove existing listeners first
+    document.querySelectorAll('.resize-handle').forEach(handle => {
+      // Clone node to remove all event listeners
+      const newHandle = handle.cloneNode(true);
+      handle.parentNode.replaceChild(newHandle, handle);
+    });
+    
+    // Bind resize handle events to fresh handles
     document.querySelectorAll('.resize-handle').forEach(handle => {
       handle.addEventListener('mousedown', (e) => this.startResize(e));
       console.log('✅ Bound resize handle:', handle.dataset.panel);
     });
+    
+    console.log('🔄 Resize handles rebound');
   }
 
   startResize(e) {
@@ -176,32 +185,44 @@ class LayoutManager {
   toggleFileTree() {
     const fileTreePanel = document.getElementById('fileTreePanel');
     const appContainer = document.querySelector('.app-container');
+    const aiPanel = document.getElementById('aiPanel');
+    
+    if (!fileTreePanel || !appContainer) {
+      console.error('Required elements not found for toggleFileTree');
+      return;
+    }
     
     fileTreePanel.classList.toggle('collapsed');
     
-    // Update grid template to hide/show file tree
-    if (fileTreePanel.classList.contains('collapsed')) {
-      appContainer.style.gridTemplateColumns = '0 1fr';
-    } else {
-      const fileTreeWidth = getComputedStyle(document.documentElement)
-        .getPropertyValue('--file-tree-default-width');
-      appContainer.style.gridTemplateColumns = `${fileTreeWidth} 1fr`;
-    }
+    // Update grid template based on current state
+    this.updateGridLayout();
+    
+    // Re-bind resize handles after layout change
+    setTimeout(() => this.bindResizeHandles(), 100);
     
     // Save state and notify
     this.saveLayoutState();
     
     const isCollapsed = fileTreePanel.classList.contains('collapsed');
     if (window.showNotification) {
-      window.showNotification(`File tree ${isCollapsed ? 'hidden' : 'shown'}`, 'info');
+      window.showNotification(`File tree ${isCollapsed ? 'hidden' : 'shown'} (Cmd+1)`, 'info');
     }
+    
+    console.log('🔄 File tree toggled:', isCollapsed ? 'collapsed' : 'expanded');
   }
 
   toggleAiPanel() {
     const aiPanel = document.getElementById('aiPanel');
     const appContainer = document.querySelector('.app-container');
     
-    if (aiPanel.style.display === 'none') {
+    if (!aiPanel || !appContainer) {
+      console.error('Required elements not found for toggleAiPanel');
+      return;
+    }
+    
+    const isCurrentlyHidden = aiPanel.style.display === 'none' || !aiPanel.style.display;
+    
+    if (isCurrentlyHidden) {
       aiPanel.style.display = 'flex';
       appContainer.classList.add('show-ai-panel');
     } else {
@@ -209,8 +230,21 @@ class LayoutManager {
       appContainer.classList.remove('show-ai-panel');
     }
     
+    // Update grid layout
+    this.updateGridLayout();
+    
+    // Re-bind resize handles after layout change
+    setTimeout(() => this.bindResizeHandles(), 100);
+    
     // Save state
     this.saveLayoutState();
+    
+    const isVisible = !isCurrentlyHidden;
+    if (window.showNotification) {
+      window.showNotification(`AI Panel ${isVisible ? 'shown' : 'hidden'} (Cmd+2)`, 'info');
+    }
+    
+    console.log('🤖 AI panel toggled:', isVisible ? 'visible' : 'hidden');
   }
 
   handleWindowResize() {
@@ -258,14 +292,14 @@ class LayoutManager {
       }
     }
     
-    // Layout shortcuts (no modifiers needed)
-    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+    // Layout shortcuts with Cmd/Ctrl modifiers
+    if (e.ctrlKey || e.metaKey) {
       switch (e.key) {
-        case 'F1':
+        case '1':
           e.preventDefault();
           this.toggleFileTree();
           break;
-        case 'F2':
+        case '2':
           e.preventDefault();
           this.toggleAiPanel();
           break;
@@ -313,6 +347,40 @@ class LayoutManager {
     }
   }
 
+  updateGridLayout() {
+    const fileTreePanel = document.getElementById('fileTreePanel');
+    const aiPanel = document.getElementById('aiPanel');
+    const appContainer = document.querySelector('.app-container');
+    
+    if (!fileTreePanel || !aiPanel || !appContainer) {
+      console.error('Cannot update grid layout: missing elements');
+      return;
+    }
+    
+    const fileTreeCollapsed = fileTreePanel.classList.contains('collapsed');
+    const aiPanelVisible = aiPanel.style.display === 'flex';
+    
+    const fileTreeWidth = fileTreeCollapsed ? '0' : 
+      getComputedStyle(document.documentElement).getPropertyValue('--file-tree-default-width');
+    const aiPanelWidth = aiPanelVisible ? 
+      getComputedStyle(document.documentElement).getPropertyValue('--ai-panel-default-width') : '';
+    
+    // Update grid template columns based on panel states
+    if (aiPanelVisible) {
+      appContainer.style.gridTemplateColumns = `${fileTreeWidth} 1fr ${aiPanelWidth}`;
+      appContainer.classList.add('show-ai-panel');
+    } else {
+      appContainer.style.gridTemplateColumns = `${fileTreeWidth} 1fr`;
+      appContainer.classList.remove('show-ai-panel');
+    }
+    
+    console.log('📐 Grid layout updated:', {
+      fileTreeCollapsed,
+      aiPanelVisible,
+      gridTemplate: appContainer.style.gridTemplateColumns
+    });
+  }
+  
   applyLayoutState(layoutState) {
     const root = document.documentElement;
     const fileTreePanel = document.getElementById('fileTreePanel');
@@ -335,13 +403,14 @@ class LayoutManager {
     
     if (layoutState.fileTreeCollapsed) {
       fileTreePanel.classList.add('collapsed');
-      appContainer.style.gridTemplateColumns = '0 1fr';
     }
     
     if (layoutState.aiPanelVisible) {
       aiPanel.style.display = 'flex';
-      appContainer.classList.add('show-ai-panel');
     }
+    
+    // Apply the correct grid layout
+    this.updateGridLayout();
     
     console.log('🎨 Layout state applied successfully');
   }

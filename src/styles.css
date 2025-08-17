@@ -418,8 +418,9 @@ input, textarea {
   width: var(--resize-handle-width);
   background-color: transparent;
   cursor: col-resize;
-  z-index: var(--z-base);
+  z-index: 10;
   transition: background-color var(--transition-fast);
+  user-select: none;
 }
 
 .resize-handle-right {
@@ -428,14 +429,35 @@ input, textarea {
 
 .resize-handle:hover {
   background-color: var(--color-bg-accent);
+  opacity: 0.7;
 }
 
 .resize-handle:active {
   background-color: var(--color-bg-accent);
+  opacity: 1;
 }
 
 .resize-handle.resizing {
   background-color: var(--color-bg-accent);
+  opacity: 1;
+}
+
+/* Debug visibility for resize handles */
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 20px;
+  background-color: rgba(59, 130, 246, 0.3);
+  transform: translate(-50%, -50%);
+  border-radius: 1px;
+  transition: background-color var(--transition-fast);
+}
+
+.resize-handle:hover::before {
+  background-color: rgba(59, 130, 246, 0.8);
 }
 
 /* ===============================

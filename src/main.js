@@ -398,9 +398,6 @@ function toggleFileTree() {
 function toggleAiPanel() {
   if (layoutManager) {
     layoutManager.toggleAiPanel();
-    const aiPanel = document.getElementById('aiPanel');
-    const isVisible = aiPanel.style.display !== 'none';
-    showNotification(`AI Panel ${isVisible ? 'shown' : 'hidden'} (F2 to toggle)`, 'info');
   }
 }
 
