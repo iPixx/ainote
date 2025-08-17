@@ -1,345 +1,15 @@
 const { invoke } = window.__TAURI__.core;
 
-// Import AppState for centralized state management
+// Import modules for application functionality
 import AppState from './js/state.js';
+import { LayoutManager, MobileNavManager } from './js/layout-manager.js';
 
 // Initialize global application state
 const appState = new AppState();
 
-// Layout Management System
-class LayoutManager {
-  constructor() {
-    this.isResizing = false;
-    this.currentResizeHandle = null;
-    this.initialMouseX = 0;
-    this.initialPanelWidth = 0;
-    this.minWidths = {
-      'file-tree': 250,
-      'editor': 600,
-      'ai-panel': 300
-    };
-    this.maxWidths = {
-      'file-tree': 400,
-      'editor': null, // No max width
-      'ai-panel': 500
-    };
-    
-    this.initializeLayout();
-    this.bindEvents();
-  }
-
-  initializeLayout() {
-    // Load saved layout preferences from localStorage
-    const savedLayout = this.loadLayoutState();
-    if (savedLayout) {
-      this.applyLayoutState(savedLayout);
-    }
-  }
-
-  bindEvents() {
-    // Bind resize handle events
-    document.querySelectorAll('.resize-handle').forEach(handle => {
-      handle.addEventListener('mousedown', (e) => this.startResize(e));
-    });
-
-    // Global mouse events for resize
-    document.addEventListener('mousemove', (e) => this.handleResize(e));
-    document.addEventListener('mouseup', () => this.stopResize());
-
-    // Window resize handler
-    window.addEventListener('resize', () => this.handleWindowResize());
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => this.handleKeydown(e));
-  }
-
-  startResize(e) {
-    e.preventDefault();
-    this.isResizing = true;
-    this.currentResizeHandle = e.target;
-    this.initialMouseX = e.clientX;
-    
-    const panel = this.getPanelFromHandle(this.currentResizeHandle);
-    const panelElement = this.getPanelElement(panel);
-    this.initialPanelWidth = panelElement.getBoundingClientRect().width;
-    
-    // Add resizing class for visual feedback
-    this.currentResizeHandle.classList.add('resizing');
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }
-
-  handleResize(e) {
-    if (!this.isResizing || !this.currentResizeHandle) return;
-    
-    e.preventDefault();
-    const deltaX = e.clientX - this.initialMouseX;
-    const panel = this.getPanelFromHandle(this.currentResizeHandle);
-    const newWidth = this.initialPanelWidth + deltaX;
-    
-    // Apply width constraints
-    const constrainedWidth = this.constrainWidth(panel, newWidth);
-    this.setPanelWidth(panel, constrainedWidth);
-  }
-
-  stopResize() {
-    if (!this.isResizing) return;
-    
-    this.isResizing = false;
-    if (this.currentResizeHandle) {
-      this.currentResizeHandle.classList.remove('resizing');
-    }
-    this.currentResizeHandle = null;
-    
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-    
-    // Save layout state
-    this.saveLayoutState();
-  }
-
-  getPanelFromHandle(handle) {
-    return handle.dataset.panel;
-  }
-
-  getPanelElement(panel) {
-    switch (panel) {
-      case 'file-tree': return document.getElementById('fileTreePanel');
-      case 'editor': return document.getElementById('editorPanel');
-      case 'ai-panel': return document.getElementById('aiPanel');
-      default: return null;
-    }
-  }
-
-  constrainWidth(panel, width) {
-    const min = this.minWidths[panel];
-    const max = this.maxWidths[panel];
-    
-    if (width < min) return min;
-    if (max && width > max) return max;
-    
-    // Additional constraint: ensure editor panel maintains minimum width
-    if (panel === 'file-tree') {
-      const appContainer = document.querySelector('.app-container');
-      const totalWidth = appContainer.getBoundingClientRect().width;
-      const aiPanelWidth = this.getAiPanelWidth();
-      const maxFileTreeWidth = totalWidth - this.minWidths.editor - aiPanelWidth - 20; // 20px for borders/margins
-      
-      if (width > maxFileTreeWidth) return maxFileTreeWidth;
-    }
-    
-    return width;
-  }
-
-  setPanelWidth(panel, width) {
-    const root = document.documentElement;
-    
-    switch (panel) {
-      case 'file-tree':
-        root.style.setProperty('--file-tree-default-width', `${width}px`);
-        break;
-      case 'ai-panel':
-        root.style.setProperty('--ai-panel-default-width', `${width}px`);
-        break;
-    }
-  }
-
-  getAiPanelWidth() {
-    const aiPanel = document.getElementById('aiPanel');
-    if (!aiPanel || aiPanel.style.display === 'none') return 0;
-    return aiPanel.getBoundingClientRect().width;
-  }
-
-  toggleFileTree() {
-    const fileTreePanel = document.getElementById('fileTreePanel');
-    const appContainer = document.querySelector('.app-container');
-    
-    fileTreePanel.classList.toggle('collapsed');
-    
-    // Update grid template to hide/show file tree
-    if (fileTreePanel.classList.contains('collapsed')) {
-      appContainer.style.gridTemplateColumns = '0 1fr';
-    } else {
-      const fileTreeWidth = getComputedStyle(document.documentElement)
-        .getPropertyValue('--file-tree-default-width');
-      appContainer.style.gridTemplateColumns = `${fileTreeWidth} 1fr`;
-    }
-  }
-
-  toggleAiPanel() {
-    const aiPanel = document.getElementById('aiPanel');
-    const appContainer = document.querySelector('.app-container');
-    
-    if (aiPanel.style.display === 'none') {
-      aiPanel.style.display = 'flex';
-      appContainer.classList.add('show-ai-panel');
-    } else {
-      aiPanel.style.display = 'none';
-      appContainer.classList.remove('show-ai-panel');
-    }
-  }
-
-  handleWindowResize() {
-    // Ensure panels maintain their constraints on window resize
-    const fileTreePanel = document.getElementById('fileTreePanel');
-    const currentWidth = fileTreePanel.getBoundingClientRect().width;
-    const constrainedWidth = this.constrainWidth('file-tree', currentWidth);
-    
-    if (constrainedWidth !== currentWidth) {
-      this.setPanelWidth('file-tree', constrainedWidth);
-    }
-  }
-
-  handleKeydown(e) {
-    // Keyboard shortcuts for layout management
-    if (e.ctrlKey || e.metaKey) {
-      switch (e.key) {
-        case 'o':
-        case 'O':
-          e.preventDefault();
-          selectVault();
-          break;
-        case 'n':
-        case 'N':
-          e.preventDefault();
-          createNewFile();
-          break;
-        case 's':
-        case 'S':
-          e.preventDefault();
-          saveFile();
-          break;
-        case 'e':
-        case 'E':
-          e.preventDefault();
-          toggleViewMode();
-          break;
-      }
-    }
-    
-    switch (e.key) {
-      case 'F1':
-        e.preventDefault();
-        this.toggleFileTree();
-        break;
-      case '?':
-        if (!e.ctrlKey && !e.metaKey) {
-          e.preventDefault();
-          toggleShortcutsHelp();
-        }
-        break;
-    }
-  }
-
-  saveLayoutState() {
-    const fileTreeWidth = getComputedStyle(document.documentElement)
-      .getPropertyValue('--file-tree-default-width');
-    const aiPanelWidth = getComputedStyle(document.documentElement)
-      .getPropertyValue('--ai-panel-default-width');
-    
-    const layoutState = {
-      fileTreeWidth: fileTreeWidth,
-      aiPanelWidth: aiPanelWidth,
-      fileTreeCollapsed: document.getElementById('fileTreePanel').classList.contains('collapsed'),
-      aiPanelVisible: document.getElementById('aiPanel').style.display !== 'none'
-    };
-    
-    try {
-      localStorage.setItem('aiNote_layoutState', JSON.stringify(layoutState));
-    } catch (error) {
-      console.error('Failed to save layout state:', error);
-    }
-  }
-
-  loadLayoutState() {
-    try {
-      const saved = localStorage.getItem('aiNote_layoutState');
-      return saved ? JSON.parse(saved) : null;
-    } catch (error) {
-      console.error('Failed to load layout state:', error);
-      return null;
-    }
-  }
-
-  applyLayoutState(layoutState) {
-    const root = document.documentElement;
-    const fileTreePanel = document.getElementById('fileTreePanel');
-    const aiPanel = document.getElementById('aiPanel');
-    const appContainer = document.querySelector('.app-container');
-    
-    if (layoutState.fileTreeWidth) {
-      root.style.setProperty('--file-tree-default-width', layoutState.fileTreeWidth);
-    }
-    
-    if (layoutState.aiPanelWidth) {
-      root.style.setProperty('--ai-panel-default-width', layoutState.aiPanelWidth);
-    }
-    
-    if (layoutState.fileTreeCollapsed) {
-      fileTreePanel.classList.add('collapsed');
-      appContainer.style.gridTemplateColumns = '0 1fr';
-    }
-    
-    if (layoutState.aiPanelVisible) {
-      aiPanel.style.display = 'flex';
-      appContainer.classList.add('show-ai-panel');
-    }
-  }
-}
-
-// Mobile Navigation Manager
-class MobileNavManager {
-  constructor() {
-    this.isOpen = false;
-    this.bindEvents();
-  }
-
-  bindEvents() {
-    // Close on overlay click
-    document.getElementById('mobileNavOverlay').addEventListener('click', (e) => {
-      if (e.target === e.currentTarget) {
-        this.close();
-      }
-    });
-  }
-
-  open() {
-    if (this.isOpen) return;
-    
-    const overlay = document.getElementById('mobileNavOverlay');
-    const navContent = document.getElementById('mobileNavContent');
-    const fileTreeContent = document.getElementById('fileTreeContent');
-    
-    // Clone file tree content to mobile nav
-    navContent.innerHTML = fileTreeContent.innerHTML;
-    
-    overlay.style.display = 'block';
-    // Force reflow before adding active class for animation
-    overlay.offsetHeight;
-    overlay.classList.add('active');
-    
-    this.isOpen = true;
-    document.body.style.overflow = 'hidden';
-  }
-
-  close() {
-    if (!this.isOpen) return;
-    
-    const overlay = document.getElementById('mobileNavOverlay');
-    
-    overlay.classList.remove('active');
-    setTimeout(() => {
-      overlay.style.display = 'none';
-    }, 250); // Match CSS transition duration
-    
-    this.isOpen = false;
-    document.body.style.overflow = '';
-  }
-}
-
-// Initialize layout managers
-const layoutManager = new LayoutManager();
-const mobileNavManager = new MobileNavManager();
+// Initialize layout managers (will be initialized after DOM load)
+let layoutManager;
+let mobileNavManager;
 
 /**
  * Update vault information display
@@ -403,15 +73,19 @@ function showNotification(message, type = 'info') {
     notification.id = 'notification';
     notification.style.cssText = `
       position: fixed;
-      top: 20px;
+      top: 70px;
       right: 20px;
       padding: 12px 20px;
       border-radius: 8px;
       color: white;
       font-weight: 500;
-      z-index: 1080;
+      z-index: 9999;
       transition: all 0.3s ease;
-      transform: translateX(100%);
+      transform: translateX(400px);
+      min-width: 200px;
+      max-width: 350px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(8px);
     `;
     document.body.appendChild(notification);
   }
@@ -429,10 +103,10 @@ function showNotification(message, type = 'info') {
   // Show notification
   notification.style.transform = 'translateX(0)';
   
-  // Auto-hide after 3 seconds
+  // Auto-hide after 4 seconds
   setTimeout(() => {
-    notification.style.transform = 'translateX(100%)';
-  }, 3000);
+    notification.style.transform = 'translateX(400px)';
+  }, 4000);
 }
 
 // Vault Operations
@@ -713,14 +387,21 @@ async function saveFile() {
  * Toggle file tree panel
  */
 function toggleFileTree() {
-  layoutManager.toggleFileTree();
+  if (layoutManager) {
+    layoutManager.toggleFileTree();
+  }
 }
 
 /**
- * Toggle AI panel (for future use)
+ * Toggle AI panel (temporary toggle for testing)
  */
 function toggleAiPanel() {
-  layoutManager.toggleAiPanel();
+  if (layoutManager) {
+    layoutManager.toggleAiPanel();
+    const aiPanel = document.getElementById('aiPanel');
+    const isVisible = aiPanel.style.display !== 'none';
+    showNotification(`AI Panel ${isVisible ? 'shown' : 'hidden'} (F2 to toggle)`, 'info');
+  }
 }
 
 /**
@@ -819,6 +500,10 @@ window.toggleShortcutsHelp = toggleShortcutsHelp;
 // Initialize the application
 window.addEventListener('DOMContentLoaded', () => {
   console.log('aiNote application initialized');
+  
+  // Initialize layout managers after DOM is ready
+  layoutManager = new LayoutManager();
+  mobileNavManager = new MobileNavManager();
   
   // Add file tree styling
   const fileTreeStyles = document.createElement('style');
