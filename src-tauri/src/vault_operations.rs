@@ -397,6 +397,67 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // Expensive test - run with --ignored
+    fn test_scan_vault_files_large_scale_performance() {
+        let env = TestEnv::new();
+        
+        println!("Creating large scale test vault with 1000+ files...");
+        
+        // Create directory structure
+        env.create_directory_structure(&[
+            "docs", "projects", "archive", "notes", "ideas",
+            "docs/api", "docs/guides", "projects/web", "projects/mobile",
+            "archive/2023", "archive/2024", "notes/daily", "notes/weekly"
+        ]).unwrap();
+        
+        // Create 1000 markdown files across the directory structure
+        let dirs = ["docs", "projects", "archive", "notes", "ideas", 
+                   "docs/api", "docs/guides", "projects/web", "projects/mobile",
+                   "archive/2023", "archive/2024", "notes/daily", "notes/weekly"];
+        
+        for i in 0..1000 {
+            let dir = dirs[i % dirs.len()];
+            let file_path = format!("{}/note_{:04}.md", dir, i);
+            let content = format!("# Note {}\n\nThis is note {} with content.\n\n## Details\n\nSome more content here to make it realistic.", i, i);
+            env.create_test_file(&file_path, &content).unwrap();
+        }
+        
+        // Add some non-markdown files (should be ignored)
+        for i in 0..100 {
+            let dir = dirs[i % dirs.len()];
+            let file_path = format!("{}/document_{:03}.txt", dir, i);
+            env.create_test_file(&file_path, &format!("Document {}", i)).unwrap();
+        }
+        
+        println!("Testing scan performance with 1000+ files...");
+        let start = std::time::Instant::now();
+        let result = scan_vault_files_internal(&env.get_path());
+        let duration = start.elapsed();
+
+        assert!(result.is_ok());
+        let files = result.unwrap();
+        let md_files: Vec<_> = files.iter().filter(|f| !f.is_dir && f.name.ends_with(".md")).collect();
+        let directories: Vec<_> = files.iter().filter(|f| f.is_dir).collect();
+        
+        println!("Performance Results:");
+        println!("  • Scan time: {:.2}ms", duration.as_secs_f64() * 1000.0);
+        println!("  • Markdown files found: {}", md_files.len());
+        println!("  • Directories found: {}", directories.len());
+        println!("  • Files per second: {:.0}", files.len() as f64 / duration.as_secs_f64());
+        
+        assert_eq!(md_files.len(), 1000);
+        assert_eq!(directories.len(), 13); // All the created directories
+        
+        // Performance target: <100ms for 1000 files (issue requirement)
+        let target_ms = 100;
+        assert!(duration.as_millis() < target_ms, 
+               "Scanning 1000+ files took {:.2}ms, exceeds target of {}ms", 
+               duration.as_secs_f64() * 1000.0, target_ms);
+        
+        println!("✅ Large scale performance test passed!");
+    }
+
+    #[test]
     fn test_scan_vault_files_mixed_file_types() {
         let env = TestEnv::new();
         
