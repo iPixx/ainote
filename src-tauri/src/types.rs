@@ -57,6 +57,27 @@ impl Default for LayoutState {
     }
 }
 
+/// Session state structure for UI navigation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionState {
+    /// Current vault path
+    pub current_vault: Option<String>,
+    /// Current file path
+    pub current_file: Option<String>,
+    /// Current view mode (editor/preview)
+    pub view_mode: String,
+}
+
+impl Default for SessionState {
+    fn default() -> Self {
+        Self {
+            current_vault: None,
+            current_file: None,
+            view_mode: "editor".to_string(),
+        }
+    }
+}
+
 /// Combined application state
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppState {
@@ -64,6 +85,8 @@ pub struct AppState {
     pub window: WindowState,
     /// Layout state
     pub layout: LayoutState,
+    /// Session state
+    pub session: SessionState,
 }
 
 /// FileInfo struct representing file metadata for frontend communication

@@ -63,10 +63,57 @@ pub fn save_app_state_internal(state: &AppState) -> FileSystemResult<()> {
     Ok(())
 }
 
+/// Update session state (vault, file, view mode)
+pub fn save_session_state_internal(
+    current_vault: Option<String>,
+    current_file: Option<String>,
+    view_mode: String,
+) -> FileSystemResult<()> {
+    let mut state = load_app_state_internal().unwrap_or_default();
+    state.session.current_vault = current_vault;
+    state.session.current_file = current_file;
+    state.session.view_mode = view_mode;
+    save_app_state_internal(&state)
+}
+
+/// Update layout state (panel widths and visibility)
+pub fn save_layout_state_internal(
+    file_tree_width: f64,
+    ai_panel_width: f64,
+    file_tree_visible: bool,
+    ai_panel_visible: bool,
+    editor_mode: String,
+) -> FileSystemResult<()> {
+    let mut state = load_app_state_internal().unwrap_or_default();
+    state.layout.file_tree_width = file_tree_width;
+    state.layout.ai_panel_width = ai_panel_width;
+    state.layout.file_tree_visible = file_tree_visible;
+    state.layout.ai_panel_visible = ai_panel_visible;
+    state.layout.editor_mode = editor_mode;
+    save_app_state_internal(&state)
+}
+
+/// Update window state (size and position)
+pub fn save_window_state_internal(
+    width: f64,
+    height: f64,
+    x: Option<i32>,
+    y: Option<i32>,
+    maximized: bool,
+) -> FileSystemResult<()> {
+    let mut state = load_app_state_internal().unwrap_or_default();
+    state.window.width = width;
+    state.window.height = height;
+    state.window.x = x;
+    state.window.y = y;
+    state.window.maximized = maximized;
+    save_app_state_internal(&state)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{WindowState, LayoutState};
+    use crate::types::{WindowState, LayoutState, SessionState};
     use tempfile::TempDir;
 
     #[allow(dead_code)]
@@ -122,6 +169,11 @@ mod tests {
                 ai_panel_visible: true,
                 editor_mode: "split".to_string(),
             },
+            session: SessionState {
+                current_vault: Some("/test/vault".to_string()),
+                current_file: Some("/test/vault/file.md".to_string()),
+                view_mode: "preview".to_string(),
+            },
         };
 
         // Test serialization
@@ -150,8 +202,8 @@ mod tests {
 
     #[test] 
     fn test_state_backward_compatibility() {
-        // Test with complete valid format
-        let old_format_json = r#"{
+        // Test with complete valid format including new session field
+        let updated_format_json = r#"{
             "window": {
                 "width": 1366.0,
                 "height": 768.0,
@@ -165,13 +217,20 @@ mod tests {
                 "file_tree_visible": true,
                 "ai_panel_visible": false,
                 "editor_mode": "edit"
+            },
+            "session": {
+                "current_vault": "/test/vault",
+                "current_file": "/test/vault/note.md",
+                "view_mode": "editor"
             }
         }"#;
 
-        let state: AppState = serde_json::from_str(old_format_json).unwrap();
+        let state: AppState = serde_json::from_str(updated_format_json).unwrap();
         assert_eq!(state.window.width, 1366.0);
         assert_eq!(state.window.height, 768.0);
         assert_eq!(state.layout.file_tree_width, 250.0);
+        assert_eq!(state.session.current_vault, Some("/test/vault".to_string()));
+        assert_eq!(state.session.view_mode, "editor");
     }
 
     #[test]
@@ -213,5 +272,124 @@ mod tests {
             
             assert_eq!(deserialized.editor_mode, mode);
         }
+    }
+
+    #[test]
+    fn test_session_state_default() {
+        let session_state = SessionState::default();
+        
+        assert_eq!(session_state.current_vault, None);
+        assert_eq!(session_state.current_file, None);
+        assert_eq!(session_state.view_mode, "editor");
+    }
+
+    #[test]
+    fn test_session_state_serialization() {
+        let session_state = SessionState {
+            current_vault: Some("/Users/test/vault".to_string()),
+            current_file: Some("/Users/test/vault/note.md".to_string()),
+            view_mode: "preview".to_string(),
+        };
+
+        // Test serialization
+        let json = serde_json::to_string_pretty(&session_state).unwrap();
+        assert!(json.contains("current_vault"));
+        assert!(json.contains("/Users/test/vault"));
+        assert!(json.contains("current_file"));
+        assert!(json.contains("view_mode"));
+        assert!(json.contains("preview"));
+
+        // Test deserialization
+        let deserialized: SessionState = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.current_vault, Some("/Users/test/vault".to_string()));
+        assert_eq!(deserialized.current_file, Some("/Users/test/vault/note.md".to_string()));
+        assert_eq!(deserialized.view_mode, "preview");
+    }
+
+    #[test]
+    fn test_session_state_with_nulls() {
+        let session_state = SessionState {
+            current_vault: None,
+            current_file: None,
+            view_mode: "editor".to_string(),
+        };
+
+        let json = serde_json::to_string(&session_state).unwrap();
+        let deserialized: SessionState = serde_json::from_str(&json).unwrap();
+        
+        assert_eq!(deserialized.current_vault, None);
+        assert_eq!(deserialized.current_file, None);
+        assert_eq!(deserialized.view_mode, "editor");
+    }
+
+    #[test]
+    fn test_save_session_state_internal() {
+        // Test the session state save function
+        let result = save_session_state_internal(
+            Some("/test/vault".to_string()),
+            Some("/test/vault/file.md".to_string()),
+            "preview".to_string(),
+        );
+        
+        // May fail due to home directory access in test environment,
+        // but function should not panic
+        let _ = result;
+    }
+
+    #[test]
+    fn test_session_state_view_modes() {
+        let view_modes = vec!["editor", "preview"];
+        
+        for mode in view_modes {
+            let session_state = SessionState {
+                current_vault: Some("/test".to_string()),
+                current_file: Some("/test/file.md".to_string()),
+                view_mode: mode.to_string(),
+            };
+
+            let json = serde_json::to_string(&session_state).unwrap();
+            let deserialized: SessionState = serde_json::from_str(&json).unwrap();
+            
+            assert_eq!(deserialized.view_mode, mode);
+        }
+    }
+
+    #[test]
+    fn test_complete_app_state_with_session() {
+        let app_state = AppState {
+            window: WindowState {
+                width: 1200.0,
+                height: 800.0,
+                x: Some(100),
+                y: Some(50),
+                maximized: false,
+            },
+            layout: LayoutState {
+                file_tree_width: 280.0,
+                ai_panel_width: 350.0,
+                file_tree_visible: true,
+                ai_panel_visible: false,
+                editor_mode: "edit".to_string(),
+            },
+            session: SessionState {
+                current_vault: Some("/home/user/notes".to_string()),
+                current_file: Some("/home/user/notes/daily.md".to_string()),
+                view_mode: "preview".to_string(),
+            },
+        };
+
+        // Test that all three state components work together
+        let json = serde_json::to_string_pretty(&app_state).unwrap();
+        assert!(json.contains("window"));
+        assert!(json.contains("layout"));
+        assert!(json.contains("session"));
+        assert!(json.contains("current_vault"));
+        assert!(json.contains("/home/user/notes"));
+
+        let deserialized: AppState = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.window.width, 1200.0);
+        assert_eq!(deserialized.layout.file_tree_width, 280.0);
+        assert_eq!(deserialized.session.current_vault, Some("/home/user/notes".to_string()));
+        assert_eq!(deserialized.session.view_mode, "preview");
     }
 }

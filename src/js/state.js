@@ -40,15 +40,15 @@ class AppState {
     // Event system for component communication
     this.eventListeners = new Map();
 
-    // Initialize state from localStorage if available
+    // Initialize state from JSON file if available
     this.loadState();
   }
 
   /**
-   * Set the current vault path and persist to localStorage
+   * Set the current vault path and persist to JSON file
    * @param {string|null} vaultPath - Path to the vault directory
    */
-  setVault(vaultPath) {
+  async setVault(vaultPath) {
     if (this.currentVault === vaultPath) return;
 
     const previousVault = this.currentVault;
@@ -61,7 +61,7 @@ class AppState {
       this.unsavedChanges = false;
     }
 
-    this.saveState();
+    await this.saveState();
     this.emit(AppState.EVENTS.VAULT_CHANGED, { 
       vault: vaultPath, 
       previousVault 
@@ -69,10 +69,10 @@ class AppState {
   }
 
   /**
-   * Set the current file path and persist to localStorage
+   * Set the current file path and persist to JSON file
    * @param {string|null} filePath - Path to the current file
    */
-  setCurrentFile(filePath) {
+  async setCurrentFile(filePath) {
     if (this.currentFile === filePath) return;
 
     const previousFile = this.currentFile;
@@ -83,7 +83,7 @@ class AppState {
       this.unsavedChanges = false;
     }
 
-    this.saveState();
+    await this.saveState();
     this.emit(AppState.EVENTS.FILE_CHANGED, { 
       file: filePath, 
       previousFile 
@@ -107,7 +107,7 @@ class AppState {
    * Set the view mode explicitly
    * @param {string} mode - View mode (editor or preview)
    */
-  setViewMode(mode) {
+  async setViewMode(mode) {
     if (!Object.values(AppState.VIEW_MODES).includes(mode)) {
       throw new Error(`Invalid view mode: ${mode}`);
     }
@@ -117,7 +117,7 @@ class AppState {
     const previousMode = this.viewMode;
     this.viewMode = mode;
 
-    this.saveState();
+    await this.saveState();
     this.emit(AppState.EVENTS.VIEW_MODE_CHANGED, { 
       mode, 
       previousMode 
@@ -132,7 +132,7 @@ class AppState {
     if (this.unsavedChanges === isDirty) return;
 
     this.unsavedChanges = isDirty;
-    this.saveState();
+    // Note: Don't save dirty state to file, it's session-only
     this.emit(AppState.EVENTS.DIRTY_STATE_CHANGED, { 
       isDirty, 
       file: this.currentFile 
@@ -170,51 +170,46 @@ class AppState {
   }
 
   /**
-   * Save current state to localStorage
-   * Performance target: <5ms
+   * Save current state to unified JSON file via Tauri
+   * Performance target: <50ms
    */
-  saveState() {
+  async saveState() {
     try {
-      const state = {
+      await window.__TAURI__.core.invoke('save_session_state', {
         currentVault: this.currentVault,
         currentFile: this.currentFile,
-        viewMode: this.viewMode,
-        // Note: Don't persist unsavedChanges or files array
-        // These should be reset on application restart
-      };
-
-      localStorage.setItem('aiNote_appState', JSON.stringify(state));
+        viewMode: this.viewMode
+      });
     } catch (error) {
-      console.error('Failed to save state to localStorage:', error);
+      console.error('Failed to save session state:', error);
     }
   }
 
   /**
-   * Load state from localStorage
+   * Load state from unified JSON file via Tauri
    * Restores vault, file, and view mode preferences
    */
-  loadState() {
+  async loadState() {
     try {
-      const savedState = localStorage.getItem('aiNote_appState');
-      if (!savedState) return;
+      const appState = await window.__TAURI__.core.invoke('load_app_state');
+      
+      if (appState?.session) {
+        // Validate and restore session properties
+        if (appState.session.current_vault && typeof appState.session.current_vault === 'string') {
+          this.currentVault = appState.session.current_vault;
+        }
 
-      const state = JSON.parse(savedState);
+        if (appState.session.current_file && typeof appState.session.current_file === 'string') {
+          this.currentFile = appState.session.current_file;
+        }
 
-      // Validate and restore state properties
-      if (state.currentVault && typeof state.currentVault === 'string') {
-        this.currentVault = state.currentVault;
-      }
-
-      if (state.currentFile && typeof state.currentFile === 'string') {
-        this.currentFile = state.currentFile;
-      }
-
-      if (state.viewMode && Object.values(AppState.VIEW_MODES).includes(state.viewMode)) {
-        this.viewMode = state.viewMode;
+        if (appState.session.view_mode && Object.values(AppState.VIEW_MODES).includes(appState.session.view_mode)) {
+          this.viewMode = appState.session.view_mode;
+        }
       }
 
     } catch (error) {
-      console.error('Failed to load state from localStorage:', error);
+      console.error('Failed to load session state:', error);
       // Reset to defaults on error
       this.currentVault = null;
       this.currentFile = null;
@@ -278,18 +273,18 @@ class AppState {
    * Clear all state and reset to defaults
    * Useful for logout or vault switching
    */
-  reset() {
+  async reset() {
     this.currentVault = null;
     this.currentFile = null;
     this.viewMode = AppState.VIEW_MODES.EDITOR;
     this.unsavedChanges = false;
     this.files = [];
 
-    // Clear localStorage
+    // Clear state file (reset to defaults)
     try {
-      localStorage.removeItem('aiNote_appState');
+      await this.saveState();
     } catch (error) {
-      console.error('Failed to clear localStorage:', error);
+      console.error('Failed to reset state file:', error);
     }
 
     // Emit reset events

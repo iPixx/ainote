@@ -564,6 +564,7 @@ const debouncedSaveLayoutState = debounce(saveLayoutState, 300);
 
 /**
  * Force save all application state (useful for manual triggers)
+ * Now uses unified JSON file storage only
  */
 async function forceSaveAllState() {
   try {
@@ -571,9 +572,12 @@ async function forceSaveAllState() {
     
     await saveWindowState();
     
-    if (layoutManager && layoutManager.getCurrentLayoutState) {
-      const layoutState = layoutManager.getCurrentLayoutState();
-      await saveLayoutState(layoutState);
+    if (layoutManager && layoutManager.saveState) {
+      await layoutManager.saveState();
+    }
+    
+    if (appState && appState.saveState) {
+      await appState.saveState();
     }
     
     console.log('✅ All application state saved successfully');
@@ -681,7 +685,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Longer delay to ensure window is fully ready on all platforms
   await new Promise(resolve => setTimeout(resolve, 500));
   
-  // Load saved window and layout state
+  // Load saved window and layout state from unified JSON file
   console.log('📥 Loading saved application state...');
   const savedAppState = await loadWindowState();
   

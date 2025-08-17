@@ -500,35 +500,32 @@ class LayoutManager {
     console.log(`📍 Toggle buttons updated: ${this.panelState.fileTreeCollapsed ? '➡️ (expand)' : '⬅️ (collapse)'}`);
   }
 
-  saveState() {
-    const state = {
-      fileTreeWidth: getComputedStyle(document.documentElement).getPropertyValue('--file-tree-default-width'),
-      aiPanelWidth: getComputedStyle(document.documentElement).getPropertyValue('--ai-panel-default-width'),
-      fileTreeCollapsed: this.panelState.fileTreeCollapsed,
-      aiPanelVisible: this.panelState.aiPanelVisible
-    };
-    
+  async saveState() {
     try {
-      localStorage.setItem('aiNote_layoutState', JSON.stringify(state));
-      console.log('💾 Layout state saved successfully');
+      const layoutState = this.getCurrentLayoutState();
       
-      // Also trigger the new persistent save function if available
-      if (window.debouncedSaveLayoutState) {
-        window.debouncedSaveLayoutState(this.getCurrentLayoutState());
-      }
+      await window.__TAURI__.core.invoke('save_layout_state', {
+        fileTreeWidth: layoutState.fileTreeWidth,
+        aiPanelWidth: layoutState.aiPanelWidth,
+        fileTreeVisible: layoutState.fileTreeVisible,
+        aiPanelVisible: layoutState.aiPanelVisible,
+        editorMode: layoutState.editorMode
+      });
+      
+      console.log('💾 Layout state saved successfully');
     } catch (error) {
       console.error('❌ Failed to save layout state:', error);
     }
   }
 
-  loadSavedState() {
+  async loadSavedState() {
     try {
-      const saved = localStorage.getItem('aiNote_layoutState');
-      if (!saved) return;
+      const appState = await window.__TAURI__.core.invoke('load_app_state');
       
-      const state = JSON.parse(saved);
-      this.applyState(state);
-      console.log('📂 Layout state loaded successfully');
+      if (appState?.layout) {
+        this.applyLayoutState(appState.layout);
+        console.log('📂 Layout state loaded successfully');
+      }
     } catch (error) {
       console.error('❌ Failed to load layout state:', error);
     }
@@ -605,17 +602,17 @@ class LayoutManager {
     console.log('📥 Applying saved layout state:', layoutState);
 
     // Apply panel widths
-    if (layoutState.fileTreeWidth) {
-      document.documentElement.style.setProperty('--file-tree-default-width', `${layoutState.fileTreeWidth}px`);
+    if (layoutState.file_tree_width) {
+      document.documentElement.style.setProperty('--file-tree-default-width', `${layoutState.file_tree_width}px`);
     }
 
-    if (layoutState.aiPanelWidth) {
-      document.documentElement.style.setProperty('--ai-panel-default-width', `${layoutState.aiPanelWidth}px`);
+    if (layoutState.ai_panel_width) {
+      document.documentElement.style.setProperty('--ai-panel-default-width', `${layoutState.ai_panel_width}px`);
     }
 
     // Apply panel visibility states
-    this.panelState.fileTreeCollapsed = !layoutState.fileTreeVisible;
-    this.panelState.aiPanelVisible = layoutState.aiPanelVisible || false;
+    this.panelState.fileTreeCollapsed = !layoutState.file_tree_visible;
+    this.panelState.aiPanelVisible = layoutState.ai_panel_visible || false;
 
     // Apply DOM states
     const fileTreePanel = this.getElement('file-tree');

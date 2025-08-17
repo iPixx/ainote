@@ -95,13 +95,7 @@ fn save_app_state(state: AppState) -> Result<(), String> {
 
 #[tauri::command]
 fn save_window_state(width: f64, height: f64, x: Option<i32>, y: Option<i32>, maximized: bool) -> Result<(), String> {
-    let mut state = state_management::load_app_state_internal().unwrap_or_default();
-    state.window.width = width;
-    state.window.height = height;
-    state.window.x = x;
-    state.window.y = y;
-    state.window.maximized = maximized;
-    state_management::save_app_state_internal(&state).map_err(|e| e.into())
+    state_management::save_window_state_internal(width, height, x, y, maximized).map_err(|e| e.into())
 }
 
 #[tauri::command]
@@ -112,13 +106,22 @@ fn save_layout_state(
     ai_panel_visible: bool,
     editor_mode: String,
 ) -> Result<(), String> {
-    let mut state = state_management::load_app_state_internal().unwrap_or_default();
-    state.layout.file_tree_width = file_tree_width;
-    state.layout.ai_panel_width = ai_panel_width;
-    state.layout.file_tree_visible = file_tree_visible;
-    state.layout.ai_panel_visible = ai_panel_visible;
-    state.layout.editor_mode = editor_mode;
-    state_management::save_app_state_internal(&state).map_err(|e| e.into())
+    state_management::save_layout_state_internal(
+        file_tree_width,
+        ai_panel_width,
+        file_tree_visible,
+        ai_panel_visible,
+        editor_mode,
+    ).map_err(|e| e.into())
+}
+
+#[tauri::command]
+fn save_session_state(
+    current_vault: Option<String>,
+    current_file: Option<String>,
+    view_mode: String,
+) -> Result<(), String> {
+    state_management::save_session_state_internal(current_vault, current_file, view_mode).map_err(|e| e.into())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -211,7 +214,8 @@ pub fn run() {
             load_app_state,
             save_app_state,
             save_window_state,
-            save_layout_state
+            save_layout_state,
+            save_session_state
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -693,9 +697,18 @@ mod tests {
                 ai_panel_visible: false,
                 editor_mode: "split".to_string(),
             },
+            session: crate::types::SessionState::default(),
         };
         
         let _save_state_result = save_app_state(test_state.clone());
+        // May fail due to home directory access, which is expected
+        
+        // Test session state commands
+        let _session_save_result = save_session_state(
+            Some("/test/vault".to_string()),
+            Some("/test/vault/file.md".to_string()),
+            "preview".to_string(),
+        );
         // May fail due to home directory access, which is expected
         
         // Test individual state save commands
