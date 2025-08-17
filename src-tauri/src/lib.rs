@@ -159,40 +159,33 @@ pub fn run() {
                 }
             }
             
+            // Helper function to save window state consistently
+            fn save_current_window_state(window: &tauri::WebviewWindow) {
+                if let (Ok(size), Ok(position)) = (window.inner_size(), window.outer_position()) {
+                    let is_maximized = window.is_maximized().unwrap_or(false);
+                    let scale_factor = window.scale_factor().unwrap_or(1.0);
+                    let logical_size = size.to_logical::<f64>(scale_factor);
+                    let logical_position = position.to_logical::<i32>(scale_factor);
+                    let _ = save_window_state(
+                        logical_size.width,
+                        logical_size.height,
+                        Some(logical_position.x),
+                        Some(logical_position.y),
+                        is_maximized
+                    );
+                }
+            }
+
             // Handle window events
             let window_clone = window.clone();
             window.on_window_event(move |event| {
                 match event {
                     tauri::WindowEvent::CloseRequested { .. } => {
-                        // Save window state before closing
-                        if let Ok(size) = window_clone.inner_size() {
-                            if let Ok(position) = window_clone.outer_position() {
-                                let is_maximized = window_clone.is_maximized().unwrap_or(false);
-                                let _ = save_window_state(
-                                    size.width as f64,
-                                    size.height as f64,
-                                    Some(position.x),
-                                    Some(position.y),
-                                    is_maximized
-                                );
-                            }
-                        }
+                        save_current_window_state(&window_clone);
                         std::process::exit(0);
                     }
                     tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
-                        // Save window state on resize or move
-                        if let Ok(size) = window_clone.inner_size() {
-                            if let Ok(position) = window_clone.outer_position() {
-                                let is_maximized = window_clone.is_maximized().unwrap_or(false);
-                                let _ = save_window_state(
-                                    size.width as f64,
-                                    size.height as f64,
-                                    Some(position.x),
-                                    Some(position.y),
-                                    is_maximized
-                                );
-                            }
-                        }
+                        save_current_window_state(&window_clone);
                     }
                     _ => {}
                 }
