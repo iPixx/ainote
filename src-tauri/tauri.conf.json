@@ -11,8 +11,8 @@
     "windows": [
       {
         "title": "ainote",
-        "width": 1920,
-        "height": 1080,
+        "width": 1200,
+        "height": 800,
         "resizable": true,
         "maximizable": true,
         "minimizable": true,
@@ -24,7 +24,8 @@
     ],
     "security": {
       "csp": null
-    }
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,

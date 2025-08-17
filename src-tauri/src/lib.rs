@@ -5,6 +5,7 @@ use thiserror::Error;
 use std::collections::HashSet;
 use std::sync::{Mutex, LazyLock};
 use std::time::Instant;
+use tauri::Manager;
 
 /// Performance instrumentation module
 pub mod performance {
@@ -523,8 +524,8 @@ pub struct WindowState {
 impl Default for WindowState {
     fn default() -> Self {
         Self {
-            width: 1920.0,
-            height: 1080.0,
+            width: 1200.0,
+            height: 800.0,
             x: None,
             y: None,
             maximized: false,
@@ -1254,6 +1255,78 @@ fn save_layout_state(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            let window = app.get_webview_window("main").unwrap();
+            
+            // Load and apply saved window state
+            if let Ok(app_state) = load_app_state_internal() {
+                let window_state = &app_state.window;
+                
+                // Validate and constrain window size to reasonable bounds
+                let validated_width = window_state.width.max(800.0).min(2000.0);
+                let validated_height = window_state.height.max(600.0).min(1400.0);
+                
+                // Apply saved window size with validation
+                let _ = window.set_size(tauri::LogicalSize::new(
+                    validated_width,
+                    validated_height,
+                ));
+                
+                // Apply saved window position if available
+                if let (Some(x), Some(y)) = (window_state.x, window_state.y) {
+                    // Validate position to ensure window is on screen
+                    let validated_x = x.max(-100).min(1500);
+                    let validated_y = y.max(-100).min(1000);
+                    let _ = window.set_position(tauri::LogicalPosition::new(validated_x, validated_y));
+                }
+                
+                // Apply maximized state
+                if window_state.maximized {
+                    let _ = window.maximize();
+                }
+            }
+            
+            // Handle window events
+            let window_clone = window.clone();
+            window.on_window_event(move |event| {
+                match event {
+                    tauri::WindowEvent::CloseRequested { .. } => {
+                        // Save window state before closing
+                        if let Ok(size) = window_clone.inner_size() {
+                            if let Ok(position) = window_clone.outer_position() {
+                                let is_maximized = window_clone.is_maximized().unwrap_or(false);
+                                let _ = save_window_state(
+                                    size.width as f64,
+                                    size.height as f64,
+                                    Some(position.x),
+                                    Some(position.y),
+                                    is_maximized
+                                );
+                            }
+                        }
+                        std::process::exit(0);
+                    }
+                    tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
+                        // Save window state on resize or move
+                        if let Ok(size) = window_clone.inner_size() {
+                            if let Ok(position) = window_clone.outer_position() {
+                                let is_maximized = window_clone.is_maximized().unwrap_or(false);
+                                let _ = save_window_state(
+                                    size.width as f64,
+                                    size.height as f64,
+                                    Some(position.x),
+                                    Some(position.y),
+                                    is_maximized
+                                );
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            });
+            
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             read_file,
             write_file,
@@ -2301,8 +2374,8 @@ mod tests {
         fn test_window_state_default_values() {
             let window_state = WindowState::default();
             
-            assert_eq!(window_state.width, 1920.0);
-            assert_eq!(window_state.height, 1080.0);
+            assert_eq!(window_state.width, 1200.0);
+            assert_eq!(window_state.height, 800.0);
             assert_eq!(window_state.x, None);
             assert_eq!(window_state.y, None);
             assert_eq!(window_state.maximized, false);
@@ -2323,8 +2396,8 @@ mod tests {
         fn test_app_state_default_values() {
             let app_state = AppState::default();
             
-            assert_eq!(app_state.window.width, 1920.0);
-            assert_eq!(app_state.window.height, 1080.0);
+            assert_eq!(app_state.window.width, 1200.0);
+            assert_eq!(app_state.window.height, 800.0);
             assert_eq!(app_state.layout.file_tree_width, 280.0);
             assert_eq!(app_state.layout.ai_panel_width, 350.0);
             assert_eq!(app_state.layout.file_tree_visible, true);
@@ -2432,7 +2505,7 @@ mod tests {
             assert!(result.is_ok());
             
             let state = result.unwrap();
-            assert_eq!(state.window.width, 1920.0);
+            assert_eq!(state.window.width, 1200.0);
             assert_eq!(state.layout.file_tree_width, 280.0);
             
             // Clean up
@@ -2643,8 +2716,8 @@ mod tests {
             
             let app_state = AppState {
                 window: WindowState {
-                    width: 1920.0,
-                    height: 1080.0,
+                    width: 1200.0,
+                    height: 800.0,
                     x: Some(100),
                     y: Some(50),
                     maximized: false,
@@ -2690,7 +2763,7 @@ mod tests {
                 let content = fs::read_to_string(&state_file).unwrap();
                 let state: AppState = serde_json::from_str(&content).unwrap();
                 
-                assert_eq!(state.window.width, 1920.0);
+                assert_eq!(state.window.width, 1200.0);
                 assert_eq!(state.layout.file_tree_width, 280.0);
             }
         }
@@ -2744,7 +2817,7 @@ mod tests {
             // Test that we can handle various window sizes
             let test_cases = vec![
                 (800.0, 600.0),    // Small window
-                (1920.0, 1080.0), // Full HD
+                (1200.0, 800.0),  // Default size
                 (2560.0, 1440.0), // QHD
                 (3840.0, 2160.0), // 4K
             ];
@@ -2827,7 +2900,7 @@ mod tests {
             assert!(save_result.is_ok() || save_result.is_err()); // Should return some result
             
             // Test save_window_state command
-            let window_result = save_window_state(1920.0, 1080.0, Some(100), Some(50), false);
+            let window_result = save_window_state(1200.0, 800.0, Some(100), Some(50), false);
             assert!(window_result.is_ok() || window_result.is_err()); // Should return some result
             
             // Test save_layout_state command
