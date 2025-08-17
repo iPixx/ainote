@@ -1,5 +1,5 @@
 /**
- * LayoutManager - Advanced layout management for aiNote three-column system
+ * LayoutManager - Reliable layout management for aiNote three-column system
  * 
  * Manages CSS Grid layout with resizable columns, responsive design,
  * and state persistence following local-first principles.
@@ -8,259 +8,367 @@
  */
 class LayoutManager {
   constructor() {
-    this.isResizing = false;
-    this.currentResizeHandle = null;
-    this.initialMouseX = 0;
-    this.initialPanelWidth = 0;
-    this.minWidths = {
-      'file-tree': 250,
-      'editor': 600,
-      'ai-panel': 300
-    };
-    this.maxWidths = {
-      'file-tree': 400,
-      'editor': null, // No max width
-      'ai-panel': 500
+    // Resize state
+    this.resizeState = {
+      isResizing: false,
+      currentHandle: null,
+      targetPanel: null,
+      startX: 0,
+      startWidth: 0
     };
     
-    this.initializeLayout();
-    this.bindEvents();
+    // Panel constraints
+    this.constraints = {
+      'file-tree': { min: 250, max: 400, default: 280 },
+      'editor': { min: 600, max: null, default: null }, // Flexible
+      'ai-panel': { min: 300, max: 500, default: 350 }
+    };
+    
+    // Panel state
+    this.panelState = {
+      fileTreeCollapsed: false,
+      aiPanelVisible: false
+    };
+    
+    // Initialize when DOM is ready
+    this.initialize();
   }
 
-  initializeLayout() {
-    // Load saved layout preferences from localStorage
-    const savedLayout = this.loadLayoutState();
-    if (savedLayout) {
-      this.applyLayoutState(savedLayout);
-    }
-  }
-
-  bindEvents() {
-    // Defer resize handle binding until DOM is ready
-    this.bindResizeHandles();
-
-    // Global mouse events for resize
-    document.addEventListener('mousemove', (e) => this.handleResize(e));
-    document.addEventListener('mouseup', () => this.stopResize());
-
-    // Window resize handler
-    window.addEventListener('resize', () => this.handleWindowResize());
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => this.handleKeydown(e));
-  }
-
-  bindResizeHandles() {
-    // Wait for DOM to be ready
-    if (document.readyState !== 'complete') {
-      setTimeout(() => this.bindResizeHandles(), 100);
+  initialize() {
+    // Wait for DOM to be completely ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.initialize());
       return;
     }
     
-    // Remove existing listeners first
-    document.querySelectorAll('.resize-handle').forEach(handle => {
-      // Clone node to remove all event listeners
-      const newHandle = handle.cloneNode(true);
-      handle.parentNode.replaceChild(newHandle, handle);
-    });
+    // Initialize in phases for reliability
+    this.setupEventListeners();
+    this.loadSavedState();
+    this.setupResizeHandles();
+    this.updateLayout();
+    this.updateExpandButton();
     
-    // Bind resize handle events to fresh handles
-    document.querySelectorAll('.resize-handle').forEach(handle => {
-      handle.addEventListener('mousedown', (e) => this.startResize(e));
-      console.log('✅ Bound resize handle:', handle.dataset.panel);
-    });
-    
-    console.log('🔄 Resize handles rebound');
+    console.log('✅ LayoutManager initialized successfully');
   }
 
-  startResize(e) {
+  setupEventListeners() {
+    // Global mouse events for resize (with proper binding)
+    this.handleMouseMove = this.handleMouseMove.bind(this);
+    this.handleMouseUp = this.handleMouseUp.bind(this);
+    this.handleKeydown = this.handleKeydown.bind(this);
+    this.handleWindowResize = this.handleWindowResize.bind(this);
+
+    document.addEventListener('mousemove', this.handleMouseMove);
+    document.addEventListener('mouseup', this.handleMouseUp);
+    document.addEventListener('keydown', this.handleKeydown);
+    window.addEventListener('resize', this.handleWindowResize);
+    
+    console.log('📡 Event listeners setup complete');
+  }
+
+  setupResizeHandles() {
+    const handles = document.querySelectorAll('.resize-handle');
+    
+    // Bind the method once if not already bound
+    if (!this.boundHandleMouseDown) {
+      this.boundHandleMouseDown = this.handleMouseDown.bind(this);
+    }
+    
+    handles.forEach(handle => {
+      const panel = handle.dataset.panel;
+      
+      // Only setup handles for panels that should be resizable
+      if (panel === 'file-tree' || panel === 'editor') {
+        // Remove any existing listeners
+        handle.removeEventListener('mousedown', this.boundHandleMouseDown);
+        
+        // Add new listener with proper binding
+        handle.addEventListener('mousedown', this.boundHandleMouseDown);
+        
+        console.log(`🎯 Setup resize handle for: ${panel}`);
+      }
+    });
+    
+    console.log('🔧 Resize handles setup complete');
+  }
+
+  handleMouseDown(e) {
     e.preventDefault();
-    this.isResizing = true;
-    this.currentResizeHandle = e.target;
-    this.initialMouseX = e.clientX;
+    e.stopPropagation();
     
-    const panel = this.getPanelFromHandle(this.currentResizeHandle);
-    const panelElement = this.getPanelElement(panel);
+    const handle = e.target;
+    const handlePanel = handle.dataset.panel;
     
-    if (!panelElement) {
-      console.warn('Panel element not found for:', panel);
+    // Determine which panel we're actually resizing
+    let targetPanel;
+    if (handlePanel === 'file-tree') {
+      targetPanel = 'file-tree';
+    } else if (handlePanel === 'editor') {
+      // Editor handle resizes the AI panel
+      targetPanel = 'ai-panel';
+      
+      // Only allow resizing if AI panel is visible
+      const aiPanel = this.getElement('ai-panel');
+      if (!aiPanel || aiPanel.style.display === 'none') {
+        console.log('🚫 Cannot resize AI panel - not visible');
+        return;
+      }
+    } else {
+      console.warn('🚫 Unknown resize handle:', handlePanel);
       return;
     }
     
-    this.initialPanelWidth = panelElement.getBoundingClientRect().width;
+    const targetElement = this.getElement(targetPanel);
+    if (!targetElement) {
+      console.error('🚫 Target panel element not found:', targetPanel);
+      return;
+    }
     
-    // Add resizing class for visual feedback
-    this.currentResizeHandle.classList.add('resizing');
+    // Set resize state
+    this.resizeState = {
+      isResizing: true,
+      currentHandle: handle,
+      targetPanel: targetPanel,
+      startX: e.clientX,
+      startWidth: targetElement.getBoundingClientRect().width
+    };
+    
+    // Visual feedback
+    handle.classList.add('resizing');
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
     
-    console.log('🎯 Started resizing:', panel, 'initial width:', this.initialPanelWidth);
+    console.log(`🎯 Started resizing ${targetPanel}, initial width: ${this.resizeState.startWidth}px`);
   }
 
-  handleResize(e) {
-    if (!this.isResizing || !this.currentResizeHandle) return;
+  handleMouseMove(e) {
+    if (!this.resizeState.isResizing) return;
     
     e.preventDefault();
-    const deltaX = e.clientX - this.initialMouseX;
-    const panel = this.getPanelFromHandle(this.currentResizeHandle);
-    const newWidth = this.initialPanelWidth + deltaX;
     
-    // Apply width constraints
-    const constrainedWidth = this.constrainWidth(panel, newWidth);
-    this.setPanelWidth(panel, constrainedWidth);
+    const { targetPanel, startX, startWidth } = this.resizeState;
+    const deltaX = e.clientX - startX;
+    
+    let newWidth;
+    
+    // Calculate new width based on panel type
+    if (targetPanel === 'ai-panel') {
+      // AI panel resizes in reverse (dragging left makes it larger)
+      newWidth = startWidth - deltaX;
+    } else {
+      // File tree panel resizes normally (dragging right makes it larger)
+      newWidth = startWidth + deltaX;
+    }
+    
+    // Apply constraints and update
+    const constrainedWidth = this.constrainWidth(targetPanel, newWidth);
+    this.setPanelWidth(targetPanel, constrainedWidth);
   }
 
-  stopResize() {
-    if (!this.isResizing) return;
+  handleMouseUp(e) {
+    if (!this.resizeState.isResizing) return;
     
-    this.isResizing = false;
-    if (this.currentResizeHandle) {
-      this.currentResizeHandle.classList.remove('resizing');
+    // Clean up resize state
+    if (this.resizeState.currentHandle) {
+      this.resizeState.currentHandle.classList.remove('resizing');
     }
-    this.currentResizeHandle = null;
     
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
     
-    // Save layout state
-    this.saveLayoutState();
+    // Save state
+    this.saveState();
     
-    console.log('🏁 Resize completed');
+    console.log(`🏁 Resize completed for ${this.resizeState.targetPanel}`);
+    
+    // Reset state
+    this.resizeState = {
+      isResizing: false,
+      currentHandle: null,
+      targetPanel: null,
+      startX: 0,
+      startWidth: 0
+    };
   }
 
-  getPanelFromHandle(handle) {
-    return handle.dataset.panel;
-  }
-
-  getPanelElement(panel) {
-    switch (panel) {
-      case 'file-tree': return document.getElementById('fileTreePanel');
-      case 'editor': return document.getElementById('editorPanel');
-      case 'ai-panel': return document.getElementById('aiPanel');
-      default: return null;
+  getElement(panel) {
+    const elements = {
+      'file-tree': 'fileTreePanel',
+      'editor': 'editorPanel',
+      'ai-panel': 'aiPanel',
+      'app-container': 'app-container'
+    };
+    
+    const id = elements[panel];
+    if (!id) {
+      console.error(`🚫 Unknown panel: ${panel}`);
+      return null;
     }
+    
+    const element = document.getElementById(id) || document.querySelector(`.${id}`);
+    if (!element) {
+      console.error(`🚫 Element not found for panel: ${panel}`);
+    }
+    
+    return element;
   }
 
   constrainWidth(panel, width) {
-    const min = this.minWidths[panel];
-    const max = this.maxWidths[panel];
-    
-    if (width < min) return min;
-    if (max && width > max) return max;
-    
-    // Additional constraint: ensure editor panel maintains minimum width
-    if (panel === 'file-tree') {
-      const appContainer = document.querySelector('.app-container');
-      const totalWidth = appContainer.getBoundingClientRect().width;
-      const aiPanelWidth = this.getAiPanelWidth();
-      const maxFileTreeWidth = totalWidth - this.minWidths.editor - aiPanelWidth - 20; // 20px for borders/margins
-      
-      if (width > maxFileTreeWidth) return maxFileTreeWidth;
+    const constraint = this.constraints[panel];
+    if (!constraint) {
+      console.error(`🚫 No constraints defined for panel: ${panel}`);
+      return width;
     }
     
-    return width;
+    // Apply basic min/max constraints
+    let constrainedWidth = Math.max(width, constraint.min);
+    if (constraint.max) {
+      constrainedWidth = Math.min(constrainedWidth, constraint.max);
+    }
+    
+    // Apply contextual constraints to ensure layout stability
+    const appContainer = this.getElement('app-container');
+    if (!appContainer) return constrainedWidth;
+    
+    const totalWidth = appContainer.getBoundingClientRect().width;
+    const editorMinWidth = this.constraints.editor.min;
+    const margins = 20; // Account for borders, padding, etc.
+    
+    if (panel === 'file-tree') {
+      const aiPanelWidth = this.getCurrentPanelWidth('ai-panel');
+      const maxAllowed = totalWidth - editorMinWidth - aiPanelWidth - margins;
+      constrainedWidth = Math.min(constrainedWidth, maxAllowed);
+    }
+    
+    if (panel === 'ai-panel') {
+      const fileTreeWidth = this.getCurrentPanelWidth('file-tree');
+      const maxAllowed = totalWidth - editorMinWidth - fileTreeWidth - margins;
+      constrainedWidth = Math.min(constrainedWidth, maxAllowed);
+    }
+    
+    return Math.max(constrainedWidth, constraint.min); // Ensure we never go below minimum
   }
 
   setPanelWidth(panel, width) {
-    const root = document.documentElement;
+    const cssVarMap = {
+      'file-tree': '--file-tree-default-width',
+      'ai-panel': '--ai-panel-default-width'
+    };
     
-    switch (panel) {
-      case 'file-tree':
-        root.style.setProperty('--file-tree-default-width', `${width}px`);
-        break;
-      case 'ai-panel':
-        root.style.setProperty('--ai-panel-default-width', `${width}px`);
-        break;
+    const cssVar = cssVarMap[panel];
+    if (!cssVar) {
+      console.error(`🚫 No CSS variable mapping for panel: ${panel}`);
+      return;
     }
     
-    console.log(`📏 Set ${panel} width to:`, width + 'px');
+    document.documentElement.style.setProperty(cssVar, `${width}px`);
+    this.updateLayout(); // Ensure layout is updated after width change
+    
+    console.log(`📏 Set ${panel} width to: ${width}px`);
   }
 
-  getAiPanelWidth() {
-    const aiPanel = document.getElementById('aiPanel');
-    if (!aiPanel || aiPanel.style.display === 'none') return 0;
-    return aiPanel.getBoundingClientRect().width;
+  getCurrentPanelWidth(panel) {
+    const element = this.getElement(panel);
+    if (!element) return 0;
+    
+    // Check if panel is visible/collapsed
+    if (panel === 'file-tree' && element.classList.contains('collapsed')) return 0;
+    if (panel === 'ai-panel' && element.style.display === 'none') return 0;
+    
+    return element.getBoundingClientRect().width;
   }
 
   toggleFileTree() {
-    const fileTreePanel = document.getElementById('fileTreePanel');
-    const appContainer = document.querySelector('.app-container');
-    const aiPanel = document.getElementById('aiPanel');
+    const fileTreePanel = this.getElement('file-tree');
+    if (!fileTreePanel) return;
     
-    if (!fileTreePanel || !appContainer) {
-      console.error('Required elements not found for toggleFileTree');
-      return;
+    const wasCollapsed = fileTreePanel.classList.contains('collapsed');
+    
+    if (wasCollapsed) {
+      fileTreePanel.classList.remove('collapsed');
+      this.panelState.fileTreeCollapsed = false;
+    } else {
+      fileTreePanel.classList.add('collapsed');
+      this.panelState.fileTreeCollapsed = true;
     }
     
-    fileTreePanel.classList.toggle('collapsed');
+    this.updateLayout();
+    this.updateExpandButton();
+    this.saveState();
     
-    // Update grid template based on current state
-    this.updateGridLayout();
-    
-    // Re-bind resize handles after layout change
-    setTimeout(() => this.bindResizeHandles(), 100);
-    
-    // Save state and notify
-    this.saveLayoutState();
-    
-    const isCollapsed = fileTreePanel.classList.contains('collapsed');
+    const isCollapsed = this.panelState.fileTreeCollapsed;
     if (window.showNotification) {
-      window.showNotification(`File tree ${isCollapsed ? 'hidden' : 'shown'} (Cmd+1)`, 'info');
+      window.showNotification(`File tree ${isCollapsed ? 'hidden' : 'shown'} (Ctrl/Cmd+1)`, 'info');
     }
     
-    console.log('🔄 File tree toggled:', isCollapsed ? 'collapsed' : 'expanded');
+    console.log(`🗂️ File tree ${isCollapsed ? 'collapsed' : 'expanded'}`);
   }
 
   toggleAiPanel() {
-    const aiPanel = document.getElementById('aiPanel');
-    const appContainer = document.querySelector('.app-container');
+    const aiPanel = this.getElement('ai-panel');
+    const appContainer = this.getElement('app-container');
     
-    if (!aiPanel || !appContainer) {
-      console.error('Required elements not found for toggleAiPanel');
-      return;
-    }
+    if (!aiPanel || !appContainer) return;
     
-    const isCurrentlyHidden = aiPanel.style.display === 'none' || !aiPanel.style.display;
+    const wasVisible = this.panelState.aiPanelVisible;
     
-    if (isCurrentlyHidden) {
-      aiPanel.style.display = 'flex';
-      appContainer.classList.add('show-ai-panel');
-    } else {
+    if (wasVisible) {
       aiPanel.style.display = 'none';
       appContainer.classList.remove('show-ai-panel');
+      this.panelState.aiPanelVisible = false;
+    } else {
+      aiPanel.style.display = 'flex';
+      appContainer.classList.add('show-ai-panel');
+      this.panelState.aiPanelVisible = true;
     }
     
-    // Update grid layout
-    this.updateGridLayout();
+    this.updateLayout();
+    this.saveState();
     
-    // Re-bind resize handles after layout change
-    setTimeout(() => this.bindResizeHandles(), 100);
-    
-    // Save state
-    this.saveLayoutState();
-    
-    const isVisible = !isCurrentlyHidden;
+    const isVisible = this.panelState.aiPanelVisible;
     if (window.showNotification) {
-      window.showNotification(`AI Panel ${isVisible ? 'shown' : 'hidden'} (Cmd+2)`, 'info');
+      window.showNotification(`AI Panel ${isVisible ? 'shown' : 'hidden'} (Ctrl/Cmd+2)`, 'info');
     }
     
-    console.log('🤖 AI panel toggled:', isVisible ? 'visible' : 'hidden');
+    console.log(`🤖 AI panel ${isVisible ? 'shown' : 'hidden'}`);
   }
 
   handleWindowResize() {
-    // Ensure panels maintain their constraints on window resize
-    const fileTreePanel = document.getElementById('fileTreePanel');
-    if (!fileTreePanel) return;
+    // Validate and adjust panel widths on window resize
+    console.log('🔄 Window resized - validating panel widths');
     
-    const currentWidth = fileTreePanel.getBoundingClientRect().width;
-    const constrainedWidth = this.constrainWidth('file-tree', currentWidth);
-    
-    if (constrainedWidth !== currentWidth) {
-      this.setPanelWidth('file-tree', constrainedWidth);
+    // Check file tree width
+    const fileTreeWidth = this.getCurrentPanelWidth('file-tree');
+    if (fileTreeWidth > 0) {
+      const constrainedFileTreeWidth = this.constrainWidth('file-tree', fileTreeWidth);
+      if (constrainedFileTreeWidth !== fileTreeWidth) {
+        this.setPanelWidth('file-tree', constrainedFileTreeWidth);
+      }
     }
+    
+    // Check AI panel width
+    const aiPanelWidth = this.getCurrentPanelWidth('ai-panel');
+    if (aiPanelWidth > 0) {
+      const constrainedAiPanelWidth = this.constrainWidth('ai-panel', aiPanelWidth);
+      if (constrainedAiPanelWidth !== aiPanelWidth) {
+        this.setPanelWidth('ai-panel', constrainedAiPanelWidth);
+      }
+    }
+    
+    this.updateLayout();
   }
 
   handleKeydown(e) {
+    // Handle Escape key to close modals
+    if (e.key === 'Escape') {
+      const shortcutsHelp = document.getElementById('shortcutsHelp');
+      if (shortcutsHelp && (shortcutsHelp.style.display === 'flex' || shortcutsHelp.style.display === 'block')) {
+        e.preventDefault();
+        if (window.toggleShortcutsHelp) window.toggleShortcutsHelp();
+        return;
+      }
+    }
+    
     // Keyboard shortcuts for layout management
     if (e.ctrlKey || e.metaKey) {
       switch (e.key) {
@@ -307,112 +415,258 @@ class LayoutManager {
     }
   }
 
-  saveLayoutState() {
-    const fileTreePanel = document.getElementById('fileTreePanel');
-    const aiPanel = document.getElementById('aiPanel');
+  updateLayout() {
+    const appContainer = this.getElement('app-container');
+    const fileTreePanel = this.getElement('file-tree');
     
-    if (!fileTreePanel || !aiPanel) return;
+    if (!appContainer) return;
     
-    const fileTreeWidth = getComputedStyle(document.documentElement)
-      .getPropertyValue('--file-tree-default-width');
-    const aiPanelWidth = getComputedStyle(document.documentElement)
-      .getPropertyValue('--ai-panel-default-width');
-    
-    const layoutState = {
-      fileTreeWidth: fileTreeWidth,
-      aiPanelWidth: aiPanelWidth,
-      fileTreeCollapsed: fileTreePanel.classList.contains('collapsed'),
-      aiPanelVisible: aiPanel.style.display !== 'none'
-    };
-    
-    try {
-      localStorage.setItem('aiNote_layoutState', JSON.stringify(layoutState));
-      console.log('💾 Layout state saved:', layoutState);
-    } catch (error) {
-      console.error('Failed to save layout state:', error);
-    }
-  }
-
-  loadLayoutState() {
-    try {
-      const saved = localStorage.getItem('aiNote_layoutState');
-      const state = saved ? JSON.parse(saved) : null;
-      if (state) {
-        console.log('📂 Layout state loaded:', state);
+    // Ensure DOM state matches panel state
+    if (fileTreePanel) {
+      if (this.panelState.fileTreeCollapsed) {
+        fileTreePanel.classList.add('collapsed');
+      } else {
+        fileTreePanel.classList.remove('collapsed');
       }
-      return state;
-    } catch (error) {
-      console.error('Failed to load layout state:', error);
-      return null;
-    }
-  }
-
-  updateGridLayout() {
-    const fileTreePanel = document.getElementById('fileTreePanel');
-    const aiPanel = document.getElementById('aiPanel');
-    const appContainer = document.querySelector('.app-container');
-    
-    if (!fileTreePanel || !aiPanel || !appContainer) {
-      console.error('Cannot update grid layout: missing elements');
-      return;
     }
     
-    const fileTreeCollapsed = fileTreePanel.classList.contains('collapsed');
-    const aiPanelVisible = aiPanel.style.display === 'flex';
-    
-    const fileTreeWidth = fileTreeCollapsed ? '0' : 
+    const fileTreeWidth = this.panelState.fileTreeCollapsed ? '0' : 
       getComputedStyle(document.documentElement).getPropertyValue('--file-tree-default-width');
-    const aiPanelWidth = aiPanelVisible ? 
+    
+    const aiPanelWidth = this.panelState.aiPanelVisible ? 
       getComputedStyle(document.documentElement).getPropertyValue('--ai-panel-default-width') : '';
     
-    // Update grid template columns based on panel states
-    if (aiPanelVisible) {
-      appContainer.style.gridTemplateColumns = `${fileTreeWidth} 1fr ${aiPanelWidth}`;
+    // Update grid template columns with important to override responsive CSS
+    if (this.panelState.aiPanelVisible) {
+      appContainer.style.setProperty('grid-template-columns', `${fileTreeWidth} 1fr ${aiPanelWidth}`, 'important');
       appContainer.classList.add('show-ai-panel');
     } else {
-      appContainer.style.gridTemplateColumns = `${fileTreeWidth} 1fr`;
+      appContainer.style.setProperty('grid-template-columns', `${fileTreeWidth} 1fr`, 'important');
       appContainer.classList.remove('show-ai-panel');
     }
     
-    console.log('📐 Grid layout updated:', {
-      fileTreeCollapsed,
-      aiPanelVisible,
+    console.log('📐 Layout updated:', {
+      fileTreeCollapsed: this.panelState.fileTreeCollapsed,
+      aiPanelVisible: this.panelState.aiPanelVisible,
       gridTemplate: appContainer.style.gridTemplateColumns
     });
   }
-  
-  applyLayoutState(layoutState) {
-    const root = document.documentElement;
-    const fileTreePanel = document.getElementById('fileTreePanel');
-    const aiPanel = document.getElementById('aiPanel');
-    const appContainer = document.querySelector('.app-container');
+
+  updateExpandButton() {
+    const expandBtn = document.getElementById('fileTreeExpandBtn');
+    const collapseBtn = document.getElementById('collapseTreeBtn');
     
-    if (!fileTreePanel || !aiPanel || !appContainer) {
-      // Retry after a short delay if elements aren't ready
-      setTimeout(() => this.applyLayoutState(layoutState), 100);
-      return;
+    // Update editor header toggle button
+    if (expandBtn) {
+      if (this.panelState.fileTreeCollapsed) {
+        // When collapsed, show right arrow to expand
+        expandBtn.textContent = '➡️';
+        expandBtn.setAttribute('aria-label', 'Show file tree');
+        expandBtn.setAttribute('title', 'Show file tree (Ctrl/Cmd+1)');
+      } else {
+        // When expanded, show left arrow to collapse
+        expandBtn.textContent = '⬅️';
+        expandBtn.setAttribute('aria-label', 'Hide file tree');
+        expandBtn.setAttribute('title', 'Hide file tree (Ctrl/Cmd+1)');
+      }
     }
     
-    if (layoutState.fileTreeWidth) {
-      root.style.setProperty('--file-tree-default-width', layoutState.fileTreeWidth);
+    // Update file tree header collapse button
+    if (collapseBtn) {
+      if (this.panelState.fileTreeCollapsed) {
+        // When collapsed, show right arrow to expand
+        collapseBtn.textContent = '➡️';
+        collapseBtn.setAttribute('aria-label', 'Show file tree');
+        collapseBtn.setAttribute('title', 'Show file tree (Ctrl/Cmd+1)');
+      } else {
+        // When expanded, show left arrow to collapse
+        collapseBtn.textContent = '⬅️';
+        collapseBtn.setAttribute('aria-label', 'Hide file tree');
+        collapseBtn.setAttribute('title', 'Hide file tree (Ctrl/Cmd+1)');
+      }
     }
     
-    if (layoutState.aiPanelWidth) {
-      root.style.setProperty('--ai-panel-default-width', layoutState.aiPanelWidth);
+    console.log(`📍 Toggle buttons updated: ${this.panelState.fileTreeCollapsed ? '➡️ (expand)' : '⬅️ (collapse)'}`);
+  }
+
+  saveState() {
+    const state = {
+      fileTreeWidth: getComputedStyle(document.documentElement).getPropertyValue('--file-tree-default-width'),
+      aiPanelWidth: getComputedStyle(document.documentElement).getPropertyValue('--ai-panel-default-width'),
+      fileTreeCollapsed: this.panelState.fileTreeCollapsed,
+      aiPanelVisible: this.panelState.aiPanelVisible
+    };
+    
+    try {
+      localStorage.setItem('aiNote_layoutState', JSON.stringify(state));
+      console.log('💾 Layout state saved successfully');
+    } catch (error) {
+      console.error('❌ Failed to save layout state:', error);
+    }
+  }
+
+  loadSavedState() {
+    try {
+      const saved = localStorage.getItem('aiNote_layoutState');
+      if (!saved) return;
+      
+      const state = JSON.parse(saved);
+      this.applyState(state);
+      console.log('📂 Layout state loaded successfully');
+    } catch (error) {
+      console.error('❌ Failed to load layout state:', error);
+    }
+  }
+
+  applyState(state) {
+    // Apply panel widths
+    if (state.fileTreeWidth) {
+      document.documentElement.style.setProperty('--file-tree-default-width', state.fileTreeWidth);
     }
     
-    if (layoutState.fileTreeCollapsed) {
-      fileTreePanel.classList.add('collapsed');
+    if (state.aiPanelWidth) {
+      document.documentElement.style.setProperty('--ai-panel-default-width', state.aiPanelWidth);
     }
     
-    if (layoutState.aiPanelVisible) {
-      aiPanel.style.display = 'flex';
+    // Apply panel visibility states
+    this.panelState.fileTreeCollapsed = state.fileTreeCollapsed || false;
+    this.panelState.aiPanelVisible = state.aiPanelVisible || false;
+    
+    // Apply DOM states
+    const fileTreePanel = this.getElement('file-tree');
+    const aiPanel = this.getElement('ai-panel');
+    const appContainer = this.getElement('app-container');
+    
+    if (fileTreePanel) {
+      if (this.panelState.fileTreeCollapsed) {
+        fileTreePanel.classList.add('collapsed');
+      } else {
+        fileTreePanel.classList.remove('collapsed');
+      }
     }
     
-    // Apply the correct grid layout
-    this.updateGridLayout();
+    if (aiPanel && appContainer) {
+      if (this.panelState.aiPanelVisible) {
+        aiPanel.style.display = 'flex';
+        appContainer.classList.add('show-ai-panel');
+      } else {
+        aiPanel.style.display = 'none';
+        appContainer.classList.remove('show-ai-panel');
+      }
+    }
     
-    console.log('🎨 Layout state applied successfully');
+    this.updateLayout();
+    this.updateExpandButton();
+    console.log('🎨 State applied successfully');
+  }
+
+  // Layout reliability test
+  runLayoutTest() {
+    console.log('🧪 Starting Layout Reliability Test...');
+    
+    const tests = [];
+    const appContainer = this.getElement('app-container');
+    const fileTreePanel = this.getElement('file-tree');
+    const editorPanel = this.getElement('editor');
+    const aiPanel = this.getElement('ai-panel');
+    
+    // Test 1: Basic element presence
+    tests.push({
+      name: 'Elements Present',
+      pass: !!(appContainer && fileTreePanel && editorPanel && aiPanel),
+      message: 'All required layout elements exist'
+    });
+    
+    // Test 2: Grid layout structure
+    const computedStyle = window.getComputedStyle(appContainer);
+    tests.push({
+      name: 'CSS Grid Layout',
+      pass: computedStyle.display === 'grid',
+      message: 'App container uses CSS Grid'
+    });
+    
+    // Test 3: File tree toggle functionality
+    const initialState = this.panelState.fileTreeCollapsed;
+    this.toggleFileTree();
+    const afterToggle = this.panelState.fileTreeCollapsed;
+    this.toggleFileTree(); // Reset
+    tests.push({
+      name: 'File Tree Toggle',
+      pass: initialState !== afterToggle,
+      message: 'File tree toggle changes state'
+    });
+    
+    // Test 4: Grid template updates
+    const initialGrid = appContainer.style.gridTemplateColumns;
+    this.updateLayout();
+    const afterUpdate = appContainer.style.gridTemplateColumns;
+    tests.push({
+      name: 'Grid Template Updates',
+      pass: afterUpdate.includes('1fr'),
+      message: 'Grid template contains flexible column'
+    });
+    
+    // Test 5: Panel width constraints
+    const fileTreeWidth = this.getCurrentPanelWidth('file-tree');
+    const constraint = this.constraints['file-tree'];
+    tests.push({
+      name: 'Width Constraints',
+      pass: !this.panelState.fileTreeCollapsed ? (fileTreeWidth >= constraint.min) : true,
+      message: 'Panel widths respect minimum constraints'
+    });
+    
+    // Test 6: Button state synchronization
+    const expandBtn = document.getElementById('fileTreeExpandBtn');
+    const collapseBtn = document.getElementById('collapseTreeBtn');
+    tests.push({
+      name: 'Button Synchronization',
+      pass: !!(expandBtn && collapseBtn),
+      message: 'Toggle buttons exist and are accessible'
+    });
+    
+    // Test 7: Z-index and positioning
+    const fileTreeZIndex = window.getComputedStyle(fileTreePanel).zIndex;
+    const editorZIndex = window.getComputedStyle(editorPanel).zIndex;
+    tests.push({
+      name: 'Panel Positioning',
+      pass: !window.getComputedStyle(fileTreePanel).transform.includes('translate'),
+      message: 'File tree panel not using problematic transforms'
+    });
+    
+    // Generate test report
+    const passed = tests.filter(t => t.pass).length;
+    const total = tests.length;
+    
+    console.log(`🧪 Layout Test Results: ${passed}/${total} tests passed`);
+    tests.forEach(test => {
+      const icon = test.pass ? '✅' : '❌';
+      console.log(`${icon} ${test.name}: ${test.message}`);
+    });
+    
+    if (passed === total) {
+      console.log('🎉 All layout tests passed! Layout is reliable.');
+    } else {
+      console.warn('⚠️ Some layout tests failed. Review implementation.');
+    }
+    
+    return { passed, total, tests };
+  }
+
+  // Cleanup method for removing event listeners
+  destroy() {
+    document.removeEventListener('mousemove', this.handleMouseMove);
+    document.removeEventListener('mouseup', this.handleMouseUp);
+    document.removeEventListener('keydown', this.handleKeydown);
+    window.removeEventListener('resize', this.handleWindowResize);
+    
+    // Clean up resize handle listeners
+    if (this.boundHandleMouseDown) {
+      document.querySelectorAll('.resize-handle').forEach(handle => {
+        handle.removeEventListener('mousedown', this.boundHandleMouseDown);
+      });
+    }
+    
+    console.log('🧹 LayoutManager destroyed');
   }
 }
 

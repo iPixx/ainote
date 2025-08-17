@@ -494,6 +494,16 @@ window.openMobileNav = openMobileNav;
 window.closeMobileNav = closeMobileNav;
 window.toggleShortcutsHelp = toggleShortcutsHelp;
 
+// Development and testing functions
+window.runLayoutTest = function() {
+  if (layoutManager && typeof layoutManager.runLayoutTest === 'function') {
+    return layoutManager.runLayoutTest();
+  } else {
+    console.error('❌ Layout manager not available or test method missing');
+    return null;
+  }
+};
+
 // Initialize the application
 window.addEventListener('DOMContentLoaded', () => {
   console.log('aiNote application initialized');
