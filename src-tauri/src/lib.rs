@@ -1063,7 +1063,7 @@ fn scan_single_directory(
 }
 
 /// Efficient in-place sorting optimized for typical file structures
-fn sort_files_efficiently(files: &mut Vec<FileInfo>) {
+fn sort_files_efficiently(files: &mut [FileInfo]) {
     // Use unstable sort for better performance (stable order not needed here)
     files.sort_unstable_by(|a, b| {
         // Fast path: directories vs files
