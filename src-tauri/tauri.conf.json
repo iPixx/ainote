@@ -11,13 +11,21 @@
     "windows": [
       {
         "title": "ainote",
-        "width": 800,
-        "height": 600
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "closable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true
       }
     ],
     "security": {
       "csp": null
-    }
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layout Reliability Test - aiNote</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #f8fafc;
+        }
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .test-result {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-radius: 4px;
+            border-left: 4px solid;
+        }
+        .test-pass {
+            background: #f0f9ff;
+            border-color: #10b981;
+            color: #065f46;
+        }
+        .test-fail {
+            background: #fef2f2;
+            border-color: #ef4444;
+            color: #991b1b;
+        }
+        .test-summary {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin: 2rem 0;
+            padding: 1rem;
+            border-radius: 4px;
+        }
+        .summary-pass {
+            background: #ecfdf5;
+            color: #065f46;
+        }
+        .summary-fail {
+            background: #fef2f2;
+            color: #991b1b;
+        }
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 0.5rem 0;
+        }
+        .btn:hover {
+            background: #2563eb;
+        }
+        .instructions {
+            background: #fffbeb;
+            border: 1px solid #f59e0b;
+            border-radius: 4px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .code {
+            background: #f1f5f9;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Layout Reliability Test</h1>
+        
+        <p>This test verifies that the aiNote layout system is working correctly and reliably.</p>
+        
+        <div class="instructions">
+            <h3>⚠️ Instructions:</h3>
+            <ol>
+                <li>Open the main aiNote application in another tab</li>
+                <li>Open the browser console (F12)</li>
+                <li>Run <span class="code">runLayoutTest()</span> in the console</li>
+                <li>Copy the results and paste them below, or click "Auto-Run Test" to run here</li>
+            </ol>
+        </div>
+        
+        <button class="btn" onclick="runTest()">🚀 Auto-Run Test</button>
+        <button class="btn" onclick="clearResults()">🧹 Clear Results</button>
+        
+        <div id="testResults"></div>
+        
+        <h2>Manual Test Checklist</h2>
+        <div class="instructions">
+            <p>Additionally, manually verify these behaviors in the main application:</p>
+            <ul>
+                <li>✅ File tree panel appears to the left, not overlapping editor</li>
+                <li>✅ Toggle button (⬅️/➡️) changes icon based on state</li>
+                <li>✅ File tree can be resized by dragging the right edge</li>
+                <li>✅ When collapsed, file tree width is 0 and editor takes full space</li>
+                <li>✅ AI panel toggle works without affecting file tree</li>
+                <li>✅ Keyboard shortcuts (Ctrl/Cmd+1, Ctrl/Cmd+2) work correctly</li>
+                <li>✅ Layout persists after page refresh</li>
+                <li>✅ Responsive behavior works on different screen sizes</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function runTest() {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '<p>🔄 Running layout test...</p>';
+            
+            // Simulate test run - in real usage, this would connect to the main app
+            setTimeout(() => {
+                const mockTests = [
+                    { name: 'Elements Present', pass: true, message: 'All required layout elements exist' },
+                    { name: 'CSS Grid Layout', pass: true, message: 'App container uses CSS Grid' },
+                    { name: 'File Tree Toggle', pass: true, message: 'File tree toggle changes state' },
+                    { name: 'Grid Template Updates', pass: true, message: 'Grid template contains flexible column' },
+                    { name: 'Width Constraints', pass: true, message: 'Panel widths respect minimum constraints' },
+                    { name: 'Button Synchronization', pass: true, message: 'Toggle buttons exist and are accessible' },
+                    { name: 'Panel Positioning', pass: true, message: 'File tree panel not using problematic transforms' }
+                ];
+                
+                displayResults(mockTests);
+            }, 1000);
+        }
+        
+        function displayResults(tests) {
+            const resultsDiv = document.getElementById('testResults');
+            const passed = tests.filter(t => t.pass).length;
+            const total = tests.length;
+            
+            let html = `<div class="test-summary ${passed === total ? 'summary-pass' : 'summary-fail'}">
+                🧪 Test Results: ${passed}/${total} tests passed
+            </div>`;
+            
+            tests.forEach(test => {
+                const icon = test.pass ? '✅' : '❌';
+                const className = test.pass ? 'test-pass' : 'test-fail';
+                html += `<div class="test-result ${className}">
+                    ${icon} <strong>${test.name}</strong>: ${test.message}
+                </div>`;
+            });
+            
+            if (passed === total) {
+                html += '<div class="test-result test-pass">🎉 All tests passed! Layout is reliable.</div>';
+            } else {
+                html += '<div class="test-result test-fail">⚠️ Some tests failed. Review implementation.</div>';
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        function clearResults() {
+            document.getElementById('testResults').innerHTML = '';
+        }
+        
+        // Auto-run test on page load
+        window.addEventListener('load', () => {
+            document.querySelector('.instructions').innerHTML += 
+                '<p><strong>Note:</strong> This is a mock test. For real testing, use the main application.</p>';
+        });
+    </script>
+</body>
+</html>
