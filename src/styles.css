@@ -1,5 +1,98 @@
-.logo.vanilla:hover {
-  filter: drop-shadow(0 0 2em #ffe21c);
+/* Backend validation specific styles */
+.backend-validation {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.backend-validation section {
+  margin-bottom: 30px;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.backend-validation h2 {
+  margin-top: 0;
+  color: #333;
+  border-bottom: 2px solid #646cff;
+  padding-bottom: 8px;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+
+.input-group {
+  margin: 15px 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+#file-content {
+  width: 100%;
+  min-height: 80px;
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-family: monospace;
+  resize: vertical;
+}
+
+.results {
+  min-height: 100px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 10px;
+  background: #f8f8f8;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-top: 10px;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+.result {
+  margin: 5px 0;
+  padding: 5px;
+  border-radius: 4px;
+}
+
+.result.success {
+  background: #e8f5e8;
+  color: #2d5a2d;
+  border-left: 3px solid #28a745;
+}
+
+.result.error {
+  background: #fdf2f2;
+  color: #721c24;
+  border-left: 3px solid #dc3545;
+}
+
+.timestamp {
+  color: #666;
+  font-size: 12px;
+}
+
+.test-all-btn {
+  background: #28a745;
+  color: white;
+  font-weight: bold;
+  padding: 12px 24px;
+  font-size: 16px;
+}
+
+.test-all-btn:hover {
+  background: #218838;
+  border-color: #1e7e34;
 }
 :root {
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
@@ -19,23 +112,12 @@
 
 .container {
   margin: 0;
-  padding-top: 10vh;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
 
 .row {
   display: flex;
@@ -87,14 +169,42 @@ button {
   outline: none;
 }
 
-#greet-input {
-  margin-right: 5px;
-}
 
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
     background-color: #2f2f2f;
+  }
+
+  .backend-validation h2 {
+    color: #f6f6f6;
+  }
+
+  .backend-validation section {
+    border-color: #555;
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .results {
+    background: #1a1a1a;
+    border-color: #555;
+    color: #f6f6f6;
+  }
+
+  .result.success {
+    background: #1a3d1a;
+    color: #90ee90;
+  }
+
+  .result.error {
+    background: #3d1a1a;
+    color: #ffb3b3;
+  }
+
+  #file-content {
+    background: #1a1a1a;
+    color: #f6f6f6;
+    border-color: #555;
   }
 
   a:hover {
@@ -108,5 +218,13 @@ button {
   }
   button:active {
     background-color: #0f0f0f69;
+  }
+
+  .test-all-btn {
+    background: #1e7e34;
+  }
+
+  .test-all-btn:hover {
+    background: #28a745;
   }
 }
