@@ -713,6 +713,8 @@ class FileTree {
    * Show empty state when no files are available
    */
   showEmptyState() {
+    // Clear container but preserve search interface
+    const searchContainer = this.container.querySelector('.file-tree-search-container');
     this.container.innerHTML = `
       <div class="file-tree-empty-state">
         <p>No files found in vault</p>
@@ -721,6 +723,10 @@ class FileTree {
         </button>
       </div>
     `;
+    // Re-add search interface if it existed
+    if (searchContainer) {
+      this.container.insertBefore(searchContainer, this.container.firstChild);
+    }
   }
 
   /**
@@ -1280,6 +1286,22 @@ class FileTree {
   }
 
   /**
+   * Update search references after DOM reconstruction
+   */
+  updateSearchReferences() {
+    const oldSearchContainer = this.searchContainer;
+    
+    this.searchContainer = this.container.querySelector('.file-tree-search-container');
+    this.searchInput = this.container.querySelector('.file-tree-search-input');
+    
+    // If the DOM elements are the same, event handlers should still be attached
+    // Only re-setup if references actually changed (which shouldn't happen with our current approach)
+    if (oldSearchContainer !== this.searchContainer && this.searchContainer && this.searchInput) {
+      this.setupSearchHandlers();
+    }
+  }
+
+  /**
    * Set up search event handlers
    */
   setupSearchHandlers() {
@@ -1322,10 +1344,16 @@ class FileTree {
    * Activate search mode
    */
   activateSearch() {
+    if (!this.searchContainer || !this.searchInput) {
+      console.error('FileTree: Search interface not properly initialized');
+      return;
+    }
+    
     this.isSearchActive = true;
     this.searchContainer.style.display = 'flex';
+    this.searchContainer.style.visibility = 'visible';
     this.searchInput.focus();
-    this.searchInput.select(); // Select any existing text
+    this.searchInput.select();
   }
 
   /**
@@ -1333,14 +1361,21 @@ class FileTree {
    */
   deactivateSearch() {
     this.isSearchActive = false;
-    this.searchContainer.style.display = 'none';
-    this.searchInput.value = '';
+    if (this.searchContainer) {
+      this.searchContainer.style.display = 'none';
+    }
+    if (this.searchInput) {
+      this.searchInput.value = '';
+    }
     
     // Clear search filter
     this.filteredFiles = null;
     
     // Re-render with original files
     this.render(this.files);
+    
+    // Update references after render since DOM may have been reconstructed
+    this.updateSearchReferences();
     
     // Return focus to tree
     const firstItem = this.container.querySelector(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
@@ -1474,9 +1509,17 @@ class FileTree {
       return;
     }
     
-    // Clear container (but keep search interface)
-    const existingContent = this.container.querySelectorAll(':not(.file-tree-search-container)');
-    existingContent.forEach(element => element.remove());
+    // Store current focus state and cursor position
+    const activeElement = document.activeElement;
+    const wasSearchInputFocused = activeElement && activeElement.classList.contains('file-tree-search-input');
+    const cursorPosition = wasSearchInputFocused ? activeElement.selectionStart : null;
+    
+    // Clear container but preserve search interface (same pattern as render method)
+    const searchContainer = this.container.querySelector('.file-tree-search-container');
+    this.container.innerHTML = '';
+    if (searchContainer) {
+      this.container.appendChild(searchContainer);
+    }
     
     // Render search results in flat list (no hierarchy during search)
     filteredFiles.forEach((file, index) => {
@@ -1484,7 +1527,18 @@ class FileTree {
       this.container.appendChild(itemElement);
     });
     
-    // Focus first result
+    // Update references after DOM manipulation
+    this.updateSearchReferences();
+    
+    // Restore focus to search input if it was focused before
+    if (wasSearchInputFocused && this.searchInput) {
+      this.searchInput.focus();
+      if (cursorPosition !== null) {
+        this.searchInput.setSelectionRange(cursorPosition, cursorPosition);
+      }
+    }
+    
+    // Set tab index for first result (but don't focus it)
     const firstResult = this.container.querySelector(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
     if (firstResult) {
       firstResult.setAttribute('tabindex', '0');
@@ -1592,9 +1646,17 @@ class FileTree {
    * @param {string} searchTerm - The search term
    */
   showNoSearchResults(searchTerm) {
-    // Clear existing content (but keep search interface)
-    const existingContent = this.container.querySelectorAll(':not(.file-tree-search-container)');
-    existingContent.forEach(element => element.remove());
+    // Store current focus state and cursor position
+    const activeElement = document.activeElement;
+    const wasSearchInputFocused = activeElement && activeElement.classList.contains('file-tree-search-input');
+    const cursorPosition = wasSearchInputFocused ? activeElement.selectionStart : null;
+    
+    // Clear container but preserve search interface (same pattern as render method)
+    const searchContainer = this.container.querySelector('.file-tree-search-container');
+    this.container.innerHTML = '';
+    if (searchContainer) {
+      this.container.appendChild(searchContainer);
+    }
     
     const noResultsDiv = document.createElement('div');
     noResultsDiv.className = 'file-tree-no-results';
@@ -1604,6 +1666,17 @@ class FileTree {
     `;
     
     this.container.appendChild(noResultsDiv);
+    
+    // Update references after DOM manipulation
+    this.updateSearchReferences();
+    
+    // Restore focus to search input if it was focused before
+    if (wasSearchInputFocused && this.searchInput) {
+      this.searchInput.focus();
+      if (cursorPosition !== null) {
+        this.searchInput.setSelectionRange(cursorPosition, cursorPosition);
+      }
+    }
   }
 
   /**
