@@ -252,6 +252,73 @@ pub fn create_folder_internal(folder_path: &str) -> FileSystemResult<()> {
     }, &format!("create_folder({})", folder_path))
 }
 
+/// Reveal file in system file manager (Finder on macOS, Explorer on Windows, file manager on Linux)
+pub fn reveal_in_finder_internal(file_path: &str) -> FileSystemResult<()> {
+    let path = Path::new(file_path);
+
+    // Validate path exists
+    validation::validate_path_exists(path)?;
+
+    // Use the opener plugin to reveal the file
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        Command::new("open")
+            .args(["-R", file_path])
+            .spawn()
+            .map_err(|e| FileSystemError::IOError {
+                message: format!("Failed to reveal file in Finder: {} ({})", file_path, e),
+            })?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        Command::new("explorer")
+            .args(["/select,", file_path])
+            .spawn()
+            .map_err(|e| FileSystemError::IOError {
+                message: format!("Failed to reveal file in Explorer: {} ({})", file_path, e),
+            })?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+        // Try different file managers commonly available on Linux
+        let file_managers = ["nautilus", "dolphin", "thunar", "nemo", "pcmanfm"];
+        
+        for &manager in &file_managers {
+            if Command::new("which")
+                .arg(manager)
+                .output()
+                .map(|output| output.status.success())
+                .unwrap_or(false)
+            {
+                Command::new(manager)
+                    .arg(file_path)
+                    .spawn()
+                    .map_err(|e| FileSystemError::IOError {
+                        message: format!("Failed to reveal file in {}: {} ({})", manager, file_path, e),
+                    })?;
+                return Ok(());
+            }
+        }
+        
+        // Fallback: just open the parent directory
+        if let Some(parent) = path.parent() {
+            Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(|e| FileSystemError::IOError {
+                    message: format!("Failed to open parent directory: {} ({})", file_path, e),
+                })?;
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

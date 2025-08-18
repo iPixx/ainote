@@ -88,6 +88,9 @@ class FileTree {
     // Event listeners registry for cleanup
     this.eventListeners = new Map();
     
+    // Context menu component
+    this.contextMenu = null;
+    
     // Initialize component
     this.initialize();
   }
@@ -116,6 +119,9 @@ class FileTree {
     // Set up virtual scrolling if needed
     this.setupVirtualScrolling();
     
+    // Initialize context menu
+    this.setupContextMenu();
+    
     // Initial empty state
     this.showEmptyState();
   }
@@ -129,10 +135,96 @@ class FileTree {
     this.container.addEventListener('click', clickHandler);
     this.eventListeners.set('click', clickHandler);
 
+    // Right-click handler for context menu
+    const contextMenuHandler = (event) => this.handleContextMenu(event);
+    this.container.addEventListener('contextmenu', contextMenuHandler);
+    this.eventListeners.set('contextmenu', contextMenuHandler);
+
     // Keyboard navigation handler
     const keyHandler = (event) => this.handleKeyboard(event);
     this.container.addEventListener('keydown', keyHandler);
     this.eventListeners.set('keydown', keyHandler);
+  }
+
+  /**
+   * Set up context menu functionality
+   */
+  setupContextMenu() {
+    // Import ContextMenu dynamically to avoid circular dependencies
+    import('./context-menu.js').then((module) => {
+      const ContextMenu = module.default;
+      this.contextMenu = new ContextMenu(this.appState);
+      
+      // Listen to context menu events
+      document.addEventListener(ContextMenu.EVENTS.ACTION_EXECUTED, (event) => {
+        this.handleContextMenuAction(event.detail);
+      });
+    }).catch((error) => {
+      console.warn('Failed to load context menu:', error);
+    });
+  }
+
+  /**
+   * Handle context menu (right-click) events
+   * @param {Event} event - Context menu event
+   */
+  handleContextMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!this.contextMenu) {
+      console.warn('Context menu not initialized');
+      return;
+    }
+
+    const treeItem = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
+    let file = null;
+
+    if (treeItem) {
+      const filePath = treeItem.dataset.filePath;
+      file = this.files.find(f => f.path === filePath);
+    }
+
+    // Show context menu at click position
+    this.contextMenu.show(event.clientX, event.clientY, file, treeItem);
+  }
+
+  /**
+   * Handle context menu action results
+   * @param {Object} actionData - Data from context menu action
+   */
+  handleContextMenuAction(actionData) {
+    const { action, file, newFile } = actionData;
+    
+    switch (action) {
+      case 'new_file':
+      case 'new_folder':
+        // File tree will be refreshed automatically by the context menu
+        // Optionally select the new file
+        if (newFile && !newFile.is_dir) {
+          this.selectFile(newFile.path);
+          this.emit(FileTree.EVENTS.FILE_SELECTED, { filePath: newFile.path });
+        }
+        break;
+        
+      case 'rename':
+        // Update selection if renamed file was selected
+        if (this.selectedFile === file.path && newFile) {
+          this.selectFile(newFile.path);
+        }
+        break;
+        
+      case 'delete':
+        // Clear selection if deleted file was selected
+        if (this.selectedFile === file.path) {
+          this.selectFile(null);
+        }
+        break;
+        
+      case 'refresh':
+        // Refresh is handled by the context menu
+        break;
+    }
   }
 
   /**
@@ -2374,6 +2466,12 @@ class FileTree {
     // Clear virtual scrolling observer
     if (this.intersectionObserver) {
       this.intersectionObserver.disconnect();
+    }
+    
+    // Clean up context menu
+    if (this.contextMenu) {
+      this.contextMenu.destroy();
+      this.contextMenu = null;
     }
     
     // Remove event listeners

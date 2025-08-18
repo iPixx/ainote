@@ -99,6 +99,11 @@ fn scan_vault_files_chunked(
 }
 
 #[tauri::command]
+fn reveal_in_finder(file_path: String) -> Result<(), String> {
+    file_operations::reveal_in_finder_internal(&file_path).map_err(|e| e.into())
+}
+
+#[tauri::command]
 fn load_app_state() -> Result<AppState, String> {
     state_management::load_app_state_internal().map_err(|e| e.into())
 }
@@ -222,6 +227,7 @@ pub fn run() {
             create_folder,
             watch_vault,
             preview_file,
+            reveal_in_finder,
             load_app_state,
             save_app_state,
             save_window_state,
