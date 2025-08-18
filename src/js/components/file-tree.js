@@ -925,6 +925,65 @@ class FileTree {
     this.container.addEventListener('dragleave', (e) => this.handleDragLeave(e));
     this.container.addEventListener('drop', (e) => this.handleDrop(e));
     this.container.addEventListener('dragend', (e) => this.handleDragEnd(e));
+    
+    // Set up vault-info as drop target for root level drops
+    this.setupVaultInfoDropTarget();
+  }
+
+  /**
+   * Set up vault-info area as a drop target for root level drops
+   */
+  setupVaultInfoDropTarget() {
+    const vaultInfo = document.querySelector('.vault-info');
+    if (!vaultInfo) {
+      console.warn('FileTree: vault-info element not found for drop target setup');
+      return;
+    }
+    
+    // Enable dropping on vault-info area
+    vaultInfo.addEventListener('dragover', (e) => {
+      if (!this.dragState.isDragging) return;
+      e.preventDefault();
+      if (this.canDropOnRoot()) {
+        e.dataTransfer.dropEffect = 'move';
+        vaultInfo.classList.add('drop-target-root');
+      } else {
+        e.dataTransfer.dropEffect = 'none';
+      }
+    });
+    
+    vaultInfo.addEventListener('dragenter', (e) => {
+      if (!this.dragState.isDragging) return;
+      e.preventDefault();
+    });
+    
+    vaultInfo.addEventListener('dragleave', (e) => {
+      if (!this.dragState.isDragging) return;
+      // Only clear highlight if we're leaving the vault-info area entirely
+      if (!vaultInfo.contains(e.relatedTarget)) {
+        vaultInfo.classList.remove('drop-target-root');
+      }
+    });
+    
+    vaultInfo.addEventListener('drop', (e) => {
+      if (!this.dragState.isDragging) return;
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (this.canDropOnRoot()) {
+        const vaultPath = this.appState.getState().currentVault;
+        if (vaultPath) {
+          this.emit(FileTree.EVENTS.FILE_MOVE_REQUESTED, {
+            sourceFile: this.dragState.draggedFile,
+            targetFolder: { path: vaultPath, is_dir: true, name: 'vault-root' },
+            newPath: `${vaultPath}/${this.dragState.draggedFile.name}`
+          });
+        }
+      }
+      
+      vaultInfo.classList.remove('drop-target-root');
+      this.handleDragEnd();
+    });
   }
 
   /**
@@ -971,7 +1030,7 @@ class FileTree {
   }
 
   /**
-   * Handle drag over event - simplified folder-only drop areas
+   * Handle drag over event - folder drops and root level drops
    * @param {DragEvent} event - Drag over event
    */
   handleDragOver(event) {
@@ -985,14 +1044,34 @@ class FileTree {
     // Clear previous drop highlights
     this.clearDropHighlights();
     
-    if (folderTarget && this.canDropOnFolder(folderTarget)) {
-      event.dataTransfer.dropEffect = 'move';
-      folderTarget.classList.add('drop-target');
-      
-      // Also highlight the children container if we're hovering over it and it's expanded
-      const childrenContainer = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_CHILDREN}`);
-      if (childrenContainer && folderTarget.classList.contains(FileTree.CSS_CLASSES.EXPANDED)) {
-        childrenContainer.classList.add('drop-target-children');
+    if (folderTarget) {
+      if (folderTarget === 'root') {
+        // Root level drop
+        if (this.canDropOnRoot()) {
+          event.dataTransfer.dropEffect = 'move';
+          // Only highlight vault-info area for root drops
+          const vaultInfo = document.querySelector('.vault-info');
+          if (vaultInfo) {
+            vaultInfo.classList.add('drop-target-root');
+          }
+        } else {
+          event.dataTransfer.dropEffect = 'none';
+        }
+      } else if (this.canDropOnFolder(folderTarget)) {
+        // Regular folder drop
+        event.dataTransfer.dropEffect = 'move';
+        
+        // Check if we're dropping directly on a children container vs. the folder item itself
+        const childrenContainer = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_CHILDREN}`);
+        if (childrenContainer) {
+          // Highlight the children container if we're hovering over it directly
+          childrenContainer.classList.add('drop-target-children');
+        } else {
+          // Highlight the folder item itself
+          folderTarget.classList.add('drop-target');
+        }
+      } else {
+        event.dataTransfer.dropEffect = 'none';
       }
     } else {
       event.dataTransfer.dropEffect = 'none';
@@ -1014,7 +1093,7 @@ class FileTree {
 
 
   /**
-   * Handle drop event - simple folder-only drops
+   * Handle drop event - folder drops and root level drops
    * @param {DragEvent} event - Drop event
    */
   handleDrop(event) {
@@ -1026,17 +1105,32 @@ class FileTree {
     // Find folder drop target
     const folderTarget = this.getFolderDropTarget(event.target);
     
-    if (folderTarget && this.canDropOnFolder(folderTarget)) {
-      const targetFilePath = folderTarget.dataset.filePath;
-      const targetFile = this.files.find(f => f.path === targetFilePath);
-      
-      if (targetFile && targetFile.is_dir) {
-        // Emit move request event for the application to handle
-        this.emit(FileTree.EVENTS.FILE_MOVE_REQUESTED, {
-          sourceFile: this.dragState.draggedFile,
-          targetFolder: targetFile,
-          newPath: `${targetFile.path}/${this.dragState.draggedFile.name}`
-        });
+    if (folderTarget) {
+      if (folderTarget === 'root') {
+        // Root level drop
+        if (this.canDropOnRoot()) {
+          const vaultPath = this.appState.getState().currentVault;
+          if (vaultPath) {
+            this.emit(FileTree.EVENTS.FILE_MOVE_REQUESTED, {
+              sourceFile: this.dragState.draggedFile,
+              targetFolder: { path: vaultPath, is_dir: true, name: 'vault-root' },
+              newPath: `${vaultPath}/${this.dragState.draggedFile.name}`
+            });
+          }
+        }
+      } else if (this.canDropOnFolder(folderTarget)) {
+        // Regular folder drop
+        const targetFilePath = folderTarget.dataset.filePath;
+        const targetFile = this.files.find(f => f.path === targetFilePath);
+        
+        if (targetFile && targetFile.is_dir) {
+          // Emit move request event for the application to handle
+          this.emit(FileTree.EVENTS.FILE_MOVE_REQUESTED, {
+            sourceFile: this.dragState.draggedFile,
+            targetFolder: targetFile,
+            newPath: `${targetFile.path}/${this.dragState.draggedFile.name}`
+          });
+        }
       }
     }
     
@@ -1046,10 +1140,16 @@ class FileTree {
   /**
    * Get folder drop target from event target
    * @param {HTMLElement} target - Event target element
-   * @returns {HTMLElement|null} Folder tree item element
+   * @returns {HTMLElement|null} Folder tree item element or 'root' for vault root
    */
   getFolderDropTarget(target) {
-    // First, check if we're hovering over a tree-children container
+    // Check if dropping on vault-info for root level drop
+    const vaultInfo = target.closest('.vault-info');
+    if (vaultInfo) {
+      return 'root'; // Special identifier for root level drops
+    }
+    
+    // Check if we're hovering over a tree-children container directly
     const childrenContainer = target.closest(`.${FileTree.CSS_CLASSES.TREE_CHILDREN}`);
     if (childrenContainer) {
       // Find the parent folder item that owns this children container
@@ -1059,12 +1159,27 @@ class FileTree {
       }
     }
     
-    // Otherwise, look for a direct tree item
+    // Check for direct tree item (must be a folder)
     const treeItem = target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
-    if (!treeItem) return null;
+    if (treeItem) {
+      const isDir = treeItem.dataset.isDir === 'true';
+      // Only return the item if it's a directory (folder)
+      if (isDir) {
+        return treeItem;
+      }
+      // If it's a file, don't allow dropping - return null
+      return null;
+    }
     
-    const isDir = treeItem.dataset.isDir === 'true';
-    return isDir ? treeItem : null;
+    // Check if we're in the main file tree container but not over a specific item
+    // This handles drops to empty space in the tree (root level)
+    const treeContainer = target.closest(`.${FileTree.CSS_CLASSES.TREE_CONTAINER}`);
+    if (treeContainer && target === treeContainer) {
+      // Only allow root drop if we're directly on the container, not on a child element
+      return 'root';
+    }
+    
+    return null;
   }
 
   /**
@@ -1114,6 +1229,52 @@ class FileTree {
   }
 
   /**
+   * Check if a file can be dropped on the root level
+   * @returns {boolean} Whether drop is allowed
+   */
+  canDropOnRoot() {
+    if (!this.dragState.draggedFile) return false;
+    
+    const vaultPath = this.appState.getState().currentVault;
+    if (!vaultPath) return false;
+    
+    const draggedPath = this.dragState.draggedFile.path;
+    const draggedParentPath = this.getParentPath(this.getRelativePath(draggedPath));
+    
+    // Already at root level, no need to move
+    if (!draggedParentPath || draggedParentPath === '') return false;
+    
+    return true;
+  }
+
+  /**
+   * Find nearest folder from mouse coordinates (for same-level drops)
+   * This method is kept for potential future use but not currently used in the simplified logic
+   * @param {number} x - Mouse X coordinate
+   * @param {number} y - Mouse Y coordinate
+   * @returns {HTMLElement|null} Nearest folder element
+   */
+  findNearestFolderFromPoint(x, y) {
+    const allFolders = this.container.querySelectorAll(`.${FileTree.CSS_CLASSES.TREE_FOLDER}`);
+    let nearestFolder = null;
+    let nearestDistance = Infinity;
+    
+    allFolders.forEach(folder => {
+      const rect = folder.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+      
+      if (distance < nearestDistance && distance < 100) { // Within 100px
+        nearestDistance = distance;
+        nearestFolder = folder;
+      }
+    });
+    
+    return nearestFolder;
+  }
+
+  /**
    * Clear all drop target highlights
    */
   clearDropHighlights() {
@@ -1126,6 +1287,12 @@ class FileTree {
     childrenDropTargets.forEach(target => {
       target.classList.remove('drop-target-children');
     });
+    
+    // Clear root level drop highlights
+    const vaultInfo = document.querySelector('.vault-info');
+    if (vaultInfo) {
+      vaultInfo.classList.remove('drop-target-root');
+    }
   }
 
   /**
