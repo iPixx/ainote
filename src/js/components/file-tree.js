@@ -902,46 +902,29 @@ class FileTree {
   }
 
   /**
-   * Set up drag and drop functionality for file organization
+   * Set up simple HTML5 drag and drop functionality
+   * Uses standard HTML5 drag and drop with dragDropEnabled: false in Tauri config
+   * Only folders are valid drop targets
    */
   setupDragAndDrop() {
-    // Enable drag and drop only if supported
     if (!('draggable' in document.createElement('div'))) {
-      console.warn('FileTree: Drag and drop not supported in this browser');
+      console.warn('FileTree: Drag and drop not supported');
       return;
     }
     
-    // State for drag and drop operations
+    // Initialize simple drag state
     this.dragState = {
-      draggedItem: null,
       draggedFile: null,
-      dropTarget: null,
-      isDragging: false,
-      dragStartTime: null
+      isDragging: false
     };
     
-    // Set up drag event listeners using event delegation
-    const dragStartHandler = (event) => this.handleDragStart(event);
-    const dragOverHandler = (event) => this.handleDragOver(event);
-    const dragEnterHandler = (event) => this.handleDragEnter(event);
-    const dragLeaveHandler = (event) => this.handleDragLeave(event);
-    const dropHandler = (event) => this.handleDrop(event);
-    const dragEndHandler = (event) => this.handleDragEnd(event);
-    
-    this.container.addEventListener('dragstart', dragStartHandler);
-    this.container.addEventListener('dragover', dragOverHandler);
-    this.container.addEventListener('dragenter', dragEnterHandler);
-    this.container.addEventListener('dragleave', dragLeaveHandler);
-    this.container.addEventListener('drop', dropHandler);
-    this.container.addEventListener('dragend', dragEndHandler);
-    
-    // Store handlers for cleanup
-    this.eventListeners.set('dragstart', dragStartHandler);
-    this.eventListeners.set('dragover', dragOverHandler);
-    this.eventListeners.set('dragenter', dragEnterHandler);
-    this.eventListeners.set('dragleave', dragLeaveHandler);
-    this.eventListeners.set('drop', dropHandler);
-    this.eventListeners.set('dragend', dragEndHandler);
+    // Set up event listeners with delegation
+    this.container.addEventListener('dragstart', (e) => this.handleDragStart(e));
+    this.container.addEventListener('dragover', (e) => this.handleDragOver(e));
+    this.container.addEventListener('dragenter', (e) => this.handleDragEnter(e));
+    this.container.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+    this.container.addEventListener('drop', (e) => this.handleDrop(e));
+    this.container.addEventListener('dragend', (e) => this.handleDragEnd(e));
   }
 
   /**
@@ -950,7 +933,7 @@ class FileTree {
    */
   handleDragStart(event) {
     const treeItem = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
-    if (!treeItem || treeItem.classList.contains('tree-load-more')) {
+    if (!treeItem) {
       event.preventDefault();
       return;
     }
@@ -963,92 +946,19 @@ class FileTree {
       return;
     }
     
-    // Set up drag state
-    this.dragState.draggedItem = treeItem;
+    // Set up simple drag state
     this.dragState.draggedFile = file;
     this.dragState.isDragging = true;
-    this.dragState.dragStartTime = Date.now();
     
-    // Set drag effect and data
+    // Set drag data
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', file.path);
-    event.dataTransfer.setData('application/x-filetree-item', JSON.stringify({
-      path: file.path,
-      name: file.name,
-      isDir: file.is_dir
-    }));
     
-    // Create drag image
-    this.createDragImage(event, treeItem, file);
-    
-    // Add dragging class
+    // Add visual feedback
     treeItem.classList.add('dragging');
-    this.container.classList.add('drag-active');
     
     // Emit drag start event
-    this.emit(FileTree.EVENTS.DRAG_START, { file: this.dragState.draggedFile, element: treeItem });
-  }
-
-  /**
-   * Create custom drag image
-   * @param {DragEvent} event - Drag event
-   * @param {HTMLElement} treeItem - Tree item being dragged
-   * @param {Object} file - File object
-   */
-  createDragImage(event, treeItem, file) {
-    // Clone the tree item for drag image
-    const dragImage = treeItem.cloneNode(true);
-    dragImage.style.position = 'absolute';
-    dragImage.style.top = '-1000px';
-    dragImage.style.left = '-1000px';
-    dragImage.style.width = `${treeItem.offsetWidth}px`;
-    dragImage.style.opacity = '0.8';
-    dragImage.style.background = 'var(--vscode-list-activeSelectionBackground, rgba(0, 122, 204, 0.18))';
-    dragImage.style.borderRadius = '4px';
-    dragImage.classList.add('drag-ghost');
-    
-    document.body.appendChild(dragImage);
-    
-    // Set drag image
-    if (event.dataTransfer.setDragImage) {
-      event.dataTransfer.setDragImage(dragImage, 16, 11);
-    }
-    
-    // Remove drag image after a short delay
-    setTimeout(() => {
-      if (document.body.contains(dragImage)) {
-        document.body.removeChild(dragImage);
-      }
-    }, 100);
-  }
-
-  /**
-   * Handle drag over event
-   * @param {DragEvent} event - Drag over event
-   */
-  handleDragOver(event) {
-    if (!this.dragState.isDragging) return;
-    
-    event.preventDefault();
-    
-    const treeItem = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
-    if (!treeItem) return;
-    
-    const filePath = treeItem.dataset.filePath;
-    const file = this.files.find(f => f.path === filePath);
-    
-    if (!file || !this.canDropOnTarget(this.dragState.draggedFile, file)) {
-      event.dataTransfer.dropEffect = 'none';
-      return;
-    }
-    
-    // Set appropriate drop effect
-    if (file.is_dir) {
-      event.dataTransfer.dropEffect = 'move';
-      this.updateDropTarget(treeItem);
-    } else {
-      event.dataTransfer.dropEffect = 'none';
-    }
+    this.emit(FileTree.EVENTS.DRAG_START, { file });
   }
 
   /**
@@ -1057,15 +967,29 @@ class FileTree {
    */
   handleDragEnter(event) {
     if (!this.dragState.isDragging) return;
+    event.preventDefault();
+  }
+
+  /**
+   * Handle drag over event - simplified folder-only drop areas
+   * @param {DragEvent} event - Drag over event
+   */
+  handleDragOver(event) {
+    if (!this.dragState.isDragging) return;
     
-    const treeItem = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
-    if (treeItem && treeItem !== this.dragState.draggedItem) {
-      const filePath = treeItem.dataset.filePath;
-      const file = this.files.find(f => f.path === filePath);
-      
-      if (file && file.is_dir && this.canDropOnTarget(this.dragState.draggedFile, file)) {
-        this.updateDropTarget(treeItem);
-      }
+    event.preventDefault();
+    
+    // Find folder drop target
+    const folderTarget = this.getFolderDropTarget(event.target);
+    
+    // Clear previous drop highlights
+    this.clearDropHighlights();
+    
+    if (folderTarget && this.canDropOnFolder(folderTarget)) {
+      event.dataTransfer.dropEffect = 'move';
+      folderTarget.classList.add('drop-target');
+    } else {
+      event.dataTransfer.dropEffect = 'none';
     }
   }
 
@@ -1076,21 +1000,15 @@ class FileTree {
   handleDragLeave(event) {
     if (!this.dragState.isDragging) return;
     
-    const treeItem = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
-    if (treeItem === this.dragState.dropTarget) {
-      // Check if we're actually leaving the item (not just moving to a child element)
-      const rect = treeItem.getBoundingClientRect();
-      const x = event.clientX;
-      const y = event.clientY;
-      
-      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-        this.clearDropTarget();
-      }
+    // Only clear highlights if we're leaving the container entirely
+    if (!this.container.contains(event.relatedTarget)) {
+      this.clearDropHighlights();
     }
   }
 
+
   /**
-   * Handle drop event
+   * Handle drop event - simple folder-only drops
    * @param {DragEvent} event - Drop event
    */
   handleDrop(event) {
@@ -1099,158 +1017,98 @@ class FileTree {
     event.preventDefault();
     event.stopPropagation();
     
-    const treeItem = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
-    if (!treeItem) {
-      this.handleDragEnd();
-      return;
+    // Find folder drop target
+    const folderTarget = this.getFolderDropTarget(event.target);
+    
+    if (folderTarget && this.canDropOnFolder(folderTarget)) {
+      const targetFilePath = folderTarget.dataset.filePath;
+      const targetFile = this.files.find(f => f.path === targetFilePath);
+      
+      if (targetFile && targetFile.is_dir) {
+        // Emit move request event for the application to handle
+        this.emit(FileTree.EVENTS.FILE_MOVE_REQUESTED, {
+          sourceFile: this.dragState.draggedFile,
+          targetFolder: targetFile,
+          newPath: `${targetFile.path}/${this.dragState.draggedFile.name}`
+        });
+      }
     }
-    
-    const targetFilePath = treeItem.dataset.filePath;
-    const targetFile = this.files.find(f => f.path === targetFilePath);
-    
-    if (!targetFile || !targetFile.is_dir || !this.canDropOnTarget(this.dragState.draggedFile, targetFile)) {
-      this.handleDragEnd();
-      return;
-    }
-    
-    // Perform the file move operation
-    this.performFileDrop(this.dragState.draggedFile, targetFile);
     
     this.handleDragEnd();
   }
 
   /**
-   * Handle drag end event
+   * Get folder drop target from event target
+   * @param {HTMLElement} target - Event target element
+   * @returns {HTMLElement|null} Folder tree item element
    */
-  handleDragEnd() {
-    if (this.dragState.draggedItem) {
-      this.dragState.draggedItem.classList.remove('dragging');
-    }
+  getFolderDropTarget(target) {
+    const treeItem = target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
+    if (!treeItem) return null;
     
-    this.clearDropTarget();
-    this.container.classList.remove('drag-active');
-    
-    // Emit drag end event
-    if (this.dragState.isDragging) {
-      this.emit(FileTree.EVENTS.DRAG_END, { 
-        file: this.dragState.draggedFile,
-        duration: Date.now() - this.dragState.dragStartTime 
-      });
-    }
-    
-    // Reset drag state
-    this.dragState = {
-      draggedItem: null,
-      draggedFile: null,
-      dropTarget: null,
-      isDragging: false,
-      dragStartTime: null
-    };
+    const isDir = treeItem.dataset.isDir === 'true';
+    return isDir ? treeItem : null;
   }
 
   /**
-   * Update drop target visual feedback
-   * @param {HTMLElement} targetItem - Target tree item
-   */
-  updateDropTarget(targetItem) {
-    if (this.dragState.dropTarget === targetItem) return;
-    
-    this.clearDropTarget();
-    
-    this.dragState.dropTarget = targetItem;
-    targetItem.classList.add('drop-target');
-  }
-
-  /**
-   * Clear drop target visual feedback
-   */
-  clearDropTarget() {
-    if (this.dragState.dropTarget) {
-      this.dragState.dropTarget.classList.remove('drop-target');
-      this.dragState.dropTarget = null;
-    }
-  }
-
-  /**
-   * Check if a file can be dropped on a target
-   * @param {Object} draggedFile - File being dragged
-   * @param {Object} targetFile - Target file/folder
+   * Check if a file can be dropped on a folder
+   * @param {HTMLElement} folderElement - Folder tree item element
    * @returns {boolean} Whether drop is allowed
    */
-  canDropOnTarget(draggedFile, targetFile) {
-    if (!draggedFile || !targetFile) return false;
+  canDropOnFolder(folderElement) {
+    if (!folderElement || !this.dragState.draggedFile) return false;
+    
+    const folderPath = folderElement.dataset.filePath;
+    const draggedPath = this.dragState.draggedFile.path;
     
     // Can't drop on itself
-    if (draggedFile.path === targetFile.path) return false;
-    
-    // Can only drop on directories
-    if (!targetFile.is_dir) return false;
+    if (draggedPath === folderPath) return false;
     
     // Can't drop a parent folder into its own child
-    if (targetFile.path.startsWith(draggedFile.path + '/')) return false;
+    if (folderPath.startsWith(draggedPath + '/')) return false;
     
     // Can't drop into the same parent directory
-    const draggedParent = this.getParentPath(this.getRelativePath(draggedFile.path));
-    const targetRelative = this.getRelativePath(targetFile.path);
+    const draggedParent = this.getParentPath(this.getRelativePath(draggedPath));
+    const targetRelative = this.getRelativePath(folderPath);
     if (draggedParent === targetRelative) return false;
     
     return true;
   }
 
   /**
-   * Perform the actual file drop operation
-   * @param {Object} draggedFile - File being moved
-   * @param {Object} targetFolder - Target folder
+   * Clear all drop target highlights
    */
-  async performFileDrop(draggedFile, targetFolder) {
-    try {
-      // Show loading state
-      this.showLoadingState(`Moving ${draggedFile.name}...`);
-      
-      // Calculate new path
-      const fileName = draggedFile.name;
-      const newPath = `${targetFolder.path}/${fileName}`;
-      
-      // Check for name conflicts
-      const existingFile = this.files.find(f => f.path === newPath);
-      if (existingFile) {
-        const confirmed = await this.showMoveConflictDialog(draggedFile, existingFile);
-        if (!confirmed) {
-          this.hideLoadingState();
-          return;
-        }
-      }
-      
-      // Emit move request event for the application to handle
-      this.emit(FileTree.EVENTS.FILE_MOVE_REQUESTED, {
-        sourceFile: draggedFile,
-        targetFolder: targetFolder,
-        newPath: newPath
-      });
-      
-      this.hideLoadingState();
-      
-    } catch (error) {
-      console.error('FileTree: Error during file move:', error);
-      this.showErrorState(`Failed to move ${draggedFile.name}: ${error.message}`);
-    }
+  clearDropHighlights() {
+    const dropTargets = this.container.querySelectorAll('.drop-target');
+    dropTargets.forEach(target => {
+      target.classList.remove('drop-target');
+    });
   }
 
   /**
-   * Show move conflict dialog
-   * @param {Object} draggedFile - File being moved
-   * @param {Object} existingFile - Existing file at target location
-   * @returns {Promise<boolean>} Whether to proceed with move
+   * Handle drag end event
    */
-  async showMoveConflictDialog(draggedFile, existingFile) {
-    return new Promise((resolve) => {
-      const confirmed = confirm(
-        `A ${existingFile.is_dir ? 'folder' : 'file'} named "${existingFile.name}" already exists in this location.\n\n` +
-        'Do you want to replace it?'
-      );
-      resolve(confirmed);
+  handleDragEnd() {
+    // Clear visual feedback
+    const draggingItems = this.container.querySelectorAll('.dragging');
+    draggingItems.forEach(item => {
+      item.classList.remove('dragging');
     });
+    
+    this.clearDropHighlights();
+    
+    // Emit drag end event
+    if (this.dragState.isDragging) {
+      this.emit(FileTree.EVENTS.DRAG_END, { file: this.dragState.draggedFile });
+    }
+    
+    // Reset drag state
+    this.dragState = {
+      draggedFile: null,
+      isDragging: false
+    };
   }
+
 
   /**
    * Create search interface for filtering files
