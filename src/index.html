@@ -17,6 +17,9 @@
         <header class="panel-header">
           <h2>File Tree</h2>
           <div class="panel-controls">
+            <button id="searchBtn" class="control-btn" onclick="activateFileTreeSearch()" aria-label="Search files (Ctrl+F)" title="Search files (Ctrl+F)">
+              🔍
+            </button>
             <button id="selectVaultBtn" class="control-btn" onclick="selectVault()" aria-label="Select vault folder">
               📁
             </button>
@@ -121,8 +124,12 @@
           <div class="shortcut"><kbd>Ctrl/Cmd</kbd> + <kbd>E</kbd> - Toggle editor/preview</div>
           <div class="shortcut"><kbd>Ctrl/Cmd</kbd> + <kbd>1</kbd> - Toggle file tree</div>
           <div class="shortcut"><kbd>Ctrl/Cmd</kbd> + <kbd>2</kbd> - Toggle AI panel</div>
+          <div class="shortcut"><kbd>Ctrl/Cmd</kbd> + <kbd>F</kbd> - Search files (in file tree)</div>
+          <div class="shortcut"><kbd>↑↓←→</kbd> - Navigate file tree</div>
+          <div class="shortcut"><kbd>Enter</kbd> - Open file / Toggle folder</div>
+          <div class="shortcut"><kbd>Home/End</kbd> - Go to first/last item</div>
           <div class="shortcut"><kbd>Ctrl/Cmd</kbd> + <kbd>/</kbd> - Show/hide shortcuts</div>
-          <div class="shortcut"><kbd>Esc</kbd> - Close this dialog</div>
+          <div class="shortcut"><kbd>Esc</kbd> - Close dialogs / Exit search</div>
         </div>
         <button onclick="toggleShortcutsHelp()" class="btn-primary">Close</button>
       </div>

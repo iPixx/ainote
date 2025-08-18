@@ -20,7 +20,10 @@ class FileTree {
     FILE_SELECTED: 'file_selected',
     FOLDER_EXPANDED: 'folder_expanded',
     FOLDER_COLLAPSED: 'folder_collapsed',
-    TREE_UPDATED: 'tree_updated'
+    TREE_UPDATED: 'tree_updated',
+    DRAG_START: 'drag_start',
+    DRAG_END: 'drag_end',
+    FILE_MOVE_REQUESTED: 'file_move_requested'
   };
 
   /**
@@ -63,6 +66,25 @@ class FileTree {
     this.selectedFile = null;
     this.treeStructure = new Map(); // Optimized hierarchical structure
     
+    // Search and filtering state
+    this.filteredFiles = null;
+    this.searchInput = null;
+    this.searchDebounceTimer = null;
+    this.isSearchActive = false;
+    
+    // Virtual scrolling state
+    this.isVirtualScrolling = false;
+    this.virtualScrollOffset = 0;
+    this.visibleItemsCount = 20; // Items visible in viewport
+    this.intersectionObserver = null;
+    
+    // Performance monitoring
+    this.performanceMetrics = {
+      lastRenderTime: 0,
+      renderCount: 0,
+      averageRenderTime: 0
+    };
+    
     // Event listeners registry for cleanup
     this.eventListeners = new Map();
     
@@ -79,11 +101,20 @@ class FileTree {
     this.container.setAttribute('role', 'tree');
     this.container.setAttribute('aria-label', 'File tree navigation');
     
+    // Create search input container
+    this.createSearchInterface();
+    
     // Set up event delegation for performance
     this.setupEventDelegation();
     
+    // Set up drag and drop functionality
+    this.setupDragAndDrop();
+    
     // Listen to app state changes
     this.setupStateListeners();
+    
+    // Set up virtual scrolling if needed
+    this.setupVirtualScrolling();
     
     // Initial empty state
     this.showEmptyState();
@@ -137,17 +168,41 @@ class FileTree {
       return;
     }
 
+    // Check if virtual scrolling is needed based on file count
+    this.checkVirtualScrollingNeeded();
+
     // Build hierarchical structure for performance
     this.buildTreeStructure(files);
     
-    // Clear container and render tree
+    // Clear container but preserve search interface
+    const searchContainer = this.container.querySelector('.file-tree-search-container');
     this.container.innerHTML = '';
+    if (searchContainer) {
+      this.container.appendChild(searchContainer);
+    }
+    
+    // Render tree with performance optimizations
+    const startTime = performance.now();
     this.renderTreeLevel(this.getRootItems(), this.container, 0);
+    const renderTime = performance.now() - startTime;
+    
+    // Update performance metrics
+    this.updatePerformanceMetrics(renderTime);
+    
+    // Performance logging for large trees
+    if (files.length > 1000) {
+      console.debug(`FileTree: Rendered ${files.length} files in ${renderTime.toFixed(2)}ms (virtual: ${this.isVirtualScrolling})`);
+    }
+    
+    // Run performance optimization checks
+    this.performanceOptimization();
     
     // Emit tree updated event
     this.emit(FileTree.EVENTS.TREE_UPDATED, { 
       files: this.files, 
-      count: files.length 
+      count: files.length,
+      renderTime: renderTime,
+      isVirtualScrolling: this.isVirtualScrolling
     });
   }
 
@@ -288,6 +343,9 @@ class FileTree {
     item.setAttribute('aria-label', `${file.is_dir ? 'Folder' : 'File'}: ${file.name}`);
     item.setAttribute('tabindex', '0');
     
+    // Enable drag and drop
+    item.setAttribute('draggable', 'true');
+    
     if (file.is_dir) {
       const isExpanded = this.expandedFolders.has(file.path);
       item.setAttribute('aria-expanded', isExpanded.toString());
@@ -409,7 +467,7 @@ class FileTree {
   }
 
   /**
-   * Handle keyboard navigation
+   * Handle keyboard navigation with advanced features
    * @param {Event} event - Keyboard event
    */
   handleKeyboard(event) {
@@ -432,16 +490,69 @@ class FileTree {
         break;
         
       case 'ArrowRight':
-        if (isDir && !this.expandedFolders.has(filePath)) {
-          event.preventDefault();
-          this.expandFolder(filePath);
+        event.preventDefault();
+        if (isDir) {
+          if (!this.expandedFolders.has(filePath)) {
+            this.expandFolder(filePath);
+          } else {
+            // Move to first child if folder is expanded
+            this.navigateToFirstChild(treeItem);
+          }
         }
         break;
         
       case 'ArrowLeft':
+        event.preventDefault();
         if (isDir && this.expandedFolders.has(filePath)) {
-          event.preventDefault();
           this.collapseFolder(filePath);
+        } else {
+          // Move to parent
+          this.navigateToParent(treeItem);
+        }
+        break;
+        
+      case 'ArrowUp':
+        event.preventDefault();
+        this.navigateToPrevious(treeItem);
+        break;
+        
+      case 'ArrowDown':
+        event.preventDefault();
+        this.navigateToNext(treeItem);
+        break;
+        
+      case 'Home':
+        event.preventDefault();
+        this.navigateToFirst();
+        break;
+        
+      case 'End':
+        event.preventDefault();
+        this.navigateToLast();
+        break;
+        
+      case 'PageUp':
+        event.preventDefault();
+        this.navigateByPage(-1);
+        break;
+        
+      case 'PageDown':
+        event.preventDefault();
+        this.navigateByPage(1);
+        break;
+        
+      // Quick search/filter activation
+      case 'f':
+        if (event.ctrlKey || event.metaKey) {
+          event.preventDefault();
+          this.activateSearch();
+        }
+        break;
+        
+      case 'Escape':
+        if (this.searchInput && this.searchInput.style.display !== 'none') {
+          event.preventDefault();
+          this.deactivateSearch();
         }
         break;
     }
@@ -646,9 +757,1453 @@ class FileTree {
   }
 
   /**
+   * Navigate to the first child of an expanded folder
+   * @param {HTMLElement} folderItem - The folder tree item
+   */
+  navigateToFirstChild(folderItem) {
+    if (folderItem.childrenContainer) {
+      const firstChild = folderItem.childrenContainer.querySelector(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
+      if (firstChild) {
+        this.focusTreeItem(firstChild);
+      }
+    }
+  }
+
+  /**
+   * Navigate to the parent of the current item
+   * @param {HTMLElement} treeItem - Current tree item
+   */
+  navigateToParent(treeItem) {
+    const depth = parseInt(treeItem.dataset.depth || '0');
+    if (depth === 0) return; // Already at root level
+    
+    const filePath = treeItem.dataset.filePath;
+    const parentPath = this.getParentPath(this.getRelativePath(filePath));
+    const vaultPath = this.appState.getState().currentVault || '';
+    const fullParentPath = vaultPath ? `${vaultPath}/${parentPath}` : parentPath;
+    
+    const parentItem = this.findTreeItem(fullParentPath);
+    if (parentItem) {
+      this.focusTreeItem(parentItem);
+    }
+  }
+
+  /**
+   * Navigate to the previous visible tree item
+   * @param {HTMLElement} currentItem - Current tree item
+   */
+  navigateToPrevious(currentItem) {
+    const visibleItems = this.getVisibleTreeItems();
+    const currentIndex = visibleItems.indexOf(currentItem);
+    
+    if (currentIndex > 0) {
+      this.focusTreeItem(visibleItems[currentIndex - 1]);
+    }
+  }
+
+  /**
+   * Navigate to the next visible tree item
+   * @param {HTMLElement} currentItem - Current tree item
+   */
+  navigateToNext(currentItem) {
+    const visibleItems = this.getVisibleTreeItems();
+    const currentIndex = visibleItems.indexOf(currentItem);
+    
+    if (currentIndex < visibleItems.length - 1) {
+      this.focusTreeItem(visibleItems[currentIndex + 1]);
+    }
+  }
+
+  /**
+   * Navigate to the first tree item
+   */
+  navigateToFirst() {
+    const visibleItems = this.getVisibleTreeItems();
+    if (visibleItems.length > 0) {
+      this.focusTreeItem(visibleItems[0]);
+    }
+  }
+
+  /**
+   * Navigate to the last visible tree item
+   */
+  navigateToLast() {
+    const visibleItems = this.getVisibleTreeItems();
+    if (visibleItems.length > 0) {
+      this.focusTreeItem(visibleItems[visibleItems.length - 1]);
+    }
+  }
+
+  /**
+   * Navigate by page (approximately 10 items)
+   * @param {number} direction - 1 for down, -1 for up
+   */
+  navigateByPage(direction) {
+    const visibleItems = this.getVisibleTreeItems();
+    const currentFocused = document.activeElement;
+    const currentIndex = visibleItems.indexOf(currentFocused);
+    
+    if (currentIndex === -1) {
+      this.navigateToFirst();
+      return;
+    }
+    
+    const pageSize = 10;
+    let targetIndex = currentIndex + (direction * pageSize);
+    
+    // Clamp to valid range
+    targetIndex = Math.max(0, Math.min(targetIndex, visibleItems.length - 1));
+    
+    this.focusTreeItem(visibleItems[targetIndex]);
+  }
+
+  /**
+   * Get all currently visible tree items in DOM order
+   * @returns {HTMLElement[]} Array of visible tree item elements
+   */
+  getVisibleTreeItems() {
+    return Array.from(this.container.querySelectorAll(`.${FileTree.CSS_CLASSES.TREE_ITEM}`));
+  }
+
+  /**
+   * Focus a tree item and scroll it into view
+   * @param {HTMLElement} treeItem - Tree item to focus
+   */
+  focusTreeItem(treeItem) {
+    if (!treeItem) return;
+    
+    treeItem.focus();
+    
+    // Smooth scroll into view
+    treeItem.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'nearest'
+    });
+  }
+
+  /**
+   * Get relative path from absolute path
+   * @param {string} absolutePath - Absolute file path
+   * @returns {string} Relative path from vault root
+   */
+  getRelativePath(absolutePath) {
+    const vaultPath = this.appState.getState().currentVault || '';
+    if (vaultPath && absolutePath.startsWith(vaultPath)) {
+      return absolutePath.substring(vaultPath.length).replace(/^\/+/, '');
+    }
+    return absolutePath;
+  }
+
+  /**
+   * Set up drag and drop functionality for file organization
+   */
+  setupDragAndDrop() {
+    // Enable drag and drop only if supported
+    if (!('draggable' in document.createElement('div'))) {
+      console.warn('FileTree: Drag and drop not supported in this browser');
+      return;
+    }
+    
+    // State for drag and drop operations
+    this.dragState = {
+      draggedItem: null,
+      draggedFile: null,
+      dropTarget: null,
+      isDragging: false,
+      dragStartTime: null
+    };
+    
+    // Set up drag event listeners using event delegation
+    const dragStartHandler = (event) => this.handleDragStart(event);
+    const dragOverHandler = (event) => this.handleDragOver(event);
+    const dragEnterHandler = (event) => this.handleDragEnter(event);
+    const dragLeaveHandler = (event) => this.handleDragLeave(event);
+    const dropHandler = (event) => this.handleDrop(event);
+    const dragEndHandler = (event) => this.handleDragEnd(event);
+    
+    this.container.addEventListener('dragstart', dragStartHandler);
+    this.container.addEventListener('dragover', dragOverHandler);
+    this.container.addEventListener('dragenter', dragEnterHandler);
+    this.container.addEventListener('dragleave', dragLeaveHandler);
+    this.container.addEventListener('drop', dropHandler);
+    this.container.addEventListener('dragend', dragEndHandler);
+    
+    // Store handlers for cleanup
+    this.eventListeners.set('dragstart', dragStartHandler);
+    this.eventListeners.set('dragover', dragOverHandler);
+    this.eventListeners.set('dragenter', dragEnterHandler);
+    this.eventListeners.set('dragleave', dragLeaveHandler);
+    this.eventListeners.set('drop', dropHandler);
+    this.eventListeners.set('dragend', dragEndHandler);
+  }
+
+  /**
+   * Handle drag start event
+   * @param {DragEvent} event - Drag start event
+   */
+  handleDragStart(event) {
+    const treeItem = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
+    if (!treeItem || treeItem.classList.contains('tree-load-more')) {
+      event.preventDefault();
+      return;
+    }
+    
+    const filePath = treeItem.dataset.filePath;
+    const file = this.files.find(f => f.path === filePath);
+    
+    if (!file) {
+      event.preventDefault();
+      return;
+    }
+    
+    // Set up drag state
+    this.dragState.draggedItem = treeItem;
+    this.dragState.draggedFile = file;
+    this.dragState.isDragging = true;
+    this.dragState.dragStartTime = Date.now();
+    
+    // Set drag effect and data
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', file.path);
+    event.dataTransfer.setData('application/x-filetree-item', JSON.stringify({
+      path: file.path,
+      name: file.name,
+      isDir: file.is_dir
+    }));
+    
+    // Create drag image
+    this.createDragImage(event, treeItem, file);
+    
+    // Add dragging class
+    treeItem.classList.add('dragging');
+    this.container.classList.add('drag-active');
+    
+    // Emit drag start event
+    this.emit(FileTree.EVENTS.DRAG_START, { file: this.dragState.draggedFile, element: treeItem });
+  }
+
+  /**
+   * Create custom drag image
+   * @param {DragEvent} event - Drag event
+   * @param {HTMLElement} treeItem - Tree item being dragged
+   * @param {Object} file - File object
+   */
+  createDragImage(event, treeItem, file) {
+    // Clone the tree item for drag image
+    const dragImage = treeItem.cloneNode(true);
+    dragImage.style.position = 'absolute';
+    dragImage.style.top = '-1000px';
+    dragImage.style.left = '-1000px';
+    dragImage.style.width = `${treeItem.offsetWidth}px`;
+    dragImage.style.opacity = '0.8';
+    dragImage.style.background = 'var(--vscode-list-activeSelectionBackground, rgba(0, 122, 204, 0.18))';
+    dragImage.style.borderRadius = '4px';
+    dragImage.classList.add('drag-ghost');
+    
+    document.body.appendChild(dragImage);
+    
+    // Set drag image
+    if (event.dataTransfer.setDragImage) {
+      event.dataTransfer.setDragImage(dragImage, 16, 11);
+    }
+    
+    // Remove drag image after a short delay
+    setTimeout(() => {
+      if (document.body.contains(dragImage)) {
+        document.body.removeChild(dragImage);
+      }
+    }, 100);
+  }
+
+  /**
+   * Handle drag over event
+   * @param {DragEvent} event - Drag over event
+   */
+  handleDragOver(event) {
+    if (!this.dragState.isDragging) return;
+    
+    event.preventDefault();
+    
+    const treeItem = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
+    if (!treeItem) return;
+    
+    const filePath = treeItem.dataset.filePath;
+    const file = this.files.find(f => f.path === filePath);
+    
+    if (!file || !this.canDropOnTarget(this.dragState.draggedFile, file)) {
+      event.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    
+    // Set appropriate drop effect
+    if (file.is_dir) {
+      event.dataTransfer.dropEffect = 'move';
+      this.updateDropTarget(treeItem);
+    } else {
+      event.dataTransfer.dropEffect = 'none';
+    }
+  }
+
+  /**
+   * Handle drag enter event
+   * @param {DragEvent} event - Drag enter event
+   */
+  handleDragEnter(event) {
+    if (!this.dragState.isDragging) return;
+    
+    const treeItem = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
+    if (treeItem && treeItem !== this.dragState.draggedItem) {
+      const filePath = treeItem.dataset.filePath;
+      const file = this.files.find(f => f.path === filePath);
+      
+      if (file && file.is_dir && this.canDropOnTarget(this.dragState.draggedFile, file)) {
+        this.updateDropTarget(treeItem);
+      }
+    }
+  }
+
+  /**
+   * Handle drag leave event
+   * @param {DragEvent} event - Drag leave event
+   */
+  handleDragLeave(event) {
+    if (!this.dragState.isDragging) return;
+    
+    const treeItem = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
+    if (treeItem === this.dragState.dropTarget) {
+      // Check if we're actually leaving the item (not just moving to a child element)
+      const rect = treeItem.getBoundingClientRect();
+      const x = event.clientX;
+      const y = event.clientY;
+      
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+        this.clearDropTarget();
+      }
+    }
+  }
+
+  /**
+   * Handle drop event
+   * @param {DragEvent} event - Drop event
+   */
+  handleDrop(event) {
+    if (!this.dragState.isDragging) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const treeItem = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
+    if (!treeItem) {
+      this.handleDragEnd();
+      return;
+    }
+    
+    const targetFilePath = treeItem.dataset.filePath;
+    const targetFile = this.files.find(f => f.path === targetFilePath);
+    
+    if (!targetFile || !targetFile.is_dir || !this.canDropOnTarget(this.dragState.draggedFile, targetFile)) {
+      this.handleDragEnd();
+      return;
+    }
+    
+    // Perform the file move operation
+    this.performFileDrop(this.dragState.draggedFile, targetFile);
+    
+    this.handleDragEnd();
+  }
+
+  /**
+   * Handle drag end event
+   */
+  handleDragEnd() {
+    if (this.dragState.draggedItem) {
+      this.dragState.draggedItem.classList.remove('dragging');
+    }
+    
+    this.clearDropTarget();
+    this.container.classList.remove('drag-active');
+    
+    // Emit drag end event
+    if (this.dragState.isDragging) {
+      this.emit(FileTree.EVENTS.DRAG_END, { 
+        file: this.dragState.draggedFile,
+        duration: Date.now() - this.dragState.dragStartTime 
+      });
+    }
+    
+    // Reset drag state
+    this.dragState = {
+      draggedItem: null,
+      draggedFile: null,
+      dropTarget: null,
+      isDragging: false,
+      dragStartTime: null
+    };
+  }
+
+  /**
+   * Update drop target visual feedback
+   * @param {HTMLElement} targetItem - Target tree item
+   */
+  updateDropTarget(targetItem) {
+    if (this.dragState.dropTarget === targetItem) return;
+    
+    this.clearDropTarget();
+    
+    this.dragState.dropTarget = targetItem;
+    targetItem.classList.add('drop-target');
+  }
+
+  /**
+   * Clear drop target visual feedback
+   */
+  clearDropTarget() {
+    if (this.dragState.dropTarget) {
+      this.dragState.dropTarget.classList.remove('drop-target');
+      this.dragState.dropTarget = null;
+    }
+  }
+
+  /**
+   * Check if a file can be dropped on a target
+   * @param {Object} draggedFile - File being dragged
+   * @param {Object} targetFile - Target file/folder
+   * @returns {boolean} Whether drop is allowed
+   */
+  canDropOnTarget(draggedFile, targetFile) {
+    if (!draggedFile || !targetFile) return false;
+    
+    // Can't drop on itself
+    if (draggedFile.path === targetFile.path) return false;
+    
+    // Can only drop on directories
+    if (!targetFile.is_dir) return false;
+    
+    // Can't drop a parent folder into its own child
+    if (targetFile.path.startsWith(draggedFile.path + '/')) return false;
+    
+    // Can't drop into the same parent directory
+    const draggedParent = this.getParentPath(this.getRelativePath(draggedFile.path));
+    const targetRelative = this.getRelativePath(targetFile.path);
+    if (draggedParent === targetRelative) return false;
+    
+    return true;
+  }
+
+  /**
+   * Perform the actual file drop operation
+   * @param {Object} draggedFile - File being moved
+   * @param {Object} targetFolder - Target folder
+   */
+  async performFileDrop(draggedFile, targetFolder) {
+    try {
+      // Show loading state
+      this.showLoadingState(`Moving ${draggedFile.name}...`);
+      
+      // Calculate new path
+      const fileName = draggedFile.name;
+      const newPath = `${targetFolder.path}/${fileName}`;
+      
+      // Check for name conflicts
+      const existingFile = this.files.find(f => f.path === newPath);
+      if (existingFile) {
+        const confirmed = await this.showMoveConflictDialog(draggedFile, existingFile);
+        if (!confirmed) {
+          this.hideLoadingState();
+          return;
+        }
+      }
+      
+      // Emit move request event for the application to handle
+      this.emit(FileTree.EVENTS.FILE_MOVE_REQUESTED, {
+        sourceFile: draggedFile,
+        targetFolder: targetFolder,
+        newPath: newPath
+      });
+      
+      this.hideLoadingState();
+      
+    } catch (error) {
+      console.error('FileTree: Error during file move:', error);
+      this.showErrorState(`Failed to move ${draggedFile.name}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Show move conflict dialog
+   * @param {Object} draggedFile - File being moved
+   * @param {Object} existingFile - Existing file at target location
+   * @returns {Promise<boolean>} Whether to proceed with move
+   */
+  async showMoveConflictDialog(draggedFile, existingFile) {
+    return new Promise((resolve) => {
+      const confirmed = confirm(
+        `A ${existingFile.is_dir ? 'folder' : 'file'} named "${existingFile.name}" already exists in this location.\n\n` +
+        'Do you want to replace it?'
+      );
+      resolve(confirmed);
+    });
+  }
+
+  /**
+   * Create search interface for filtering files
+   */
+  createSearchInterface() {
+    const searchContainer = document.createElement('div');
+    searchContainer.className = 'file-tree-search-container';
+    searchContainer.style.display = 'none';
+    
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'file-tree-search-input';
+    searchInput.placeholder = 'Filter files...';
+    searchInput.setAttribute('aria-label', 'Filter files');
+    
+    const closeButton = document.createElement('button');
+    closeButton.className = 'file-tree-search-close';
+    closeButton.innerHTML = '×';
+    closeButton.setAttribute('aria-label', 'Close search');
+    closeButton.type = 'button';
+    
+    searchContainer.appendChild(searchInput);
+    searchContainer.appendChild(closeButton);
+    
+    // Insert at the top of the container
+    this.container.insertBefore(searchContainer, this.container.firstChild);
+    
+    this.searchInput = searchInput;
+    this.searchContainer = searchContainer;
+    
+    // Set up search event handlers
+    this.setupSearchHandlers();
+  }
+
+  /**
+   * Set up search event handlers
+   */
+  setupSearchHandlers() {
+    // Debounced search input handler
+    const searchHandler = (event) => {
+      clearTimeout(this.searchDebounceTimer);
+      this.searchDebounceTimer = setTimeout(() => {
+        this.performSearch(event.target.value.trim());
+      }, 300); // 300ms debounce
+    };
+    
+    this.searchInput.addEventListener('input', searchHandler);
+    this.eventListeners.set('search-input', searchHandler);
+    
+    // Close button handler
+    const closeHandler = () => this.deactivateSearch();
+    const closeButton = this.searchContainer.querySelector('.file-tree-search-close');
+    closeButton.addEventListener('click', closeHandler);
+    this.eventListeners.set('search-close', closeHandler);
+    
+    // Escape key handler for search input
+    const keyHandler = (event) => {
+      if (event.key === 'Escape') {
+        this.deactivateSearch();
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        // Move focus to first tree item
+        const firstItem = this.container.querySelector(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
+        if (firstItem) {
+          firstItem.focus();
+        }
+      }
+    };
+    
+    this.searchInput.addEventListener('keydown', keyHandler);
+    this.eventListeners.set('search-keydown', keyHandler);
+  }
+
+  /**
+   * Activate search mode
+   */
+  activateSearch() {
+    this.isSearchActive = true;
+    this.searchContainer.style.display = 'flex';
+    this.searchInput.focus();
+    this.searchInput.select(); // Select any existing text
+  }
+
+  /**
+   * Deactivate search mode and return to normal view
+   */
+  deactivateSearch() {
+    this.isSearchActive = false;
+    this.searchContainer.style.display = 'none';
+    this.searchInput.value = '';
+    
+    // Clear search filter
+    this.filteredFiles = null;
+    
+    // Re-render with original files
+    this.render(this.files);
+    
+    // Return focus to tree
+    const firstItem = this.container.querySelector(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
+    if (firstItem) {
+      firstItem.focus();
+    }
+  }
+
+  /**
+   * Perform fuzzy search on files and render results
+   * @param {string} searchTerm - The search term
+   */
+  performSearch(searchTerm) {
+    if (!searchTerm) {
+      this.filteredFiles = null;
+      this.render(this.files);
+      return;
+    }
+    
+    const startTime = performance.now();
+    
+    // Fuzzy search algorithm
+    const searchResults = this.fuzzySearch(this.files, searchTerm);
+    
+    // Sort by relevance score
+    searchResults.sort((a, b) => b.score - a.score);
+    
+    this.filteredFiles = searchResults.map(result => result.file);
+    
+    // Render filtered results
+    this.renderSearchResults(this.filteredFiles, searchTerm);
+    
+    // Performance tracking
+    const renderTime = performance.now() - startTime;
+    this.updatePerformanceMetrics(renderTime);
+    
+    // Show search stats
+    this.showSearchStats(searchResults.length, searchTerm, renderTime);
+  }
+
+  /**
+   * Fuzzy search implementation with scoring
+   * @param {Array} files - Files to search
+   * @param {string} searchTerm - Search term
+   * @returns {Array} Array of {file, score} objects
+   */
+  fuzzySearch(files, searchTerm) {
+    const term = searchTerm.toLowerCase();
+    const results = [];
+    
+    files.forEach(file => {
+      const fileName = file.name.toLowerCase();
+      const filePath = file.path.toLowerCase();
+      
+      // Exact match gets highest score
+      if (fileName === term) {
+        results.push({ file, score: 1000 });
+        return;
+      }
+      
+      // Start of name match
+      if (fileName.startsWith(term)) {
+        results.push({ file, score: 800 });
+        return;
+      }
+      
+      // Contains term
+      if (fileName.includes(term)) {
+        results.push({ file, score: 600 });
+        return;
+      }
+      
+      // Path contains term
+      if (filePath.includes(term)) {
+        results.push({ file, score: 400 });
+        return;
+      }
+      
+      // Fuzzy character matching
+      const fuzzyScore = this.calculateFuzzyScore(fileName, term);
+      if (fuzzyScore > 0) {
+        results.push({ file, score: fuzzyScore });
+      }
+    });
+    
+    return results;
+  }
+
+  /**
+   * Calculate fuzzy matching score
+   * @param {string} text - Text to search in
+   * @param {string} term - Search term
+   * @returns {number} Fuzzy score (0-300)
+   */
+  calculateFuzzyScore(text, term) {
+    let score = 0;
+    let termIndex = 0;
+    let lastMatchIndex = -1;
+    
+    for (let i = 0; i < text.length && termIndex < term.length; i++) {
+      if (text[i] === term[termIndex]) {
+        score += 10;
+        
+        // Bonus for consecutive matches
+        if (i === lastMatchIndex + 1) {
+          score += 5;
+        }
+        
+        // Bonus for word boundary matches
+        if (i === 0 || text[i - 1] === ' ' || text[i - 1] === '-' || text[i - 1] === '_') {
+          score += 15;
+        }
+        
+        lastMatchIndex = i;
+        termIndex++;
+      }
+    }
+    
+    // Only return score if all characters were matched
+    return termIndex === term.length ? Math.max(score - (text.length - term.length), 0) : 0;
+  }
+
+  /**
+   * Render search results with highlighted matches
+   * @param {Array} filteredFiles - Filtered file list
+   * @param {string} searchTerm - The search term for highlighting
+   */
+  renderSearchResults(filteredFiles, searchTerm) {
+    if (filteredFiles.length === 0) {
+      this.showNoSearchResults(searchTerm);
+      return;
+    }
+    
+    // Clear container (but keep search interface)
+    const existingContent = this.container.querySelectorAll(':not(.file-tree-search-container)');
+    existingContent.forEach(element => element.remove());
+    
+    // Render search results in flat list (no hierarchy during search)
+    filteredFiles.forEach((file, index) => {
+      const itemElement = this.createSearchResultItem(file, searchTerm, index);
+      this.container.appendChild(itemElement);
+    });
+    
+    // Focus first result
+    const firstResult = this.container.querySelector(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
+    if (firstResult) {
+      firstResult.setAttribute('tabindex', '0');
+    }
+  }
+
+  /**
+   * Create a search result item with highlighted text
+   * @param {Object} file - File object
+   * @param {string} searchTerm - Search term for highlighting
+   * @param {number} index - Item index
+   * @returns {HTMLElement} Search result element
+   */
+  createSearchResultItem(file, searchTerm, index) {
+    const item = document.createElement('div');
+    item.className = `${FileTree.CSS_CLASSES.TREE_ITEM} ${file.is_dir ? FileTree.CSS_CLASSES.TREE_FOLDER : FileTree.CSS_CLASSES.TREE_FILE} search-result`;
+    
+    // Remove depth-based styling for search results
+    item.style.paddingLeft = '8px';
+    
+    // Store file data
+    item.dataset.filePath = file.path;
+    item.dataset.isDir = file.is_dir.toString();
+    item.dataset.searchIndex = index.toString();
+    
+    // Accessibility attributes
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-label', `Search result ${index + 1}: ${file.is_dir ? 'Folder' : 'File'} ${file.name}`);
+    item.setAttribute('tabindex', index === 0 ? '0' : '-1');
+    
+    // Create item content with highlighting
+    const icon = this.createIcon(file);
+    const name = this.createHighlightedName(file, searchTerm);
+    const path = this.createSearchResultPath(file);
+    
+    item.appendChild(icon);
+    item.appendChild(name);
+    if (path) {
+      item.appendChild(path);
+    }
+    
+    return item;
+  }
+
+  /**
+   * Create highlighted name element for search results
+   * @param {Object} file - File object
+   * @param {string} searchTerm - Search term for highlighting
+   * @returns {HTMLElement} Name element with highlighting
+   */
+  createHighlightedName(file, searchTerm) {
+    const name = document.createElement('span');
+    name.className = `${FileTree.CSS_CLASSES.TREE_NAME} highlighted`;
+    
+    // Highlight matching text
+    const highlightedText = this.highlightText(file.name, searchTerm);
+    name.innerHTML = highlightedText;
+    
+    return name;
+  }
+
+  /**
+   * Create path element for search results
+   * @param {Object} file - File object
+   * @returns {HTMLElement|null} Path element or null
+   */
+  createSearchResultPath(file) {
+    const relativePath = this.getRelativePath(file.path);
+    const parentPath = this.getParentPath(relativePath);
+    
+    if (!parentPath) return null; // Root level files don't need path
+    
+    const pathElement = document.createElement('span');
+    pathElement.className = 'search-result-path';
+    pathElement.textContent = parentPath;
+    pathElement.title = `Located in: ${parentPath}`;
+    
+    return pathElement;
+  }
+
+  /**
+   * Highlight matching text in a string
+   * @param {string} text - Original text
+   * @param {string} searchTerm - Term to highlight
+   * @returns {string} HTML string with highlighted matches
+   */
+  highlightText(text, searchTerm) {
+    if (!searchTerm) return text;
+    
+    const regex = new RegExp(`(${this.escapeRegex(searchTerm)})`, 'gi');
+    return text.replace(regex, '<mark>$1</mark>');
+  }
+
+  /**
+   * Escape special regex characters
+   * @param {string} text - Text to escape
+   * @returns {string} Escaped text
+   */
+  escapeRegex(text) {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * Show message when no search results found
+   * @param {string} searchTerm - The search term
+   */
+  showNoSearchResults(searchTerm) {
+    // Clear existing content (but keep search interface)
+    const existingContent = this.container.querySelectorAll(':not(.file-tree-search-container)');
+    existingContent.forEach(element => element.remove());
+    
+    const noResultsDiv = document.createElement('div');
+    noResultsDiv.className = 'file-tree-no-results';
+    noResultsDiv.innerHTML = `
+      <p>No files found matching "${searchTerm}"</p>
+      <small>Try a different search term or check your spelling</small>
+    `;
+    
+    this.container.appendChild(noResultsDiv);
+  }
+
+  /**
+   * Show search statistics
+   * @param {number} resultCount - Number of results found
+   * @param {string} searchTerm - The search term
+   * @param {number} renderTime - Time taken to render results
+   */
+  showSearchStats(resultCount, searchTerm, renderTime) {
+    // You could add a stats display here if needed
+    console.debug(`Search "${searchTerm}": ${resultCount} results in ${renderTime.toFixed(2)}ms`);
+  }
+
+  /**
+   * Update performance metrics
+   * @param {number} renderTime - Time taken for last render
+   */
+  updatePerformanceMetrics(renderTime) {
+    this.performanceMetrics.lastRenderTime = renderTime;
+    this.performanceMetrics.renderCount++;
+    
+    // Calculate running average
+    const totalTime = (this.performanceMetrics.averageRenderTime * (this.performanceMetrics.renderCount - 1)) + renderTime;
+    this.performanceMetrics.averageRenderTime = totalTime / this.performanceMetrics.renderCount;
+  }
+
+  /**
+   * Show loading state with message
+   * @param {string} message - Loading message to display
+   */
+  showLoadingState(message = 'Loading...') {
+    // Create or update loading indicator
+    let loadingIndicator = this.container.querySelector('.file-tree-loading-indicator');
+    if (!loadingIndicator) {
+      loadingIndicator = document.createElement('div');
+      loadingIndicator.className = 'file-tree-loading-indicator';
+      loadingIndicator.setAttribute('role', 'status');
+      loadingIndicator.setAttribute('aria-live', 'polite');
+      
+      // Position it at the top after search container
+      const searchContainer = this.container.querySelector('.file-tree-search-container');
+      if (searchContainer) {
+        this.container.insertBefore(loadingIndicator, searchContainer.nextSibling);
+      } else {
+        this.container.insertBefore(loadingIndicator, this.container.firstChild);
+      }
+    }
+    
+    loadingIndicator.innerHTML = `
+      <div class="loading-content">
+        <span class="loading-spinner" aria-hidden="true">⏳</span>
+        <span class="loading-message">${message}</span>
+      </div>
+    `;
+    
+    loadingIndicator.style.display = 'flex';
+  }
+
+  /**
+   * Hide loading state
+   */
+  hideLoadingState() {
+    const loadingIndicator = this.container.querySelector('.file-tree-loading-indicator');
+    if (loadingIndicator) {
+      loadingIndicator.style.display = 'none';
+    }
+  }
+
+  /**
+   * Show error state with message
+   * @param {string} message - Error message to display
+   */
+  showErrorState(message) {
+    // Create or update error indicator
+    let errorIndicator = this.container.querySelector('.file-tree-error-indicator');
+    if (!errorIndicator) {
+      errorIndicator = document.createElement('div');
+      errorIndicator.className = 'file-tree-error-indicator';
+      errorIndicator.setAttribute('role', 'alert');
+      errorIndicator.setAttribute('aria-live', 'assertive');
+      
+      // Position it at the top after search container
+      const searchContainer = this.container.querySelector('.file-tree-search-container');
+      if (searchContainer) {
+        this.container.insertBefore(errorIndicator, searchContainer.nextSibling);
+      } else {
+        this.container.insertBefore(errorIndicator, this.container.firstChild);
+      }
+    }
+    
+    errorIndicator.innerHTML = `
+      <div class="error-content">
+        <span class="error-icon" aria-hidden="true">⚠️</span>
+        <span class="error-message">${message}</span>
+        <button class="error-dismiss" type="button" aria-label="Dismiss error">×</button>
+      </div>
+    `;
+    
+    errorIndicator.style.display = 'flex';
+    
+    // Add dismiss handler
+    const dismissButton = errorIndicator.querySelector('.error-dismiss');
+    dismissButton.addEventListener('click', () => {
+      this.hideErrorState();
+    });
+    
+    // Auto-hide after 10 seconds
+    setTimeout(() => {
+      this.hideErrorState();
+    }, 10000);
+  }
+
+  /**
+   * Hide error state
+   */
+  hideErrorState() {
+    const errorIndicator = this.container.querySelector('.file-tree-error-indicator');
+    if (errorIndicator) {
+      errorIndicator.style.display = 'none';
+    }
+  }
+
+  /**
+   * Implement lazy expansion of folders
+   * @param {string} folderPath - Path to the folder to expand
+   */
+  async expandFolderLazy(folderPath) {
+    if (this.expandedFolders.has(folderPath)) return;
+    
+    const folderElement = this.findTreeItem(folderPath);
+    if (!folderElement) return;
+    
+    // Show loading state for the folder
+    this.showFolderLoadingState(folderElement);
+    
+    try {
+      // Get folder children (this might involve async operations)
+      const children = await this.getFolderChildrenLazy(folderPath);
+      
+      // Hide loading state
+      this.hideFolderLoadingState(folderElement);
+      
+      // Expand the folder normally
+      this.expandFolder(folderPath);
+      
+    } catch (error) {
+      console.error(`Failed to expand folder ${folderPath}:`, error);
+      this.hideFolderLoadingState(folderElement);
+      this.showFolderErrorState(folderElement, 'Failed to load folder contents');
+    }
+  }
+
+  /**
+   * Get folder children with lazy loading support
+   * @param {string} folderPath - Path to the folder
+   * @returns {Promise<Array>} Promise resolving to array of child files
+   */
+  async getFolderChildrenLazy(folderPath) {
+    // For now, use the existing synchronous method
+    // In a real implementation, this might make an async call to the backend
+    return new Promise((resolve) => {
+      // Simulate async operation
+      setTimeout(() => {
+        const children = this.getFolderChildren(folderPath);
+        resolve(children);
+      }, 100);
+    });
+  }
+
+  /**
+   * Show loading state for a specific folder
+   * @param {HTMLElement} folderElement - The folder tree item element
+   */
+  showFolderLoadingState(folderElement) {
+    const icon = folderElement.querySelector(`.${FileTree.CSS_CLASSES.TREE_ICON}`);
+    if (icon) {
+      icon.classList.add('loading');
+      // Could add a spinning animation here
+    }
+  }
+
+  /**
+   * Hide loading state for a specific folder
+   * @param {HTMLElement} folderElement - The folder tree item element
+   */
+  hideFolderLoadingState(folderElement) {
+    const icon = folderElement.querySelector(`.${FileTree.CSS_CLASSES.TREE_ICON}`);
+    if (icon) {
+      icon.classList.remove('loading');
+    }
+  }
+
+  /**
+   * Show error state for a specific folder
+   * @param {HTMLElement} folderElement - The folder tree item element
+   * @param {string} message - Error message
+   */
+  showFolderErrorState(folderElement, message) {
+    folderElement.classList.add('folder-error');
+    folderElement.title = message;
+    
+    const icon = folderElement.querySelector(`.${FileTree.CSS_CLASSES.TREE_ICON}`);
+    if (icon) {
+      icon.classList.add('error');
+    }
+  }
+
+  /**
+   * Implement performance monitoring and optimization
+   */
+  performanceOptimization() {
+    // Monitor memory usage
+    if ('memory' in performance) {
+      const memoryInfo = performance.memory;
+      const usedMemory = memoryInfo.usedJSHeapSize / (1024 * 1024); // MB
+      
+      // Log memory usage for large trees
+      if (this.files.length > 1000) {
+        console.debug(`FileTree memory usage: ${usedMemory.toFixed(2)}MB for ${this.files.length} files`);
+      }
+      
+      // Trigger garbage collection hint if memory usage is high
+      if (usedMemory > 50) { // 50MB threshold
+        this.optimizeMemoryUsage();
+      }
+    }
+    
+    // Monitor rendering performance
+    const avgRenderTime = this.performanceMetrics.averageRenderTime;
+    if (avgRenderTime > 100) { // 100ms threshold
+      console.warn(`FileTree: Average render time is ${avgRenderTime.toFixed(2)}ms - consider optimizations`);
+      this.suggestPerformanceOptimizations();
+    }
+  }
+
+  /**
+   * Optimize memory usage by cleaning up unused elements
+   */
+  optimizeMemoryUsage() {
+    // Clear cached DOM references that are no longer needed
+    const allItems = this.getVisibleTreeItems();
+    const viewportItems = this.getItemsInViewport();
+    
+    allItems.forEach(item => {
+      // If item is far from viewport and not expanded, consider recycling
+      if (!viewportItems.includes(item) && !item.classList.contains('expanded')) {
+        // Remove cached children if they exist
+        if (item.childrenContainer && item.childrenContainer.children.length > 50) {
+          // Keep only the first 10 and last 10 children
+          const children = Array.from(item.childrenContainer.children);
+          const toRemove = children.slice(10, -10);
+          toRemove.forEach(child => child.remove());
+        }
+      }
+    });
+    
+    console.debug('FileTree: Performed memory optimization');
+  }
+
+  /**
+   * Get items currently in viewport
+   * @returns {HTMLElement[]} Array of visible items
+   */
+  getItemsInViewport() {
+    const containerRect = this.container.getBoundingClientRect();
+    const allItems = this.getVisibleTreeItems();
+    
+    return allItems.filter(item => {
+      const itemRect = item.getBoundingClientRect();
+      return itemRect.bottom >= containerRect.top && itemRect.top <= containerRect.bottom;
+    });
+  }
+
+  /**
+   * Suggest performance optimizations based on current state
+   */
+  suggestPerformanceOptimizations() {
+    const suggestions = [];
+    
+    if (this.files.length > 1000 && !this.isVirtualScrolling) {
+      suggestions.push('Enable virtual scrolling for large file trees');
+    }
+    
+    if (this.performanceMetrics.averageRenderTime > 50) {
+      suggestions.push('Consider limiting initial folder expansion depth');
+    }
+    
+    if (this.expandedFolders.size > 20) {
+      suggestions.push('Consider automatically collapsing distant folders');
+    }
+    
+    if (suggestions.length > 0) {
+      console.info('FileTree performance suggestions:', suggestions);
+    }
+  }
+
+  /**
+   * Set up virtual scrolling for large file trees
+   */
+  setupVirtualScrolling() {
+    // Enable virtual scrolling only when we have many files
+    this.checkVirtualScrollingNeeded();
+    
+    // Set up intersection observer for viewport detection
+    if ('IntersectionObserver' in window) {
+      const observerOptions = {
+        root: this.container,
+        rootMargin: '100px', // Load items 100px before they come into view
+        threshold: [0, 0.1, 0.5, 1]
+      };
+      
+      this.intersectionObserver = new IntersectionObserver((entries) => {
+        this.handleIntersectionChanges(entries);
+      }, observerOptions);
+    }
+    
+    // Set up scroll event listener for virtual scrolling
+    const scrollHandler = (event) => this.handleVirtualScroll(event);
+    this.container.addEventListener('scroll', scrollHandler, { passive: true });
+    this.eventListeners.set('scroll', scrollHandler);
+  }
+
+  /**
+   * Check if virtual scrolling is needed based on file count
+   */
+  checkVirtualScrollingNeeded() {
+    const fileCount = this.files ? this.files.length : 0;
+    
+    if (fileCount > 1000) {
+      this.isVirtualScrolling = true;
+      this.container.setAttribute('data-large-tree', 'true');
+      this.visibleItemsCount = Math.min(50, Math.ceil(this.container.clientHeight / 22)); // 22px per item
+      
+      console.debug(`FileTree: Enabled virtual scrolling for ${fileCount} files (visible: ${this.visibleItemsCount})`);
+    } else {
+      this.isVirtualScrolling = false;
+      this.container.removeAttribute('data-large-tree');
+    }
+  }
+
+  /**
+   * Handle intersection observer changes for virtual scrolling
+   * @param {IntersectionObserverEntry[]} entries - Intersection entries
+   */
+  handleIntersectionChanges(entries) {
+    if (!this.isVirtualScrolling) return;
+    
+    entries.forEach(entry => {
+      const itemElement = entry.target;
+      
+      if (entry.isIntersecting) {
+        // Item is visible, ensure it's fully rendered
+        this.renderVirtualItem(itemElement);
+      } else {
+        // Item is out of view, consider recycling for performance
+        const rect = entry.boundingClientRect;
+        const containerRect = this.container.getBoundingClientRect();
+        
+        // Calculate distance from viewport
+        const distanceFromViewport = Math.min(
+          Math.abs(rect.bottom - containerRect.top),
+          Math.abs(containerRect.bottom - rect.top)
+        );
+        
+        // Recycle items that are far from viewport (only for very large trees)
+        if (distanceFromViewport > 2000 && this.files.length > 5000) {
+          this.recycleVirtualItem(itemElement);
+        }
+      }
+    });
+  }
+
+  /**
+   * Handle virtual scroll events
+   * @param {Event} event - Scroll event
+   */
+  handleVirtualScroll(event) {
+    if (!this.isVirtualScrolling) return;
+    
+    // Throttle scroll handling for performance
+    if (this.scrollTimeout) return;
+    
+    this.scrollTimeout = setTimeout(() => {
+      this.updateVirtualScrollPosition();
+      this.scrollTimeout = null;
+    }, 16); // ~60fps
+  }
+
+  /**
+   * Update virtual scroll position and visible items
+   */
+  updateVirtualScrollPosition() {
+    const scrollTop = this.container.scrollTop;
+    const containerHeight = this.container.clientHeight;
+    const itemHeight = 22; // Average item height in pixels
+    
+    // Calculate which items should be visible
+    const startIndex = Math.floor(scrollTop / itemHeight);
+    const endIndex = Math.min(
+      startIndex + Math.ceil(containerHeight / itemHeight) + 5, // +5 buffer
+      this.getVisibleTreeItems().length - 1
+    );
+    
+    this.virtualScrollOffset = startIndex;
+    
+    // Update visibility of items
+    this.updateVirtualItemVisibility(startIndex, endIndex);
+  }
+
+  /**
+   * Update visibility of virtual items based on scroll position
+   * @param {number} startIndex - First visible item index
+   * @param {number} endIndex - Last visible item index
+   */
+  updateVirtualItemVisibility(startIndex, endIndex) {
+    const allItems = this.getVisibleTreeItems();
+    
+    allItems.forEach((item, index) => {
+      const shouldBeVisible = index >= startIndex && index <= endIndex;
+      
+      if (shouldBeVisible) {
+        if (item.style.display === 'none') {
+          item.style.display = '';
+          this.renderVirtualItem(item);
+        }
+      } else {
+        // Hide items that are far from viewport
+        const distance = Math.min(
+          Math.abs(index - startIndex),
+          Math.abs(index - endIndex)
+        );
+        
+        if (distance > 20) { // Hide items more than 20 positions away
+          item.style.display = 'none';
+          this.recycleVirtualItem(item);
+        }
+      }
+    });
+  }
+
+  /**
+   * Render a virtual item that has come into view
+   * @param {HTMLElement} itemElement - Item element to render
+   */
+  renderVirtualItem(itemElement) {
+    if (!itemElement || itemElement.hasAttribute('data-rendered')) return;
+    
+    const filePath = itemElement.dataset.filePath;
+    const file = this.files.find(f => f.path === filePath);
+    
+    if (file) {
+      // Mark as rendered
+      itemElement.setAttribute('data-rendered', 'true');
+      
+      // If it's a folder with children, render them lazily
+      if (file.is_dir && this.expandedFolders.has(filePath)) {
+        const childrenContainer = itemElement.childrenContainer;
+        if (childrenContainer && childrenContainer.children.length === 0) {
+          // Use requestIdleCallback for non-critical rendering
+          if ('requestIdleCallback' in window) {
+            requestIdleCallback(() => {
+              this.renderFolderChildren(itemElement, file);
+            });
+          } else {
+            // Fallback for browsers without requestIdleCallback
+            setTimeout(() => {
+              this.renderFolderChildren(itemElement, file);
+            }, 0);
+          }
+        }
+      }
+      
+      // Observe this item for intersection changes
+      if (this.intersectionObserver) {
+        this.intersectionObserver.observe(itemElement);
+      }
+    }
+  }
+
+  /**
+   * Render folder children lazily
+   * @param {HTMLElement} folderItem - Folder item element
+   * @param {Object} folderFile - Folder file object
+   */
+  renderFolderChildren(folderItem, folderFile) {
+    if (!folderItem.childrenContainer) return;
+    
+    const children = this.getFolderChildren(folderFile.path);
+    const depth = this.calculateDepth(folderFile.path);
+    
+    // Render children with virtual scrolling considerations
+    if (children.length > 100) {
+      // For folders with many children, render only a subset initially
+      const visibleChildren = children.slice(0, 50);
+      this.renderTreeLevel(visibleChildren, folderItem.childrenContainer, depth + 1);
+      
+      // Add a "load more" indicator if there are more children
+      if (children.length > 50) {
+        this.addLoadMoreIndicator(folderItem.childrenContainer, children, 50, depth + 1);
+      }
+    } else {
+      // Render all children for smaller folders
+      this.renderTreeLevel(children, folderItem.childrenContainer, depth + 1);
+    }
+  }
+
+  /**
+   * Add a "load more" indicator for folders with many children
+   * @param {HTMLElement} container - Children container
+   * @param {Array} allChildren - All children files
+   * @param {number} currentlyLoaded - Number of currently loaded children
+   * @param {number} depth - Current depth level
+   */
+  addLoadMoreIndicator(container, allChildren, currentlyLoaded, depth) {
+    const loadMoreItem = document.createElement('div');
+    loadMoreItem.className = 'tree-item tree-load-more';
+    loadMoreItem.style.paddingLeft = `${8 + (depth * 16)}px`;
+    
+    const remaining = allChildren.length - currentlyLoaded;
+    loadMoreItem.innerHTML = `
+      <span class="tree-icon">⋯</span>
+      <span class="tree-name">Load ${remaining} more items...</span>
+    `;
+    
+    loadMoreItem.addEventListener('click', () => {
+      // Load the remaining children
+      const remainingChildren = allChildren.slice(currentlyLoaded);
+      
+      // Remove the load more indicator
+      loadMoreItem.remove();
+      
+      // Render remaining children in batches for better performance
+      this.renderChildrenInBatches(container, remainingChildren, depth);
+    });
+    
+    container.appendChild(loadMoreItem);
+  }
+
+  /**
+   * Render children in batches to avoid blocking the UI
+   * @param {HTMLElement} container - Container to render into
+   * @param {Array} children - Children to render
+   * @param {number} depth - Current depth level
+   */
+  renderChildrenInBatches(container, children, depth) {
+    const batchSize = 25;
+    let currentIndex = 0;
+    
+    const renderBatch = () => {
+      const batch = children.slice(currentIndex, currentIndex + batchSize);
+      this.renderTreeLevel(batch, container, depth);
+      
+      currentIndex += batchSize;
+      
+      if (currentIndex < children.length) {
+        // Use requestAnimationFrame for smooth rendering
+        requestAnimationFrame(renderBatch);
+      }
+    };
+    
+    renderBatch();
+  }
+
+  /**
+   * Recycle a virtual item that's far from viewport to save memory
+   * @param {HTMLElement} itemElement - Item element to recycle
+   */
+  recycleVirtualItem(itemElement) {
+    if (!itemElement || !itemElement.hasAttribute('data-rendered')) return;
+    
+    // Remove rendered attribute
+    itemElement.removeAttribute('data-rendered');
+    
+    // Clear children container if it exists
+    if (itemElement.childrenContainer) {
+      itemElement.childrenContainer.innerHTML = '';
+    }
+    
+    // Unobserve from intersection observer
+    if (this.intersectionObserver) {
+      this.intersectionObserver.unobserve(itemElement);
+    }
+    
+    // The element structure remains, just content is recycled
+  }
+
+  /**
    * Clean up component resources
    */
   destroy() {
+    // Clear search debounce timer
+    if (this.searchDebounceTimer) {
+      clearTimeout(this.searchDebounceTimer);
+    }
+    
+    // Clear virtual scrolling observer
+    if (this.intersectionObserver) {
+      this.intersectionObserver.disconnect();
+    }
+    
     // Remove event listeners
     this.eventListeners.forEach((handler, event) => {
       this.container.removeEventListener(event, handler);
@@ -663,6 +2218,10 @@ class FileTree {
     this.expandedFolders.clear();
     this.selectedFile = null;
     this.treeStructure.clear();
+    this.filteredFiles = null;
+    this.isVirtualScrolling = false;
+    this.virtualScrollOffset = 0;
+    this.visibleItemsCount = 0;
   }
 }
 

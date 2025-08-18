@@ -390,3 +390,306 @@
   /* Enable virtual scrolling optimizations when needed */
   contain: strict;
 }
+
+/* Search Interface Styles */
+.file-tree-search-container {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  background-color: var(--vscode-input-background, #3c3c3c);
+  border-bottom: 1px solid var(--vscode-input-border, #464647);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.file-tree-search-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--vscode-input-border, #464647);
+  border-radius: 3px;
+  background-color: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.file-tree-search-input:focus {
+  border-color: var(--vscode-focusBorder, #007ACC);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007ACC);
+}
+
+.file-tree-search-input::placeholder {
+  color: var(--vscode-input-placeholderForeground, #a6a6a6);
+}
+
+.file-tree-search-close {
+  margin-left: 6px;
+  padding: 4px 6px;
+  border: none;
+  background-color: transparent;
+  color: var(--vscode-icon-foreground, #c5c5c5);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 3px;
+}
+
+.file-tree-search-close:hover {
+  background-color: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+}
+
+.file-tree-search-close:focus {
+  outline: 1px solid var(--vscode-focusBorder, #007ACC);
+}
+
+/* Search Results Styles */
+.tree-item.search-result {
+  background-color: var(--vscode-list-searchMatchBackground, rgba(234, 92, 0, 0.33));
+}
+
+.tree-item.search-result:hover {
+  background-color: var(--vscode-list-searchMatchBackground, rgba(234, 92, 0, 0.33));
+}
+
+.tree-name.highlighted mark {
+  background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.5));
+  color: var(--vscode-editor-findMatchHighlightForeground, inherit);
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+.search-result-path {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.file-tree-no-results {
+  padding: 24px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+}
+
+.file-tree-no-results p {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.file-tree-no-results small {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* Drag and Drop Styles */
+.tree-item.dragging {
+  opacity: 0.5;
+  transform: rotate(2deg);
+  transition: opacity 0.1s ease, transform 0.1s ease;
+}
+
+.tree-item.drop-target {
+  background-color: var(--vscode-list-dropBackground, rgba(0, 122, 204, 0.18)) !important;
+  border: 2px dashed var(--vscode-focusBorder, #007ACC);
+  border-radius: 4px;
+}
+
+.file-tree-container.drag-active {
+  user-select: none;
+}
+
+.file-tree-container.drag-active .tree-item:not(.dragging):not(.drop-target) {
+  opacity: 0.7;
+}
+
+.drag-ghost {
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* Loading States */
+.file-tree-loading-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background-color: var(--vscode-notifications-background, #2d2d30);
+  border: 1px solid var(--vscode-notifications-border, #454545);
+  border-radius: 4px;
+  margin: 8px;
+}
+
+.loading-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.loading-message {
+  color: var(--vscode-notifications-foreground, #cccccc);
+  font-size: 13px;
+}
+
+/* Error States */
+.file-tree-error-indicator {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background-color: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+  border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
+  border-radius: 4px;
+  margin: 8px;
+}
+
+.error-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.error-icon {
+  flex-shrink: 0;
+}
+
+.error-message {
+  color: var(--vscode-inputValidation-errorForeground, #f48771);
+  font-size: 13px;
+  flex: 1;
+}
+
+.error-dismiss {
+  margin-left: auto;
+  padding: 4px 8px;
+  border: none;
+  background-color: transparent;
+  color: var(--vscode-inputValidation-errorForeground, #f48771);
+  cursor: pointer;
+  font-size: 14px;
+  border-radius: 2px;
+}
+
+.error-dismiss:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Folder Loading States */
+.tree-icon.loading::before {
+  content: "⏳";
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.tree-item.folder-error {
+  background-color: var(--vscode-inputValidation-errorBackground, rgba(190, 17, 0, 0.1));
+}
+
+.tree-icon.error::before {
+  content: "⚠️";
+}
+
+/* Virtual Scrolling Optimizations */
+.tree-item[data-rendered="false"] {
+  min-height: 22px;
+  background-color: var(--vscode-list-inactiveSelectionBackground, rgba(80, 80, 80, 0.3));
+}
+
+/* Load More Indicator */
+.tree-item.tree-load-more {
+  font-style: italic;
+  color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.tree-item.tree-load-more:hover {
+  background-color: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.31));
+  color: var(--vscode-list-hoverForeground, inherit);
+}
+
+.tree-item.tree-load-more .tree-icon {
+  opacity: 0.7;
+}
+
+/* Performance Indicators */
+.file-tree-container[data-performance="poor"] .tree-item {
+  /* Visual indicator for performance issues */
+  border-left: 2px solid var(--vscode-editorWarning-foreground, #ff8c00);
+}
+
+/* Responsive adjustments for advanced features */
+@media (max-width: 768px) {
+  .file-tree-search-container {
+    padding: 6px;
+  }
+  
+  .file-tree-search-input {
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+  
+  .search-result-path {
+    display: none; /* Hide paths on mobile for space */
+  }
+  
+  .file-tree-loading-indicator,
+  .file-tree-error-indicator {
+    margin: 4px;
+    padding: 8px;
+  }
+}
+
+/* High contrast mode support for new features */
+@media (prefers-contrast: high) {
+  .tree-item.search-result {
+    border: 2px solid currentColor;
+  }
+  
+  .tree-item.drop-target {
+    border: 3px solid currentColor;
+  }
+  
+  .tree-name.highlighted mark {
+    border: 1px solid currentColor;
+  }
+}
+
+/* Reduced motion support for new animations */
+@media (prefers-reduced-motion: reduce) {
+  .tree-item.dragging,
+  .loading-spinner,
+  .tree-icon.loading::before {
+    animation: none;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Dark mode enhancements */
+@media (prefers-color-scheme: dark) {
+  .file-tree-search-input {
+    background-color: var(--color-bg-secondary-dark, #2d2d30);
+    border-color: var(--color-border-dark, #464647);
+    color: var(--color-text-primary-dark, #cccccc);
+  }
+  
+  .search-result-path {
+    color: var(--color-text-secondary-dark, rgba(255, 255, 255, 0.6));
+  }
+}
