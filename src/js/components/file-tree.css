@@ -1,6 +1,6 @@
 /**
- * FileTree Component Styles - VSCode Theme
- * Dark theme styling matching VSCode's file explorer
+ * FileTree Component Styles
+ * Consistent styling using aiNote design system
  */
 
 /* Container */
@@ -30,36 +30,37 @@
   /* padding-left is set via JavaScript based on depth */
 }
 
-/* Hover States - VSCode Style */
+/* Hover States */
 .tree-item:hover {
-  background-color: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.31));
+  background-color: var(--color-bg-hover);
 }
 
 .tree-item:focus {
-  background-color: var(--vscode-list-focusBackground, rgba(90, 93, 94, 0.31));
-  outline: 1px solid var(--vscode-focusBorder, #007ACC);
+  background-color: var(--color-bg-hover);
+  outline: 1px solid var(--color-border-focus);
   outline-offset: -1px;
 }
 
 .tree-file:hover {
-  background-color: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.31));
+  background-color: var(--color-bg-hover);
 }
 
 .tree-file:focus {
-  background-color: var(--vscode-list-focusBackground, rgba(90, 93, 94, 0.31));
+  background-color: var(--color-bg-hover);
 }
 
-/* Selected State - VSCode Style */
+/* Selected State */
 .tree-item.selected {
-  background-color: var(--vscode-list-activeSelectionBackground, rgba(0, 122, 204, 0.18));
-  color: var(--vscode-list-activeSelectionForeground, inherit);
+  background-color: var(--color-bg-accent);
+  color: var(--color-text-inverse);
+  opacity: 0.8;
 }
 
 .tree-item.selected:hover {
-  background-color: var(--vscode-list-activeSelectionBackground, rgba(0, 122, 204, 0.25));
+  opacity: 1;
 }
 
-/* Tree Icons - VSCode Style */
+/* Tree Icons */
 .tree-icon {
   margin-right: 6px;
   font-size: 16px;
@@ -77,13 +78,13 @@
 .tree-icon.folder-collapsed::before {
   content: "▶";
   font-size: 10px;
-  color: var(--vscode-tree-indentGuidesStroke, #585858);
+  color: var(--color-text-secondary);
 }
 
 .tree-icon.folder-expanded::before {
   content: "▼";
   font-size: 10px;
-  color: var(--vscode-tree-indentGuidesStroke, #585858);
+  color: var(--color-text-secondary);
 }
 
 .tree-icon.folder::after {
@@ -92,7 +93,7 @@
   margin-left: 2px;
 }
 
-/* File Type Icons - VSCode Style */
+/* File Type Icons */
 .tree-icon.file-md::before {
   content: "";
   width: 16px;
@@ -129,7 +130,7 @@
   content: "";
   width: 16px;
   height: 16px;
-  background-color: var(--vscode-symbolIcon-fileColor, #858585);
+  background-color: var(--color-text-tertiary);
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z'/%3E%3C/svg%3E") center/contain no-repeat;
 }
 
@@ -166,19 +167,19 @@
   color: inherit;
 }
 
-/* Indentation for Nested Items - VSCode Style */
+/* Indentation for Nested Items */
 .tree-item.indented {
   position: relative;
 }
 
-/* VSCode-style indentation guides */
+/* Indentation guides */
 .tree-item::before {
   content: '';
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  border-left: 1px solid var(--vscode-tree-indentGuidesStroke, rgba(120, 120, 120, 0.4));
+  border-left: 1px solid var(--color-border-secondary);
   pointer-events: none;
 }
 
@@ -319,25 +320,6 @@
   }
 }
 
-/* Dark Mode Support (if CSS variables are available) */
-@media (prefers-color-scheme: dark) {
-  .tree-item:hover {
-    background-color: var(--color-bg-hover-dark, rgba(255, 255, 255, 0.1));
-  }
-  
-  .tree-file .tree-name {
-    color: var(--color-text-secondary-dark, rgba(255, 255, 255, 0.7));
-  }
-  
-  .file-tree-empty-state,
-  .file-tree-loading {
-    color: var(--color-text-secondary-dark, rgba(255, 255, 255, 0.6));
-  }
-  
-  .tree-item.indented::before {
-    background-color: var(--color-border-light-dark, rgba(255, 255, 255, 0.1));
-  }
-}
 
 /* Performance Optimizations */
 .file-tree-container {
@@ -353,7 +335,7 @@
 
 /* Focus ring customization */
 .tree-item:focus-visible {
-  outline: 2px solid var(--color-accent, #007AFF);
+  outline: 2px solid var(--color-border-focus);
   outline-offset: -2px;
   box-shadow: none;
 }
@@ -361,7 +343,7 @@
 /* Keyboard navigation improvements */
 .tree-item[tabindex="0"]:focus {
   /* Make focusable items visually distinct when using keyboard navigation */
-  background-color: var(--vscode-list-focusBackground, rgba(90, 93, 94, 0.31));
+  background-color: var(--color-bg-hover);
 }
 
 .tree-item[aria-selected="true"] {
@@ -376,7 +358,7 @@
   top: 0;
   bottom: 0;
   width: 3px;
-  background-color: var(--color-accent, #007AFF);
+  background-color: var(--color-bg-accent);
 }
 
 /* Ensure text doesn't break in unexpected ways */
@@ -471,7 +453,7 @@
 .file-tree-no-results {
   padding: 24px;
   text-align: center;
-  color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+  color: var(--color-text-tertiary);
 }
 
 .file-tree-no-results p {
@@ -492,13 +474,14 @@
 
 /* Folder drop target highlight */
 .tree-item.drop-target {
-  background-color: var(--vscode-list-dropBackground, rgba(0, 122, 204, 0.25)) !important;
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  color: var(--color-text-primary);
   border-radius: 4px;
 }
 
 /* Children container drop target highlight */
 .tree-children.drop-target-children {
-  background-color: var(--vscode-list-dropBackground, rgba(0, 122, 204, 0.1));
+  background-color: rgba(59, 130, 246, 0.1);
   border-radius: 4px;
 }
 
@@ -508,8 +491,8 @@
   align-items: center;
   justify-content: center;
   padding: 12px;
-  background-color: var(--vscode-notifications-background, #2d2d30);
-  border: 1px solid var(--vscode-notifications-border, #454545);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
   border-radius: 4px;
   margin: 8px;
 }
@@ -530,7 +513,7 @@
 }
 
 .loading-message {
-  color: var(--vscode-notifications-foreground, #cccccc);
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 
@@ -539,8 +522,9 @@
   display: flex;
   align-items: center;
   padding: 12px;
-  background-color: var(--vscode-inputValidation-errorBackground, #5a1d1d);
-  border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
+  background-color: var(--color-error);
+  opacity: 0.1;
+  border: 1px solid var(--color-error);
   border-radius: 4px;
   margin: 8px;
 }
@@ -557,7 +541,7 @@
 }
 
 .error-message {
-  color: var(--vscode-inputValidation-errorForeground, #f48771);
+  color: var(--color-error);
   font-size: 13px;
   flex: 1;
 }
@@ -567,7 +551,7 @@
   padding: 4px 8px;
   border: none;
   background-color: transparent;
-  color: var(--vscode-inputValidation-errorForeground, #f48771);
+  color: var(--color-error);
   cursor: pointer;
   font-size: 14px;
   border-radius: 2px;
@@ -589,7 +573,8 @@
 }
 
 .tree-item.folder-error {
-  background-color: var(--vscode-inputValidation-errorBackground, rgba(190, 17, 0, 0.1));
+  background-color: var(--color-error);
+  opacity: 0.1;
 }
 
 .tree-icon.error::before {
@@ -599,20 +584,20 @@
 /* Virtual Scrolling Optimizations */
 .tree-item[data-rendered="false"] {
   min-height: 22px;
-  background-color: var(--vscode-list-inactiveSelectionBackground, rgba(80, 80, 80, 0.3));
+  background-color: var(--color-bg-tertiary);
 }
 
 /* Load More Indicator */
 .tree-item.tree-load-more {
   font-style: italic;
-  color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+  color: var(--color-text-tertiary);
   cursor: pointer;
   padding: 4px 8px;
 }
 
 .tree-item.tree-load-more:hover {
-  background-color: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.31));
-  color: var(--vscode-list-hoverForeground, inherit);
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .tree-item.tree-load-more .tree-icon {
@@ -622,7 +607,7 @@
 /* Performance Indicators */
 .file-tree-container[data-performance="poor"] .tree-item {
   /* Visual indicator for performance issues */
-  border-left: 2px solid var(--vscode-editorWarning-foreground, #ff8c00);
+  border-left: 2px solid var(--color-warning);
 }
 
 /* Responsive adjustments for advanced features */
@@ -673,15 +658,3 @@
   }
 }
 
-/* Dark mode enhancements */
-@media (prefers-color-scheme: dark) {
-  .file-tree-search-input {
-    background-color: var(--color-bg-secondary-dark, #2d2d30);
-    border-color: var(--color-border-dark, #464647);
-    color: var(--color-text-primary-dark, #cccccc);
-  }
-  
-  .search-result-path {
-    color: var(--color-text-secondary-dark, rgba(255, 255, 255, 0.6));
-  }
-}
