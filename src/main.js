@@ -26,9 +26,9 @@ function updateVaultInfo(vaultPath) {
   const vaultPathSpan = vaultInfo.querySelector('.vault-path');
   
   if (vaultPath) {
-    const displayPath = vaultPath.length > 50 ? 
-      '...' + vaultPath.slice(-47) : vaultPath;
-    vaultPathSpan.textContent = displayPath;
+    // Extract just the folder name from the full path
+    const folderName = vaultPath.split('/').pop() || vaultPath.split('\\').pop();
+    vaultPathSpan.textContent = folderName;
     vaultPathSpan.title = vaultPath; // Full path on hover
   } else {
     vaultPathSpan.textContent = 'No vault selected';
@@ -247,6 +247,53 @@ function getFileIcon(fileName) {
 }
 
 // File Operations
+
+/**
+ * Handle file move operation from drag-and-drop
+ * @param {Object} sourceFile - File being moved
+ * @param {Object} targetFolder - Target folder
+ * @param {string} newPath - New file path
+ */
+async function handleFileMove(sourceFile, targetFolder, newPath) {
+  try {
+    // Check if source file still exists by trying to get its info
+    try {
+      await invoke('get_file_info', { filePath: sourceFile.path });
+    } catch {
+      throw new Error('Source file no longer exists');
+    }
+    
+    // Move the file using rename_file command (which is essentially move)
+    await invoke('rename_file', { 
+      oldPath: sourceFile.path, 
+      newPath: newPath 
+    });
+    
+    // Update current file path if it was the moved file
+    const currentFile = appState.getState().currentFile;
+    if (currentFile === sourceFile.path) {
+      appState.setCurrentFile(newPath);
+    }
+    
+    // Refresh the file tree to show the change
+    await refreshVault();
+    
+    showNotification(`Moved ${sourceFile.name} to ${targetFolder.name}`, 'success');
+    
+  } catch (error) {
+    console.error('Failed to move file:', error);
+    throw error; // Re-throw so the FileTree component can handle it
+  }
+}
+
+/**
+ * Activate file tree search
+ */
+function activateFileTreeSearch() {
+  if (fileTreeComponent && fileTreeComponent.activateSearch) {
+    fileTreeComponent.activateSearch();
+  }
+}
 
 /**
  * Get the full path for a file (using selected vault or current directory)
@@ -660,6 +707,7 @@ window.closeMobileNav = closeMobileNav;
 window.toggleShortcutsHelp = toggleShortcutsHelp;
 window.forceSaveAllState = forceSaveAllState;
 window.debouncedSaveLayoutState = debouncedSaveLayoutState;
+window.activateFileTreeSearch = activateFileTreeSearch;
 
 // Development and testing functions
 window.runLayoutTest = function() {
@@ -714,7 +762,26 @@ window.addEventListener('DOMContentLoaded', async () => {
       await openFile(filePath);
     });
     
-    console.log('🌳 FileTree component initialized');
+    // Listen to file move requests from drag-and-drop
+    fileTreeContent.addEventListener(FileTree.EVENTS.FILE_MOVE_REQUESTED, async (event) => {
+      const { sourceFile, targetFolder, newPath } = event.detail;
+      try {
+        await handleFileMove(sourceFile, targetFolder, newPath);
+      } catch (error) {
+        showNotification(`Failed to move ${sourceFile.name}: ${error.message}`, 'error');
+      }
+    });
+    
+    // Listen to drag events for feedback
+    fileTreeContent.addEventListener(FileTree.EVENTS.DRAG_START, (event) => {
+      showNotification(`Moving ${event.detail.file.name}...`, 'info');
+    });
+    
+    fileTreeContent.addEventListener(FileTree.EVENTS.DRAG_END, (event) => {
+      // Drag operation completed (success handled by move event)
+    });
+    
+    console.log('🌳 FileTree component initialized with advanced features');
   } else {
     console.warn('⚠️ FileTree container not found');
   }
@@ -814,6 +881,21 @@ window.addEventListener('DOMContentLoaded', async () => {
   
   // Add keyboard shortcut handling for macOS
   document.addEventListener('keydown', async (event) => {
+    // Handle file tree search activation (Ctrl/Cmd + F when file tree is focused)
+    if ((event.metaKey || event.ctrlKey) && event.key === 'f') {
+      const activeElement = document.activeElement;
+      const isFileTreeFocused = activeElement && (
+        activeElement.closest('#fileTreeContent') ||
+        activeElement.classList.contains('tree-item')
+      );
+      
+      if (isFileTreeFocused) {
+        event.preventDefault();
+        activateFileTreeSearch();
+        return;
+      }
+    }
+    
     // Handle Cmd+Q (quit) on macOS or Ctrl+Q on other platforms
     if ((event.metaKey && event.key === 'q') || (event.ctrlKey && event.key === 'q')) {
       event.preventDefault();

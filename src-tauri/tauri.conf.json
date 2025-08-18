@@ -19,7 +19,8 @@
         "closable": true,
         "fullscreen": false,
         "center": true,
-        "decorations": true
+        "decorations": true,
+        "dragDropEnabled": false
       }
     ],
     "security": {
