@@ -1,0 +1,416 @@
+/**
+ * ContextMenu Component Styles
+ * Clean, modern context menu with aiNote design system
+ */
+
+/* Context Menu Container */
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  background-color: var(--color-bg-primary, #ffffff);
+  border: 1px solid var(--color-border-primary, #e2e8f0);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 4px;
+  min-width: 180px;
+  max-width: 240px;
+  font-family: inherit;
+  font-size: 13px;
+  backdrop-filter: blur(8px);
+  user-select: none;
+}
+
+/* Menu Item */
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  margin: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-primary, #0f172a);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  width: 100%;
+  text-align: left;
+  gap: 8px;
+  transition: background-color 0.1s ease;
+  outline: none;
+  position: relative;
+}
+
+.context-menu-item:hover {
+  background-color: var(--color-bg-hover, #f1f5f9);
+}
+
+.context-menu-item:focus {
+  background-color: var(--color-bg-hover, #f1f5f9);
+  outline: 2px solid var(--color-border-focus, #3b82f6);
+  outline-offset: -2px;
+}
+
+.context-menu-item:active {
+  background-color: var(--color-bg-active, #e2e8f0);
+}
+
+.context-menu-item:disabled {
+  color: var(--color-text-disabled, #94a3b8);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.context-menu-item:disabled:hover {
+  background-color: transparent;
+}
+
+/* Dangerous Actions */
+.context-menu-item.dangerous {
+  color: var(--color-error, #dc3545);
+}
+
+.context-menu-item.dangerous:hover {
+  background-color: var(--color-error-bg, rgba(220, 53, 69, 0.1));
+  color: var(--color-error, #dc3545);
+}
+
+.context-menu-item.dangerous:focus {
+  background-color: var(--color-error-bg, rgba(220, 53, 69, 0.1));
+  outline-color: var(--color-error, #dc3545);
+}
+
+/* Menu Item Icon */
+.menu-item-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Menu Item Label */
+.menu-item-label {
+  flex: 1;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Menu Item Shortcut */
+.menu-item-shortcut {
+  font-size: 11px;
+  color: var(--color-text-tertiary, #64748b);
+  font-weight: 400;
+  margin-left: auto;
+  opacity: 0.8;
+}
+
+/* Menu Separator */
+.context-menu-separator {
+  height: 1px;
+  background-color: var(--color-border-secondary, #e2e8f0);
+  margin: 4px 8px;
+}
+
+/* Input Dialog Styles */
+.input-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+}
+
+.input-dialog {
+  background-color: var(--color-bg-primary, #ffffff);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  min-width: 320px;
+  max-width: 480px;
+  width: 90vw;
+  overflow: hidden;
+}
+
+.input-dialog-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--color-border-secondary, #e2e8f0);
+}
+
+.input-dialog-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.input-dialog-body {
+  padding: 16px 20px;
+}
+
+.input-dialog-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-primary, #e2e8f0);
+  border-radius: 4px;
+  background-color: var(--color-bg-primary, #ffffff);
+  color: var(--color-text-primary, #0f172a);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.input-dialog-input:focus {
+  border-color: var(--color-border-focus, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.input-dialog-footer {
+  padding: 12px 20px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--color-border-secondary, #e2e8f0);
+}
+
+/* Confirmation Dialog Styles */
+.confirmation-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+}
+
+.confirmation-dialog {
+  background-color: var(--color-bg-primary, #ffffff);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  min-width: 360px;
+  max-width: 480px;
+  width: 90vw;
+  overflow: hidden;
+}
+
+.confirmation-dialog-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--color-border-secondary, #e2e8f0);
+}
+
+.confirmation-dialog-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.confirmation-dialog-body {
+  padding: 16px 20px;
+}
+
+.confirmation-dialog-body p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #475569);
+}
+
+.confirmation-dialog-footer {
+  padding: 12px 20px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--color-border-secondary, #e2e8f0);
+}
+
+/* Button Styles */
+.btn-primary {
+  background-color: var(--color-primary, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+  outline: none;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-hover, #2563eb);
+}
+
+.btn-primary:focus {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--color-text-secondary, #475569);
+  border: 1px solid var(--color-border-primary, #e2e8f0);
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  outline: none;
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-bg-hover, #f1f5f9);
+  border-color: var(--color-border-secondary, #cbd5e1);
+}
+
+.btn-secondary:focus {
+  border-color: var(--color-border-focus, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.btn-danger {
+  background-color: var(--color-error, #dc3545);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+  outline: none;
+}
+
+.btn-danger:hover {
+  background-color: var(--color-error-hover, #c82333);
+}
+
+.btn-danger:focus {
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.5);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .context-menu {
+    min-width: 160px;
+    font-size: 12px;
+  }
+  
+  .context-menu-item {
+    padding: 10px 12px;
+  }
+  
+  .menu-item-shortcut {
+    display: none; /* Hide shortcuts on mobile */
+  }
+  
+  .input-dialog,
+  .confirmation-dialog {
+    margin: 16px;
+    width: calc(100vw - 32px);
+    min-width: 280px;
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  .context-menu {
+    border: 2px solid currentColor;
+  }
+  
+  .context-menu-item:focus {
+    outline: 2px solid currentColor;
+  }
+  
+  .context-menu-separator {
+    background-color: currentColor;
+    opacity: 0.3;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .context-menu-item,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    transition: none;
+  }
+  
+  .input-dialog,
+  .confirmation-dialog {
+    animation: none;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .context-menu {
+    background-color: var(--color-bg-primary-dark, #1e293b);
+    border-color: var(--color-border-primary-dark, #334155);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+  
+  .context-menu-item {
+    color: var(--color-text-primary-dark, #f1f5f9);
+  }
+  
+  .context-menu-item:hover {
+    background-color: var(--color-bg-hover-dark, #334155);
+  }
+  
+  .context-menu-separator {
+    background-color: var(--color-border-secondary-dark, #475569);
+  }
+  
+  .input-dialog,
+  .confirmation-dialog {
+    background-color: var(--color-bg-primary-dark, #1e293b);
+    color: var(--color-text-primary-dark, #f1f5f9);
+  }
+  
+  .input-dialog-input {
+    background-color: var(--color-bg-secondary-dark, #334155);
+    border-color: var(--color-border-primary-dark, #475569);
+    color: var(--color-text-primary-dark, #f1f5f9);
+  }
+}
+
+/* Animation for menu appearance */
+@keyframes contextMenuAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.context-menu {
+  animation: contextMenuAppear 0.15s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .context-menu {
+    animation: none;
+  }
+}

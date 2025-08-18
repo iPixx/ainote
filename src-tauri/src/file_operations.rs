@@ -152,28 +152,48 @@ pub fn create_file_internal(file_path: &str) -> FileSystemResult<()> {
         })
 }
 
-/// Internal delete file function using structured error handling
+/// Internal delete file or directory function using structured error handling
 pub fn delete_file_internal(file_path: &str) -> FileSystemResult<()> {
     let path = Path::new(file_path);
 
     // Acquire file lock to prevent concurrent access
     let _lock = FileLockGuard::acquire(file_path)?;
 
-    // Validate path exists and is a file
+    // Validate path exists
     validation::validate_path_exists(path)?;
-    validation::validate_is_file(path)?;
-    validation::validate_markdown_extension(path)?;
 
-    // Delete the file
-    fs::remove_file(path)
-        .map_err(|e| match e.kind() {
-            std::io::ErrorKind::PermissionDenied => FileSystemError::PermissionDenied { 
-                path: file_path.to_string() 
-            },
-            _ => FileSystemError::IOError { 
-                message: format!("Failed to delete file {}: {}", file_path, e) 
-            },
-        })
+    // Check if it's a file or directory and validate accordingly
+    let is_directory = path.is_dir();
+    if is_directory {
+        // For directories, validate it's actually a directory
+        validation::validate_is_directory(path)?;
+        
+        // Delete the directory and all its contents
+        fs::remove_dir_all(path)
+            .map_err(|e| match e.kind() {
+                std::io::ErrorKind::PermissionDenied => FileSystemError::PermissionDenied { 
+                    path: file_path.to_string() 
+                },
+                _ => FileSystemError::IOError { 
+                    message: format!("Failed to delete directory {}: {}", file_path, e) 
+                },
+            })
+    } else {
+        // For files, validate it's a file and has .md extension
+        validation::validate_is_file(path)?;
+        validation::validate_markdown_extension(path)?;
+
+        // Delete the file
+        fs::remove_file(path)
+            .map_err(|e| match e.kind() {
+                std::io::ErrorKind::PermissionDenied => FileSystemError::PermissionDenied { 
+                    path: file_path.to_string() 
+                },
+                _ => FileSystemError::IOError { 
+                    message: format!("Failed to delete file {}: {}", file_path, e) 
+                },
+            })
+    }
 }
 
 /// Internal rename file function using structured error handling
@@ -185,13 +205,21 @@ pub fn rename_file_internal(old_path: &str, new_path: &str) -> FileSystemResult<
     let _old_lock = FileLockGuard::acquire(old_path)?;
     let _new_lock = FileLockGuard::acquire(new_path)?;
 
-    // Validate old path exists and is a file
+    // Validate old path exists
     validation::validate_path_exists(old)?;
-    validation::validate_is_file(old)?;
 
-    // Validate both paths have .md extension
-    validation::validate_markdown_extension(old)?;
-    validation::validate_markdown_extension(new)?;
+    // Check if it's a file or directory and validate accordingly
+    let is_directory = old.is_dir();
+    if is_directory {
+        // For directories, validate it's actually a directory
+        validation::validate_is_directory(old)?;
+        // No extension validation needed for directories
+    } else {
+        // For files, validate it's a file and has .md extension
+        validation::validate_is_file(old)?;
+        validation::validate_markdown_extension(old)?;
+        validation::validate_markdown_extension(new)?;
+    }
 
     // Check if destination already exists
     validation::validate_file_not_exists(new)?;
@@ -250,6 +278,73 @@ pub fn create_folder_internal(folder_path: &str) -> FileSystemResult<()> {
                 },
             })
     }, &format!("create_folder({})", folder_path))
+}
+
+/// Reveal file in system file manager (Finder on macOS, Explorer on Windows, file manager on Linux)
+pub fn reveal_in_finder_internal(file_path: &str) -> FileSystemResult<()> {
+    let path = Path::new(file_path);
+
+    // Validate path exists
+    validation::validate_path_exists(path)?;
+
+    // Use the opener plugin to reveal the file
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        Command::new("open")
+            .args(["-R", file_path])
+            .spawn()
+            .map_err(|e| FileSystemError::IOError {
+                message: format!("Failed to reveal file in Finder: {} ({})", file_path, e),
+            })?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        Command::new("explorer")
+            .args(["/select,", file_path])
+            .spawn()
+            .map_err(|e| FileSystemError::IOError {
+                message: format!("Failed to reveal file in Explorer: {} ({})", file_path, e),
+            })?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+        // Try different file managers commonly available on Linux
+        let file_managers = ["nautilus", "dolphin", "thunar", "nemo", "pcmanfm"];
+        
+        for &manager in &file_managers {
+            if Command::new("which")
+                .arg(manager)
+                .output()
+                .map(|output| output.status.success())
+                .unwrap_or(false)
+            {
+                Command::new(manager)
+                    .arg(file_path)
+                    .spawn()
+                    .map_err(|e| FileSystemError::IOError {
+                        message: format!("Failed to reveal file in {}: {} ({})", manager, file_path, e),
+                    })?;
+                return Ok(());
+            }
+        }
+        
+        // Fallback: just open the parent directory
+        if let Some(parent) = path.parent() {
+            Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(|e| FileSystemError::IOError {
+                    message: format!("Failed to open parent directory: {} ({})", file_path, e),
+                })?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -481,6 +576,32 @@ mod tests {
 
         let result = rename_file_internal(&env.get_test_file("test.txt"), &env.get_test_file("test2.md"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_rename_directory_success() {
+        let env = TestEnv::new();
+        let old_dir = env.path.join("old_folder");
+        let new_dir = env.path.join("new_folder");
+        
+        // Create directory with a file inside
+        fs::create_dir(&old_dir).unwrap();
+        let file_inside = old_dir.join("file.md");
+        fs::write(&file_inside, TEST_CONTENT).unwrap();
+        
+        let old_dir_str = old_dir.to_string_lossy().to_string();
+        let new_dir_str = new_dir.to_string_lossy().to_string();
+        
+        let result = rename_file_internal(&old_dir_str, &new_dir_str);
+        assert!(result.is_ok());
+        assert!(!old_dir.exists());
+        assert!(new_dir.exists());
+        
+        // Check that file inside was moved too
+        let moved_file = new_dir.join("file.md");
+        assert!(moved_file.exists());
+        let content = fs::read_to_string(&moved_file).unwrap();
+        assert_eq!(content, TEST_CONTENT);
     }
 
     #[test]
