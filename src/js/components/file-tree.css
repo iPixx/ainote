@@ -485,6 +485,14 @@
   border-radius: 4px;
 }
 
+/* Root level drop targets */
+.vault-info.drop-target-root {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  border: 2px dashed rgba(59, 130, 246, 0.5);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
 /* Loading States */
 .file-tree-loading-indicator {
   display: flex;

@@ -1039,7 +1039,7 @@ class FileTree {
     event.preventDefault();
     
     // Find folder drop target
-    const folderTarget = this.getFolderDropTarget(event.target);
+    const folderTarget = this.getFolderDropTarget(event.target, event);
     
     // Clear previous drop highlights
     this.clearDropHighlights();
@@ -1061,15 +1061,8 @@ class FileTree {
         // Regular folder drop
         event.dataTransfer.dropEffect = 'move';
         
-        // Check if we're dropping directly on a children container vs. the folder item itself
-        const childrenContainer = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_CHILDREN}`);
-        if (childrenContainer) {
-          // Highlight the children container if we're hovering over it directly
-          childrenContainer.classList.add('drop-target-children');
-        } else {
-          // Highlight the folder item itself
-          folderTarget.classList.add('drop-target');
-        }
+        // Always highlight the specific folder item, not the children container
+        folderTarget.classList.add('drop-target');
       } else {
         event.dataTransfer.dropEffect = 'none';
       }
@@ -1103,7 +1096,7 @@ class FileTree {
     event.stopPropagation();
     
     // Find folder drop target
-    const folderTarget = this.getFolderDropTarget(event.target);
+    const folderTarget = this.getFolderDropTarget(event.target, event);
     
     if (folderTarget) {
       if (folderTarget === 'root') {
@@ -1138,37 +1131,80 @@ class FileTree {
   }
 
   /**
-   * Get folder drop target from event target
+   * Get drop target from event target - supports both folder and file targets
    * @param {HTMLElement} target - Event target element
-   * @returns {HTMLElement|null} Folder tree item element or 'root' for vault root
+   * @param {DragEvent} event - The drag event for mouse position
+   * @returns {HTMLElement|string|null} Tree item element, 'root' for vault root, or null
    */
-  getFolderDropTarget(target) {
+  getFolderDropTarget(target, event) {
     // Check if dropping on vault-info for root level drop
     const vaultInfo = target.closest('.vault-info');
     if (vaultInfo) {
       return 'root'; // Special identifier for root level drops
     }
     
+    // First check for direct tree item (can be folder or file now)
+    const treeItem = target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
+    if (treeItem) {
+      const isDir = treeItem.dataset.isDir === 'true';
+      
+      if (isDir) {
+        // For folders, drop into the folder
+        return treeItem;
+      } else {
+        // For files, drop into the same directory as the file (sibling position)
+        const filePath = treeItem.dataset.filePath;
+        const parentPath = this.getParentPath(this.getRelativePath(filePath));
+        const vaultPath = this.appState.getState().currentVault || '';
+        const fullParentPath = vaultPath && parentPath ? `${vaultPath}/${parentPath}` : vaultPath;
+        
+        // Find the parent folder element
+        const parentFolder = this.findTreeItem(fullParentPath);
+        if (parentFolder) {
+          return parentFolder;
+        }
+        
+        // If no parent folder found, allow root level drop
+        return 'root';
+      }
+    }
+    
     // Check if we're hovering over a tree-children container directly
+    // In this case, look for any child item (folder or file) within that container
     const childrenContainer = target.closest(`.${FileTree.CSS_CLASSES.TREE_CHILDREN}`);
     if (childrenContainer) {
-      // Find the parent folder item that owns this children container
+      // Get the exact position of the mouse within the children container
+      const rect = childrenContainer.getBoundingClientRect();
+      const mouseY = event.clientY - rect.top;
+      
+      // Find any child item (folder or file) closest to the mouse position
+      const allChildren = Array.from(childrenContainer.querySelectorAll(`.${FileTree.CSS_CLASSES.TREE_ITEM}`));
+      
+      for (const child of allChildren) {
+        const childRect = child.getBoundingClientRect();
+        const childRelativeY = childRect.top - rect.top;
+        const childHeight = childRect.height;
+        
+        // Check if mouse is within this child's bounds
+        if (mouseY >= childRelativeY && mouseY <= childRelativeY + childHeight) {
+          const isDir = child.dataset.isDir === 'true';
+          
+          if (isDir) {
+            // For folders, drop into the folder
+            return child;
+          } else {
+            // For files, drop into the same directory as the file
+            const parentFolder = this.findParentFolderForChildren(childrenContainer);
+            return parentFolder || 'root';
+          }
+        }
+      }
+      
+      // If no specific child found, return the parent folder of this children container
       const parentFolder = this.findParentFolderForChildren(childrenContainer);
       if (parentFolder) {
         return parentFolder;
       }
-    }
-    
-    // Check for direct tree item (must be a folder)
-    const treeItem = target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
-    if (treeItem) {
-      const isDir = treeItem.dataset.isDir === 'true';
-      // Only return the item if it's a directory (folder)
-      if (isDir) {
-        return treeItem;
-      }
-      // If it's a file, don't allow dropping - return null
-      return null;
     }
     
     // Check if we're in the main file tree container but not over a specific item
@@ -1281,11 +1317,6 @@ class FileTree {
     const dropTargets = this.container.querySelectorAll('.drop-target');
     dropTargets.forEach(target => {
       target.classList.remove('drop-target');
-    });
-    
-    const childrenDropTargets = this.container.querySelectorAll('.drop-target-children');
-    childrenDropTargets.forEach(target => {
-      target.classList.remove('drop-target-children');
     });
     
     // Clear root level drop highlights

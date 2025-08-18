@@ -26,9 +26,9 @@ function updateVaultInfo(vaultPath) {
   const vaultPathSpan = vaultInfo.querySelector('.vault-path');
   
   if (vaultPath) {
-    const displayPath = vaultPath.length > 50 ? 
-      '...' + vaultPath.slice(-47) : vaultPath;
-    vaultPathSpan.textContent = displayPath;
+    // Extract just the folder name from the full path
+    const folderName = vaultPath.split('/').pop() || vaultPath.split('\\').pop();
+    vaultPathSpan.textContent = folderName;
     vaultPathSpan.title = vaultPath; // Full path on hover
   } else {
     vaultPathSpan.textContent = 'No vault selected';
