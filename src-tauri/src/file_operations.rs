@@ -152,28 +152,48 @@ pub fn create_file_internal(file_path: &str) -> FileSystemResult<()> {
         })
 }
 
-/// Internal delete file function using structured error handling
+/// Internal delete file or directory function using structured error handling
 pub fn delete_file_internal(file_path: &str) -> FileSystemResult<()> {
     let path = Path::new(file_path);
 
     // Acquire file lock to prevent concurrent access
     let _lock = FileLockGuard::acquire(file_path)?;
 
-    // Validate path exists and is a file
+    // Validate path exists
     validation::validate_path_exists(path)?;
-    validation::validate_is_file(path)?;
-    validation::validate_markdown_extension(path)?;
 
-    // Delete the file
-    fs::remove_file(path)
-        .map_err(|e| match e.kind() {
-            std::io::ErrorKind::PermissionDenied => FileSystemError::PermissionDenied { 
-                path: file_path.to_string() 
-            },
-            _ => FileSystemError::IOError { 
-                message: format!("Failed to delete file {}: {}", file_path, e) 
-            },
-        })
+    // Check if it's a file or directory and validate accordingly
+    let is_directory = path.is_dir();
+    if is_directory {
+        // For directories, validate it's actually a directory
+        validation::validate_is_directory(path)?;
+        
+        // Delete the directory and all its contents
+        fs::remove_dir_all(path)
+            .map_err(|e| match e.kind() {
+                std::io::ErrorKind::PermissionDenied => FileSystemError::PermissionDenied { 
+                    path: file_path.to_string() 
+                },
+                _ => FileSystemError::IOError { 
+                    message: format!("Failed to delete directory {}: {}", file_path, e) 
+                },
+            })
+    } else {
+        // For files, validate it's a file and has .md extension
+        validation::validate_is_file(path)?;
+        validation::validate_markdown_extension(path)?;
+
+        // Delete the file
+        fs::remove_file(path)
+            .map_err(|e| match e.kind() {
+                std::io::ErrorKind::PermissionDenied => FileSystemError::PermissionDenied { 
+                    path: file_path.to_string() 
+                },
+                _ => FileSystemError::IOError { 
+                    message: format!("Failed to delete file {}: {}", file_path, e) 
+                },
+            })
+    }
 }
 
 /// Internal rename file function using structured error handling
@@ -190,13 +210,16 @@ pub fn rename_file_internal(old_path: &str, new_path: &str) -> FileSystemResult<
 
     // Check if it's a file or directory and validate accordingly
     let is_directory = old.is_dir();
-    if !is_directory {
+    if is_directory {
+        // For directories, validate it's actually a directory
+        validation::validate_is_directory(old)?;
+        // No extension validation needed for directories
+    } else {
         // For files, validate it's a file and has .md extension
         validation::validate_is_file(old)?;
         validation::validate_markdown_extension(old)?;
         validation::validate_markdown_extension(new)?;
     }
-    // For directories, no extension validation needed
 
     // Check if destination already exists
     validation::validate_file_not_exists(new)?;
