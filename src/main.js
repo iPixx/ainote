@@ -524,14 +524,22 @@ async function loadWindowState() {
       const validWidth = Math.max(800, Math.min(width || 1920, 6000));
       const validHeight = Math.max(600, Math.min(height || 1080, 4000));
       
-      await mainWindow.setSize({ width: validWidth, height: validHeight });
+      await mainWindow.setSize({ 
+        type: 'Logical', 
+        width: validWidth, 
+        height: validHeight 
+      });
       
       // Set position if available and valid
       if (x !== null && y !== null && x !== undefined && y !== undefined) {
         // Ensure position is on screen (basic validation) - increased for larger screens
         const validX = Math.max(-200, Math.min(x, 4000)); // Allow some off-screen
         const validY = Math.max(-200, Math.min(y, 3000));
-        await mainWindow.setPosition({ x: validX, y: validY });
+        await mainWindow.setPosition({ 
+          type: 'Logical', 
+          x: validX, 
+          y: validY 
+        });
       }
       
       // Apply maximized state last
@@ -564,23 +572,40 @@ async function saveWindowState() {
     console.log('🔄 Getting window properties...');
     
     const size = await mainWindow.innerSize();
-    console.log('📐 Window size:', size);
+    console.log('📐 Window size (physical):', size);
     
     const position = await mainWindow.outerPosition();
-    console.log('📍 Window position:', position);
+    console.log('📍 Window position (physical):', position);
     
     const isMaximized = await mainWindow.isMaximized();
     console.log('🔳 Window maximized:', isMaximized);
     
+    const scaleFactor = await mainWindow.scaleFactor();
+    console.log('🔍 Scale factor:', scaleFactor);
+    
+    // Convert physical pixels to logical pixels to match backend coordinate system
+    const logicalSize = {
+      width: size.width / scaleFactor,
+      height: size.height / scaleFactor
+    };
+    
+    const logicalPosition = {
+      x: Math.round(position.x / scaleFactor),
+      y: Math.round(position.y / scaleFactor)
+    };
+    
+    console.log('📐 Window size (logical):', logicalSize);
+    console.log('📍 Window position (logical):', logicalPosition);
+    
     const windowState = {
-      width: size.width,
-      height: size.height,
-      x: position.x,
-      y: position.y,
+      width: logicalSize.width,
+      height: logicalSize.height,
+      x: logicalPosition.x,
+      y: logicalPosition.y,
       maximized: isMaximized
     };
     
-    console.log('💾 Saving window state:', windowState);
+    console.log('💾 Saving window state (logical pixels):', windowState);
     
     await invoke('save_window_state', windowState);
     
@@ -708,6 +733,7 @@ window.toggleShortcutsHelp = toggleShortcutsHelp;
 window.forceSaveAllState = forceSaveAllState;
 window.debouncedSaveLayoutState = debouncedSaveLayoutState;
 window.activateFileTreeSearch = activateFileTreeSearch;
+window.saveWindowState = saveWindowState;
 
 // Development and testing functions
 window.runLayoutTest = function() {

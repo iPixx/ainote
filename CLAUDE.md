@@ -154,6 +154,10 @@ ainote/
 - Performance testing with Ollama running
 - Cross-platform testing (Windows, macOS, Linux)
 
+### Application State Storage
+- **Window and app state** saved to: `~/.ainote/app_state.json`
+- **Contains:** Window dimensions, position, maximized state, layout settings, current vault/file
+
 ## Key Implementation Notes
 
 ### Current State (Phase 1)
