@@ -988,6 +988,12 @@ class FileTree {
     if (folderTarget && this.canDropOnFolder(folderTarget)) {
       event.dataTransfer.dropEffect = 'move';
       folderTarget.classList.add('drop-target');
+      
+      // Also highlight the children container if we're hovering over it and it's expanded
+      const childrenContainer = event.target.closest(`.${FileTree.CSS_CLASSES.TREE_CHILDREN}`);
+      if (childrenContainer && folderTarget.classList.contains(FileTree.CSS_CLASSES.EXPANDED)) {
+        childrenContainer.classList.add('drop-target-children');
+      }
     } else {
       event.dataTransfer.dropEffect = 'none';
     }
@@ -1043,11 +1049,48 @@ class FileTree {
    * @returns {HTMLElement|null} Folder tree item element
    */
   getFolderDropTarget(target) {
+    // First, check if we're hovering over a tree-children container
+    const childrenContainer = target.closest(`.${FileTree.CSS_CLASSES.TREE_CHILDREN}`);
+    if (childrenContainer) {
+      // Find the parent folder item that owns this children container
+      const parentFolder = this.findParentFolderForChildren(childrenContainer);
+      if (parentFolder) {
+        return parentFolder;
+      }
+    }
+    
+    // Otherwise, look for a direct tree item
     const treeItem = target.closest(`.${FileTree.CSS_CLASSES.TREE_ITEM}`);
     if (!treeItem) return null;
     
     const isDir = treeItem.dataset.isDir === 'true';
     return isDir ? treeItem : null;
+  }
+
+  /**
+   * Find the parent folder item for a given children container
+   * @param {HTMLElement} childrenContainer - The tree-children container
+   * @returns {HTMLElement|null} The parent folder tree item
+   */
+  findParentFolderForChildren(childrenContainer) {
+    // Look through all folder items to find which one has this children container
+    const allFolderItems = this.container.querySelectorAll(`.${FileTree.CSS_CLASSES.TREE_FOLDER}`);
+    
+    for (const folderItem of allFolderItems) {
+      if (folderItem.childrenContainer === childrenContainer) {
+        return folderItem;
+      }
+    }
+    
+    // Alternative approach: look at the previous sibling (the folder should come right before its children)
+    const previousElement = childrenContainer.previousElementSibling;
+    if (previousElement && 
+        previousElement.classList.contains(FileTree.CSS_CLASSES.TREE_FOLDER) &&
+        previousElement.childrenContainer === childrenContainer) {
+      return previousElement;
+    }
+    
+    return null;
   }
 
   /**
@@ -1067,11 +1110,6 @@ class FileTree {
     // Can't drop a parent folder into its own child
     if (folderPath.startsWith(draggedPath + '/')) return false;
     
-    // Can't drop into the same parent directory
-    const draggedParent = this.getParentPath(this.getRelativePath(draggedPath));
-    const targetRelative = this.getRelativePath(folderPath);
-    if (draggedParent === targetRelative) return false;
-    
     return true;
   }
 
@@ -1082,6 +1120,11 @@ class FileTree {
     const dropTargets = this.container.querySelectorAll('.drop-target');
     dropTargets.forEach(target => {
       target.classList.remove('drop-target');
+    });
+    
+    const childrenDropTargets = this.container.querySelectorAll('.drop-target-children');
+    childrenDropTargets.forEach(target => {
+      target.classList.remove('drop-target-children');
     });
   }
 

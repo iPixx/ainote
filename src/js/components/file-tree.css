@@ -492,8 +492,13 @@
 
 /* Folder drop target highlight */
 .tree-item.drop-target {
-  background-color: var(--vscode-list-dropBackground, rgba(0, 122, 204, 0.18)) !important;
-  border: 2px dashed var(--vscode-focusBorder, #007ACC);
+  background-color: var(--vscode-list-dropBackground, rgba(0, 122, 204, 0.25)) !important;
+  border-radius: 4px;
+}
+
+/* Children container drop target highlight */
+.tree-children.drop-target-children {
+  background-color: var(--vscode-list-dropBackground, rgba(0, 122, 204, 0.1));
   border-radius: 4px;
 }
 
