@@ -185,13 +185,18 @@ pub fn rename_file_internal(old_path: &str, new_path: &str) -> FileSystemResult<
     let _old_lock = FileLockGuard::acquire(old_path)?;
     let _new_lock = FileLockGuard::acquire(new_path)?;
 
-    // Validate old path exists and is a file
+    // Validate old path exists
     validation::validate_path_exists(old)?;
-    validation::validate_is_file(old)?;
 
-    // Validate both paths have .md extension
-    validation::validate_markdown_extension(old)?;
-    validation::validate_markdown_extension(new)?;
+    // Check if it's a file or directory and validate accordingly
+    let is_directory = old.is_dir();
+    if !is_directory {
+        // For files, validate it's a file and has .md extension
+        validation::validate_is_file(old)?;
+        validation::validate_markdown_extension(old)?;
+        validation::validate_markdown_extension(new)?;
+    }
+    // For directories, no extension validation needed
 
     // Check if destination already exists
     validation::validate_file_not_exists(new)?;
@@ -548,6 +553,32 @@ mod tests {
 
         let result = rename_file_internal(&env.get_test_file("test.txt"), &env.get_test_file("test2.md"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_rename_directory_success() {
+        let env = TestEnv::new();
+        let old_dir = env.path.join("old_folder");
+        let new_dir = env.path.join("new_folder");
+        
+        // Create directory with a file inside
+        fs::create_dir(&old_dir).unwrap();
+        let file_inside = old_dir.join("file.md");
+        fs::write(&file_inside, TEST_CONTENT).unwrap();
+        
+        let old_dir_str = old_dir.to_string_lossy().to_string();
+        let new_dir_str = new_dir.to_string_lossy().to_string();
+        
+        let result = rename_file_internal(&old_dir_str, &new_dir_str);
+        assert!(result.is_ok());
+        assert!(!old_dir.exists());
+        assert!(new_dir.exists());
+        
+        // Check that file inside was moved too
+        let moved_file = new_dir.join("file.md");
+        assert!(moved_file.exists());
+        let content = fs::read_to_string(&moved_file).unwrap();
+        assert_eq!(content, TEST_CONTENT);
     }
 
     #[test]

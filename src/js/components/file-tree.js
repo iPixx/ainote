@@ -209,14 +209,14 @@ class FileTree {
         
       case 'rename':
         // Update selection if renamed file was selected
-        if (this.selectedFile === file.path && newFile) {
+        if (file && this.selectedFile === file.path && newFile) {
           this.selectFile(newFile.path);
         }
         break;
         
       case 'delete':
         // Clear selection if deleted file was selected
-        if (this.selectedFile === file.path) {
+        if (file && this.selectedFile === file.path) {
           this.selectFile(null);
         }
         break;
