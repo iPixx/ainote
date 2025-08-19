@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syntax Highlighting Test - aiNote</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .editor-container {
+            height: 500px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .test-content {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .stat {
+            padding: 10px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+    <link rel="stylesheet" href="src/js/components/markdown-editor.css">
+</head>
+<body>
+    <div class="container">
+        <h1>aiNote Syntax Highlighting Test</h1>
+        <p>This test validates the custom markdown syntax highlighting engine.</p>
+        
+        <div class="editor-container" id="editor-container"></div>
+        
+        <div class="controls">
+            <button onclick="toggleHighlighting()">Toggle Highlighting</button>
+            <button onclick="loadTestContent()">Load Test Content</button>
+            <button onclick="showStats()">Show Performance Stats</button>
+        </div>
+        
+        <div id="stats" class="stats"></div>
+        
+        <h3>Test Markdown Content:</h3>
+        <div class="test-content" id="test-content"></div>
+    </div>
+
+    <script type="module">
+        import MarkdownEditor from './src/js/components/markdown-editor.js';
+
+        // Mock AppState for testing
+        class MockAppState {
+            constructor() {
+                this.data = {};
+            }
+            
+            get(key) { return this.data[key]; }
+            set(key, value) { this.data[key] = value; }
+            save() { return Promise.resolve(); }
+        }
+
+        const testMarkdown = `# Heading 1
+## Heading 2  
+### Heading 3
+#### Heading 4
+##### Heading 5
+###### Heading 6
+
+This is a paragraph with **bold text** and *italic text* and ***bold italic***.
+
+Here is some \`inline code\` and a [link to Google](https://google.com).
+
+## Code Block
+\`\`\`javascript
+function testFunction() {
+    const message = "Hello, World!";
+    console.log(message);
+    return message;
+}
+\`\`\`
+
+## Lists
+- Item 1
+- Item 2
+  - Nested item
+  - Another nested item
+- Item 3
+
+1. Numbered item 1
+2. Numbered item 2
+3. Numbered item 3
+
+## Blockquotes
+> This is a blockquote
+> It can span multiple lines
+> 
+> > This is a nested blockquote
+
+## Other Elements
+This text has ~~strikethrough~~ formatting.
+
+| Table | Header |
+|-------|--------|
+| Cell 1 | Cell 2 |
+| Cell 3 | Cell 4 |
+
+That's a comprehensive test of **all** supported markdown syntax!`;
+
+        // Initialize editor
+        let editor;
+        let appState;
+
+        function initializeEditor() {
+            const container = document.getElementById('editor-container');
+            appState = new MockAppState();
+            editor = new MarkdownEditor(container, appState);
+            
+            console.log('✅ Test editor initialized');
+            
+            // Set initial content
+            setTimeout(() => {
+                editor.setValue(testMarkdown);
+                updateTestContentDisplay();
+            }, 100);
+        }
+
+        function toggleHighlighting() {
+            if (editor) {
+                const currentState = editor.highlightingEnabled;
+                editor.toggleSyntaxHighlighting(!currentState);
+                console.log(\`Highlighting \${!currentState ? 'enabled' : 'disabled'}\`);
+            }
+        }
+
+        function loadTestContent() {
+            if (editor) {
+                editor.setValue(testMarkdown);
+                updateTestContentDisplay();
+                console.log('✅ Test content loaded');
+            }
+        }
+
+        function showStats() {
+            if (editor) {
+                const stats = editor.getStats();
+                const syntaxStats = editor.getSyntaxHighlightingStats();
+                
+                const statsContainer = document.getElementById('stats');
+                statsContainer.innerHTML = \`
+                    <div class="stat">Content Length: \${stats.contentLength} chars</div>
+                    <div class="stat">Word Count: \${stats.wordCount} words</div>
+                    <div class="stat">Highlighting: \${syntaxStats.enabled ? 'Enabled' : 'Disabled'}</div>
+                    <div class="stat">Last Highlight Time: \${syntaxStats.lastHighlightTime?.toFixed(2) || 'N/A'}ms</div>
+                    <div class="stat">Total Highlights: \${syntaxStats.totalHighlights || 0}</div>
+                    <div class="stat">Cache Size: \${syntaxStats.cacheSize || 0}</div>
+                \`;
+                
+                console.log('📊 Performance Stats:', stats);
+                console.log('✨ Syntax Highlighting Stats:', syntaxStats);
+            }
+        }
+
+        function updateTestContentDisplay() {
+            document.getElementById('test-content').textContent = testMarkdown;
+        }
+
+        // Make functions global
+        window.toggleHighlighting = toggleHighlighting;
+        window.loadTestContent = loadTestContent;
+        window.showStats = showStats;
+
+        // Initialize when DOM loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeEditor();
+        });
+
+        // Auto-refresh stats every 2 seconds
+        setInterval(showStats, 2000);
+    </script>
+</body>
+</html>

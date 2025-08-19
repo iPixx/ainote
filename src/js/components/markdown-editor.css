@@ -80,7 +80,7 @@
   opacity: 0.5;
 }
 
-/* Overlay container for future syntax highlighting */
+/* Overlay container for syntax highlighting */
 .markdown-editor-overlay {
   position: absolute;
   top: 0;
@@ -89,24 +89,35 @@
   bottom: 0;
   padding: 1rem;
   
-  /* Typography matching textarea */
+  /* Typography matching textarea exactly */
   font-family: var(--font-family-mono, 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace);
   font-size: 14px;
   line-height: 1.6;
   letter-spacing: 0.025em;
+  font-weight: normal;
+  
+  /* Critical for proper alignment */
+  box-sizing: border-box;
+  margin: 0;
+  border: none;
   
   /* Interaction */
   pointer-events: none;
   user-select: none;
   
-  /* Sync with textarea */
+  /* Sync with textarea scrolling and wrapping */
   overflow: hidden;
-  white-space: pre-wrap;
+  overflow-wrap: break-word;
   word-wrap: break-word;
+  white-space: pre-wrap;
   
-  /* Initially hidden, will be used by syntax highlighter */
+  /* Initially hidden, will be shown when highlighting is active */
   opacity: 0;
   z-index: 1;
+  
+  /* Ensure perfect pixel alignment */
+  transform: translateZ(0);
+  will-change: scroll-position;
 }
 
 /* Status bar */
@@ -508,4 +519,452 @@
 
 .markdown-editor-overlay {
   z-index: 1;
+}
+
+/* ===== SYNTAX HIGHLIGHTING STYLES ===== */
+
+/* Enable overlay when highlighting is active */
+.markdown-editor-overlay.highlighting-active {
+  opacity: 0.95;
+  pointer-events: none;
+  user-select: none;
+  background: transparent;
+}
+
+/* Ensure textarea remains visible underneath */
+.markdown-editor-wrapper .markdown-editor-textarea {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(31, 41, 55, 0.1);
+}
+
+.markdown-editor-wrapper .markdown-editor-overlay.highlighting-active ~ .markdown-editor-textarea {
+  color: transparent;
+  caret-color: var(--color-text-primary, #1f2937);
+}
+
+/* Base token styling */
+.markdown-editor-overlay span[class*="md-"] {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+}
+
+/* Headers (# ## ### #### ##### ######) */
+.md-header {
+  display: inline;
+  font-weight: bold;
+  color: var(--color-header, #1f2937);
+}
+
+.md-header-1 { 
+  font-size: 1.8em; 
+  color: var(--color-header-1, #dc2626);
+  border-bottom: 2px solid var(--color-header-1, #dc2626);
+}
+
+.md-header-2 { 
+  font-size: 1.6em; 
+  color: var(--color-header-2, #ea580c);
+}
+
+.md-header-3 { 
+  font-size: 1.4em; 
+  color: var(--color-header-3, #d97706);
+}
+
+.md-header-4 { 
+  font-size: 1.2em; 
+  color: var(--color-header-4, #65a30d);
+}
+
+.md-header-5 { 
+  font-size: 1.1em; 
+  color: var(--color-header-5, #0891b2);
+}
+
+.md-header-6 { 
+  font-size: 1.0em; 
+  color: var(--color-header-6, #7c3aed);
+}
+
+.md-header-marker {
+  color: var(--color-marker-muted, #9ca3af);
+  font-weight: normal;
+  margin-right: 0.5em;
+}
+
+.md-header-content {
+  color: inherit;
+}
+
+/* Bold formatting (**text**, __text__) */
+.md-bold {
+  font-weight: bold;
+  color: var(--color-text-primary, #1f2937);
+}
+
+.md-bold-marker {
+  color: var(--color-marker-bold, #6b7280);
+  font-weight: bold;
+  opacity: 0.7;
+}
+
+.md-bold-content {
+  color: inherit;
+  font-weight: bold;
+}
+
+/* Italic formatting (*text*, _text_) */
+.md-italic {
+  font-style: italic;
+  color: var(--color-text-primary, #1f2937);
+}
+
+.md-italic-marker {
+  color: var(--color-marker-italic, #6b7280);
+  font-style: normal;
+  opacity: 0.7;
+}
+
+.md-italic-content {
+  color: inherit;
+  font-style: italic;
+}
+
+/* Inline code (`code`) */
+.md-code-inline {
+  background-color: var(--color-code-bg, #f3f4f6);
+  color: var(--color-code-text, #dc2626);
+  padding: 0.125em 0.25em;
+  border-radius: 3px;
+  font-family: var(--font-family-mono, 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace);
+  font-size: 0.875em;
+  border: 1px solid var(--color-code-border, #e5e7eb);
+}
+
+.md-code-inline-marker {
+  color: var(--color-marker-code, #9ca3af);
+  background: transparent;
+  padding: 0;
+  border: none;
+}
+
+.md-code-inline-content {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border: none;
+}
+
+/* Code blocks (```...```) */
+.md-code-block {
+  display: block;
+  background-color: var(--color-code-block-bg, #1f2937);
+  color: var(--color-code-block-text, #f9fafb);
+  padding: 1em;
+  border-radius: 6px;
+  font-family: var(--font-family-mono, 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace);
+  font-size: 0.875em;
+  line-height: 1.5;
+  border: 1px solid var(--color-code-block-border, #374151);
+  margin: 0.5em 0;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.md-code-block-marker {
+  color: var(--color-marker-code-block, #6b7280);
+  font-weight: bold;
+}
+
+.md-code-block-content {
+  color: inherit;
+  display: block;
+}
+
+/* Links ([text](url), [text][ref]) */
+.md-link {
+  color: var(--color-link, #2563eb);
+  text-decoration: none;
+  position: relative;
+}
+
+.md-link:hover {
+  text-decoration: underline;
+}
+
+.md-link-marker {
+  color: var(--color-marker-link, #6b7280);
+  opacity: 0.7;
+}
+
+.md-link-text {
+  color: var(--color-link-text, #2563eb);
+  font-weight: 500;
+}
+
+.md-link-url {
+  color: var(--color-link-url, #7c3aed);
+  opacity: 0.8;
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.9em;
+}
+
+/* Lists (-, *, 1.) */
+.md-list {
+  color: var(--color-text-primary, #1f2937);
+}
+
+.md-list-marker {
+  color: var(--color-marker-list, #3b82f6);
+  font-weight: bold;
+  margin-right: 0.5em;
+}
+
+.md-list-content {
+  color: inherit;
+}
+
+.md-list-level-0 { margin-left: 0; }
+.md-list-level-1 { margin-left: 1em; }
+.md-list-level-2 { margin-left: 2em; }
+.md-list-level-3 { margin-left: 3em; }
+.md-list-level-4 { margin-left: 4em; }
+
+/* Blockquotes (> text) */
+.md-blockquote {
+  color: var(--color-blockquote-text, #4b5563);
+  border-left: 4px solid var(--color-blockquote-border, #d1d5db);
+  padding-left: 1em;
+  font-style: italic;
+}
+
+.md-blockquote-marker {
+  color: var(--color-marker-blockquote, #9ca3af);
+  font-style: normal;
+  font-weight: bold;
+  margin-right: 0.5em;
+}
+
+.md-blockquote-content {
+  color: inherit;
+  font-style: inherit;
+}
+
+.md-blockquote-level-2 {
+  border-left-width: 8px;
+  border-left-color: var(--color-blockquote-border-2, #fbbf24);
+}
+
+.md-blockquote-level-3 {
+  border-left-width: 12px;
+  border-left-color: var(--color-blockquote-border-3, #f87171);
+}
+
+/* Strikethrough (~~text~~) */
+.md-strikethrough {
+  color: var(--color-text-muted, #6b7280);
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+
+.md-strikethrough-marker {
+  color: var(--color-marker-strikethrough, #9ca3af);
+  text-decoration: none;
+  opacity: 0.6;
+}
+
+.md-strikethrough-content {
+  color: inherit;
+  text-decoration: line-through;
+}
+
+/* Tables (basic | syntax) */
+.md-table {
+  color: var(--color-table-text, #1f2937);
+  background-color: var(--color-table-bg, #f9fafb);
+  border: 1px solid var(--color-table-border, #e5e7eb);
+  padding: 0.25em 0.5em;
+}
+
+.md-table-marker {
+  color: var(--color-marker-table, #6b7280);
+  font-weight: bold;
+}
+
+.md-table-content {
+  color: inherit;
+}
+
+/* Search highlight overlays (for find/replace functionality) */
+.md-search-highlight {
+  background-color: var(--color-search-highlight, #fef3c7);
+  color: var(--color-search-highlight-text, #92400e);
+  padding: 0.125em 0.25em;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--color-search-highlight-border, #f59e0b);
+}
+
+.md-search-highlight-current {
+  background-color: var(--color-search-current, #fed7aa);
+  color: var(--color-search-current-text, #ea580c);
+  box-shadow: 0 0 0 2px var(--color-search-current-border, #f97316);
+}
+
+/* Dark theme support for syntax highlighting */
+@media (prefers-color-scheme: dark) {
+  .md-header {
+    color: var(--color-header-dark, #f9fafb);
+  }
+
+  .md-header-1 { color: var(--color-header-1-dark, #fca5a5); }
+  .md-header-2 { color: var(--color-header-2-dark, #fdba74); }
+  .md-header-3 { color: var(--color-header-3-dark, #fcd34d); }
+  .md-header-4 { color: var(--color-header-4-dark, #86efac); }
+  .md-header-5 { color: var(--color-header-5-dark, #67e8f9); }
+  .md-header-6 { color: var(--color-header-6-dark, #c4b5fd); }
+
+  .md-header-marker,
+  .md-bold-marker,
+  .md-italic-marker,
+  .md-code-inline-marker,
+  .md-code-block-marker,
+  .md-link-marker,
+  .md-list-marker,
+  .md-blockquote-marker,
+  .md-strikethrough-marker,
+  .md-table-marker {
+    color: var(--color-marker-muted-dark, #6b7280);
+  }
+
+  .md-bold,
+  .md-italic,
+  .md-list,
+  .md-table {
+    color: var(--color-text-primary-dark, #f9fafb);
+  }
+
+  .md-code-inline {
+    background-color: var(--color-code-bg-dark, #374151);
+    color: var(--color-code-text-dark, #fbbf24);
+    border-color: var(--color-code-border-dark, #4b5563);
+  }
+
+  .md-code-block {
+    background-color: var(--color-code-block-bg-dark, #111827);
+    color: var(--color-code-block-text-dark, #e5e7eb);
+    border-color: var(--color-code-block-border-dark, #1f2937);
+  }
+
+  .md-link-text {
+    color: var(--color-link-text-dark, #60a5fa);
+  }
+
+  .md-link-url {
+    color: var(--color-link-url-dark, #a78bfa);
+  }
+
+  .md-list-marker {
+    color: var(--color-marker-list-dark, #60a5fa);
+  }
+
+  .md-blockquote {
+    color: var(--color-blockquote-text-dark, #9ca3af);
+    border-left-color: var(--color-blockquote-border-dark, #4b5563);
+  }
+
+  .md-strikethrough {
+    color: var(--color-text-muted-dark, #9ca3af);
+  }
+
+  .md-table {
+    color: var(--color-table-text-dark, #f9fafb);
+    background-color: var(--color-table-bg-dark, #1f2937);
+    border-color: var(--color-table-border-dark, #374151);
+  }
+
+  .md-search-highlight {
+    background-color: var(--color-search-highlight-dark, #451a03);
+    color: var(--color-search-highlight-text-dark, #fbbf24);
+    box-shadow: 0 0 0 1px var(--color-search-highlight-border-dark, #a16207);
+  }
+
+  .md-search-highlight-current {
+    background-color: var(--color-search-current-dark, #7c2d12);
+    color: var(--color-search-current-text-dark, #fed7aa);
+    box-shadow: 0 0 0 2px var(--color-search-current-border-dark, #ea580c);
+  }
+}
+
+/* Performance optimizations for syntax highlighting */
+.markdown-editor-overlay span {
+  contain: style;
+}
+
+/* High contrast mode support for syntax highlighting */
+@media (prefers-contrast: high) {
+  .md-header,
+  .md-bold,
+  .md-italic,
+  .md-link-text,
+  .md-list,
+  .md-blockquote,
+  .md-table {
+    color: inherit;
+    text-shadow: 0 0 1px currentColor;
+  }
+
+  .md-code-inline,
+  .md-code-block {
+    border: 2px solid;
+    background: transparent;
+  }
+
+  .md-blockquote {
+    border-left-width: 6px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .md-link:hover {
+    text-decoration: none;
+    opacity: 0.8;
+  }
+}
+
+/* Print styles for syntax highlighting */
+@media print {
+  .markdown-editor-overlay {
+    opacity: 1 !important;
+  }
+
+  .md-header,
+  .md-bold,
+  .md-italic,
+  .md-link-text,
+  .md-list,
+  .md-blockquote,
+  .md-table {
+    color: black !important;
+  }
+
+  .md-code-inline,
+  .md-code-block {
+    background: #f5f5f5 !important;
+    color: black !important;
+    border: 1px solid #ccc !important;
+  }
+
+  .md-blockquote {
+    border-left-color: #666 !important;
+  }
+
+  .md-search-highlight,
+  .md-search-highlight-current {
+    background: #ffff99 !important;
+    color: black !important;
+    box-shadow: none !important;
+  }
 }

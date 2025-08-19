@@ -1,3 +1,6 @@
+// Import syntax highlighter
+import SyntaxHighlighter from '../utils/syntax-highlighter.js';
+
 /**
  * MarkdownEditor - Core markdown editor component for aiNote
  * 
@@ -84,6 +87,19 @@ class MarkdownEditor {
       "'": "'",
       '`': '`'
     };
+
+    // Initialize syntax highlighter
+    this.syntaxHighlighter = new SyntaxHighlighter({
+      debounceDelay: 300,
+      maxLinesForFullHighlight: 1000,
+      visibleLinesBuffer: 50,
+      enablePerformanceLogging: false
+    });
+
+    // Syntax highlighting state
+    this.highlightingEnabled = true;
+    this.lastHighlightedContent = '';
+    this.highlightingInProgress = false;
     
     // Initialize editor
     this.init();
@@ -183,6 +199,11 @@ class MarkdownEditor {
       this.updateCursorPosition();
       this.debouncedWordCountUpdate();
       
+      // Trigger syntax highlighting if enabled
+      if (this.highlightingEnabled && this.content !== this.lastHighlightedContent) {
+        this.updateSyntaxHighlighting();
+      }
+      
       // Emit content change event
       this.emit(MarkdownEditor.EVENTS.CONTENT_CHANGED, {
         content: this.content,
@@ -264,10 +285,15 @@ class MarkdownEditor {
     this.addDOMEventListener(this.textarea, 'keydown', keyHandler);
     this.addDOMEventListener(this.textarea, 'paste', pasteHandler);
 
-    // Scroll synchronization (prepare for preview mode)
+    // Scroll synchronization for syntax highlighting overlay
     this.addDOMEventListener(this.textarea, 'scroll', () => {
-      // Future implementation: sync with preview pane
-      this.overlayContainer.scrollTop = this.textarea.scrollTop;
+      // Sync overlay scroll position with textarea immediately
+      if (this.overlayContainer) {
+        this.overlayContainer.scrollTop = this.textarea.scrollTop;
+        this.overlayContainer.scrollLeft = this.textarea.scrollLeft;
+      }
+      
+      // Note: No need to re-highlight on scroll - viewport optimization is handled internally
     });
   }
 
@@ -384,6 +410,11 @@ class MarkdownEditor {
       this.textarea.value = content;
       this.updateCursorPosition();
       this.updateWordCount();
+      
+      // Trigger syntax highlighting if content changed
+      if (this.highlightingEnabled && this.content !== this.lastHighlightedContent) {
+        this.updateSyntaxHighlighting();
+      }
       
       // Emit content change
       this.emit(MarkdownEditor.EVENTS.CONTENT_CHANGED, {
@@ -1249,26 +1280,28 @@ class MarkdownEditor {
   }
 
   /**
-   * Highlight search results (placeholder for future implementation)
+   * Highlight search results with syntax highlighting integration
    * @private
    */
   highlightSearchResults() {
-    // This will be implemented with syntax highlighting in sub-issue #40
-    // For now, just update the status
     if (this.currentSearchTerm) {
-      const regex = new RegExp(this.escapeRegExp(this.currentSearchTerm), 'gi');
-      const matches = (this.content.match(regex) || []).length;
-      this.updateSearchStatus(`${matches} match${matches !== 1 ? 'es' : ''} found`);
+      this.updateSearchHighlighting(this.currentSearchTerm);
+    } else {
+      this.clearSearchHighlights();
     }
   }
 
   /**
-   * Clear search highlights (placeholder for future implementation)
+   * Clear search highlights and refresh syntax highlighting
    * @private
    */
   clearSearchHighlights() {
-    // This will be implemented with syntax highlighting in sub-issue #40
     this.searchHighlights = [];
+    
+    // Refresh syntax highlighting to remove search highlights
+    if (this.highlightingEnabled && this.content.trim()) {
+      this.updateSyntaxHighlighting();
+    }
   }
 
   /**
@@ -1321,8 +1354,15 @@ class MarkdownEditor {
    * Clean up editor resources
    */
   destroy() {
-    // Clear debounce timeout
+    // Clear debounce timeouts
     clearTimeout(this.debounceTimeout);
+    clearTimeout(this.highlightUpdateTimeout);
+    
+    // Destroy syntax highlighter
+    if (this.syntaxHighlighter) {
+      this.syntaxHighlighter.destroy();
+      this.syntaxHighlighter = null;
+    }
     
     // Remove all event listeners
     this.eventListeners.forEach((listeners, element) => {
@@ -1342,8 +1382,163 @@ class MarkdownEditor {
     this.content = '';
     this.textarea = null;
     this.overlayContainer = null;
+    this.highlightingEnabled = false;
+    this.lastHighlightedContent = '';
+    this.highlightingInProgress = false;
     
     console.log('✅ MarkdownEditor destroyed');
+  }
+
+  /**
+   * Update syntax highlighting for current content
+   * @private
+   */
+  async updateSyntaxHighlighting() {
+    if (!this.highlightingEnabled || this.highlightingInProgress || !this.syntaxHighlighter) {
+      return;
+    }
+
+    // Skip if content hasn't changed
+    if (this.content === this.lastHighlightedContent) {
+      return;
+    }
+
+    try {
+      this.highlightingInProgress = true;
+      
+      // Get viewport information for optimization
+      const viewportInfo = this.getViewportInfo();
+      
+      // Highlight content with debouncing
+      await this.syntaxHighlighter.highlightWithDebounce(
+        this.content,
+        this.overlayContainer,
+        viewportInfo
+      );
+      
+      // Mark overlay as active when highlighting is present
+      if (this.content.trim()) {
+        this.overlayContainer.classList.add('highlighting-active');
+        this.overlayContainer.style.opacity = '0.95';
+      } else {
+        this.overlayContainer.classList.remove('highlighting-active');
+        this.overlayContainer.style.opacity = '0';
+      }
+      
+      this.lastHighlightedContent = this.content;
+      
+    } catch (error) {
+      console.error('❌ Error updating syntax highlighting:', error);
+      this.overlayContainer.classList.remove('highlighting-active');
+      this.overlayContainer.style.opacity = '0';
+    } finally {
+      this.highlightingInProgress = false;
+    }
+  }
+
+  /**
+   * Debounced syntax highlighting update for scroll events
+   * @private
+   */
+  debouncedHighlightUpdate() {
+    clearTimeout(this.highlightUpdateTimeout);
+    this.highlightUpdateTimeout = setTimeout(() => {
+      if (this.highlightingEnabled && this.content.trim()) {
+        this.updateSyntaxHighlighting();
+      }
+    }, 100); // Shorter delay for scroll-triggered updates
+  }
+
+  /**
+   * Get viewport information for performance optimization
+   * @returns {Object} Viewport information
+   * @private
+   */
+  getViewportInfo() {
+    if (!this.textarea) return null;
+
+    try {
+      const textareaRect = this.textarea.getBoundingClientRect();
+      const lineHeight = parseFloat(getComputedStyle(this.textarea).lineHeight) || 20;
+      const scrollTop = this.textarea.scrollTop;
+      
+      const firstVisibleLine = Math.floor(scrollTop / lineHeight);
+      const visibleLines = Math.ceil(textareaRect.height / lineHeight);
+      const lastVisibleLine = firstVisibleLine + visibleLines;
+
+      return {
+        firstVisibleLine,
+        lastVisibleLine,
+        lineHeight,
+        scrollTop,
+        scrollLeft: this.textarea.scrollLeft,
+        visibleHeight: textareaRect.height,
+        visibleWidth: textareaRect.width
+      };
+    } catch (error) {
+      console.warn('⚠️ Could not get viewport info:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Toggle syntax highlighting on/off
+   * @param {boolean} enabled - Whether to enable highlighting
+   */
+  toggleSyntaxHighlighting(enabled) {
+    this.highlightingEnabled = enabled;
+    
+    if (enabled && this.content.trim()) {
+      this.updateSyntaxHighlighting();
+    } else {
+      this.overlayContainer.classList.remove('highlighting-active');
+      this.overlayContainer.style.opacity = '0';
+      this.overlayContainer.innerHTML = '';
+    }
+    
+    console.log(`✨ Syntax highlighting ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  /**
+   * Update find/replace highlighting with syntax highlighting integration
+   * @param {string} searchTerm - Term to search for
+   * @private
+   */
+  updateSearchHighlighting(searchTerm) {
+    if (!searchTerm || !this.highlightingEnabled) {
+      this.clearSearchHighlights();
+      return;
+    }
+
+    // This integrates with the existing highlightSearchResults method
+    // The search highlighting is now handled by the CSS styles we added
+    const regex = new RegExp(this.escapeRegExp(searchTerm), 'gi');
+    const matches = (this.content.match(regex) || []).length;
+    
+    // Update search status
+    this.updateSearchStatus(`${matches} match${matches !== 1 ? 'es' : ''} found`);
+    
+    // Re-highlight content to include search highlights
+    if (matches > 0) {
+      this.updateSyntaxHighlighting();
+    }
+  }
+
+  /**
+   * Get syntax highlighting performance statistics
+   * @returns {Object} Performance statistics
+   */
+  getSyntaxHighlightingStats() {
+    if (!this.syntaxHighlighter) {
+      return { enabled: false };
+    }
+
+    return {
+      enabled: this.highlightingEnabled,
+      inProgress: this.highlightingInProgress,
+      lastContent: this.lastHighlightedContent.length,
+      ...this.syntaxHighlighter.getPerformanceStats()
+    };
   }
 
   /**
@@ -1359,7 +1554,8 @@ class MarkdownEditor {
       cursorPosition: this.cursorPosition,
       hasSelection: this.selectionStart !== this.selectionEnd,
       selectionLength: this.selectionEnd - this.selectionStart,
-      lastKeystrokeTime: this.lastKeystroke
+      lastKeystrokeTime: this.lastKeystroke,
+      syntaxHighlighting: this.getSyntaxHighlightingStats()
     };
   }
 }
