@@ -5,6 +5,7 @@ const { getCurrentWindow } = window.__TAURI__.window;
 import AppState from './js/state.js';
 import { LayoutManager, MobileNavManager } from './js/layout-manager.js';
 import FileTree from './js/components/file-tree.js';
+import MarkdownEditor from './js/components/markdown-editor.js';
 
 // Initialize global application state
 const appState = new AppState();
@@ -13,6 +14,7 @@ const appState = new AppState();
 let layoutManager;
 let mobileNavManager;
 let fileTreeComponent;
+let markdownEditor;
 
 // Window instance for state management
 let mainWindow;
@@ -323,47 +325,24 @@ async function openFile(filePath) {
     const fileName = filePath.split('/').pop();
     updateCurrentFileName(fileName, false);
     
-    // Update editor content (placeholder for now)
+    // Initialize or update markdown editor
     const editorContent = document.getElementById('editorContent');
-    editorContent.innerHTML = `
-      <div class="editor-wrapper">
-        <textarea class="editor-textarea" placeholder="Start writing...">${content}</textarea>
-      </div>
-    `;
     
-    // Add CSS for editor textarea
-    if (!document.getElementById('editor-styles')) {
-      const style = document.createElement('style');
-      style.id = 'editor-styles';
-      style.textContent = `
-        .editor-wrapper {
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-        }
-        .editor-textarea {
-          flex: 1;
-          width: 100%;
-          border: none;
-          outline: none;
-          padding: 1rem;
-          font-family: var(--font-family-mono);
-          font-size: 14px;
-          line-height: 1.6;
-          background: transparent;
-          color: inherit;
-          resize: none;
-        }
-      `;
-      document.head.appendChild(style);
+    if (!markdownEditor) {
+      // Create new markdown editor instance
+      markdownEditor = new MarkdownEditor(editorContent, appState);
+      
+      // Listen for content changes to mark file as dirty
+      markdownEditor.addEventListener(MarkdownEditor.EVENTS.CONTENT_CHANGED, () => {
+        appState.markDirty(true);
+        updateCurrentFileName(fileName, true);
+      });
+      
+      console.log('✅ MarkdownEditor initialized for file editing');
     }
     
-    // Monitor for changes
-    const textarea = editorContent.querySelector('.editor-textarea');
-    textarea.addEventListener('input', () => {
-      appState.markDirty(true);
-      updateCurrentFileName(fileName, true);
-    });
+    // Set the content in the editor
+    markdownEditor.setValue(content);
     
     showNotification(`Opened: ${fileName}`, 'success');
   } catch (error) {
@@ -417,14 +396,15 @@ async function saveFile() {
     return;
   }
   
-  const textarea = document.querySelector('.editor-textarea');
-  if (!textarea) {
+  if (!markdownEditor) {
     showNotification('No editor content to save', 'warning');
     return;
   }
   
+  const content = markdownEditor.getValue();
+  
   try {
-    await invoke('write_file', { filePath: currentFile, content: textarea.value });
+    await invoke('write_file', { filePath: currentFile, content });
     
     // Update state
     appState.markDirty(false);
