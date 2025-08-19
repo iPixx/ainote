@@ -840,62 +840,61 @@ class MarkdownEditor {
     const key = event.key;
     const closingChar = this.autoCompletePairs[key];
     
-    if (closingChar) {
-      // Check if we should auto-complete
-      const currentChar = this.content[this.selectionStart];
-      const selection = this.getSelectedText();
+    if (!closingChar) return;
+    
+    // Check if we should auto-complete
+    const currentChar = this.content[this.selectionStart];
+    const selection = this.getSelectedText();
+    
+    // If there's a selection, wrap it
+    if (selection) {
+      event.preventDefault();
+      this.saveUndoState();
       
-      // If there's a selection, wrap it
-      if (selection) {
-        event.preventDefault();
-        this.saveUndoState();
-        
-        const wrappedText = key + selection + closingChar;
-        this.insertText(wrappedText, true);
-        
-        // Position cursor after the wrapped text
-        const newCursorPos = this.selectionStart;
-        this.textarea.setSelectionRange(newCursorPos, newCursorPos);
-        this.updateCursorPosition();
-        
-        console.log(`🔗 Auto-wrapped selection with ${key}${closingChar}`);
-        return;
-      }
+      const wrappedText = key + selection + closingChar;
+      this.insertText(wrappedText, true);
       
-      // Determine if we should auto-complete based on the character type
-      let shouldAutoComplete = false;
+      // Position cursor after the wrapped text
+      const newCursorPos = this.selectionStart;
+      this.textarea.setSelectionRange(newCursorPos, newCursorPos);
+      this.updateCursorPosition();
       
-      // For brackets, be more permissive - complete unless next char is the same closing bracket
-      if (key === '(' || key === '[' || key === '{') {
-        shouldAutoComplete = !currentChar || currentChar !== closingChar;
-      }
-      // For quotes, use more restrictive logic to avoid issues in text
-      else if (key === '"' || key === "'" || key === '`') {
-        // Don't complete if we're inside a word or next char is the same quote
-        if (this.selectionStart > 0 && /\w/.test(this.content[this.selectionStart - 1])) {
-          shouldAutoComplete = false;
-        } else if (currentChar === key) {
-          shouldAutoComplete = false; // Avoid double quotes
-        } else {
-          shouldAutoComplete = !currentChar || /\s/.test(currentChar) || currentChar === '\n';
-        }
-      }
+      console.log(`🔗 Auto-wrapped selection with ${key}${closingChar}`);
+      return;
+    }
+    
+    // Determine if we should auto-complete based on context
+    let shouldAutoComplete = false;
+    
+    // Simple logic: auto-complete unless we're about to create a duplicate pair
+    // Exception: don't auto-complete quotes if we're in the middle of a word
+    if (key === '"' || key === "'" || key === '`') {
+      // For quotes, be more careful about context
+      const prevChar = this.selectionStart > 0 ? this.content[this.selectionStart - 1] : '';
+      const isInsideWord = /\w/.test(prevChar) && /\w/.test(currentChar || '');
+      const isDuplicate = currentChar === key;
       
-      if (shouldAutoComplete) {
-        event.preventDefault();
-        this.saveUndoState();
-        
-        // Insert both opening and closing characters
-        const completedText = key + closingChar;
-        this.insertText(completedText, false);
-        
-        // Position cursor between them
-        const newCursorPos = this.selectionStart - 1;
-        this.textarea.setSelectionRange(newCursorPos, newCursorPos);
-        this.updateCursorPosition();
-        
-        console.log(`🔧 Auto-completed ${key} with ${closingChar}`);
-      }
+      shouldAutoComplete = !isInsideWord && !isDuplicate;
+    } else {
+      // For brackets: (,  [, {
+      // Auto-complete unless the next character is already the closing bracket
+      shouldAutoComplete = currentChar !== closingChar;
+    }
+    
+    if (shouldAutoComplete) {
+      event.preventDefault();
+      this.saveUndoState();
+      
+      // Insert both opening and closing characters
+      const completedText = key + closingChar;
+      this.insertText(completedText, false);
+      
+      // Position cursor between them
+      const newCursorPos = this.selectionStart - 1;
+      this.textarea.setSelectionRange(newCursorPos, newCursorPos);
+      this.updateCursorPosition();
+      
+      console.log(`🔧 Auto-completed ${key} with ${closingChar}`);
     }
   }
 
