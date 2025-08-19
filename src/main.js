@@ -338,6 +338,11 @@ async function openFile(filePath) {
         updateCurrentFileName(fileName, true);
       });
       
+      // Listen for save requests from keyboard shortcuts
+      markdownEditor.addEventListener('save_requested', () => {
+        saveFile();
+      });
+      
       console.log('✅ MarkdownEditor initialized for file editing');
     }
     
