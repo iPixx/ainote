@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Syntax Highlighting Test - aiNote</title>
+    <link rel="stylesheet" href="src/js/components/markdown-editor.css">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .editor-container {
+            height: 85vh !important;
+            min-height: 800px !important;
+            max-height: none !important;
+            margin: 20px 0;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        /* Override any imported CSS that might be limiting height */
+        #editor-container {
+            height: 85vh !important;
+            min-height: 800px !important;
+        }
+        
+        /* Make sure the markdown editor inside takes full height */
+        #editor-container .markdown-editor-container {
+            height: 100% !important;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .controls button {
+            padding: 8px 16px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .controls button:hover {
+            background: #2563eb;
+        }
+        .controls button.danger {
+            background: #ef4444;
+        }
+        .controls button.danger:hover {
+            background: #dc2626;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .stat {
+            padding: 10px;
+            background: #f3f4f6;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .test-content {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin: 20px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #d1d5db;
+        }
+        .issue-report {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .issue-report h3 {
+            margin: 0 0 10px 0;
+            color: #92400e;
+        }
+        .cursor-test {
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .cursor-test h3 {
+            margin: 0 0 10px 0;
+            color: #dc2626;
+        }
+        .cursor-test ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 Comprehensive Syntax Highlighting Test</h1>
+        <p>This comprehensive test validates the markdown syntax highlighting engine and identifies cursor positioning issues.</p>
+        
+        <div class="issue-report">
+            <h3>⚠️ Known Issue: Cursor Position Mismatch</h3>
+            <p><strong>Problem:</strong> The cursor position in the textarea doesn't match the visual insertion point when syntax highlighting is enabled.</p>
+            <p><strong>Cause:</strong> Overlay system conflict between textarea cursor and highlighted HTML overlay.</p>
+            <p><strong>Impact:</strong> Makes text editing difficult - cursor appears in wrong location.</p>
+        </div>
+
+        <div class="cursor-test">
+            <h3>🎯 Cursor Position Test Instructions</h3>
+            <p>Perform these tests to validate cursor positioning:</p>
+            <ul>
+                <li>Type text and observe if cursor appears where text is inserted</li>
+                <li>Click different positions and verify cursor moves correctly</li>
+                <li>Use arrow keys to navigate and check cursor follows</li>
+                <li>Select text and verify selection matches visual highlighting</li>
+                <li>Test with different content types (headers, bold, code, etc.)</li>
+            </ul>
+        </div>
+        
+        <div class="controls">
+            <button onclick="toggleHighlighting()">Toggle Highlighting</button>
+            <button onclick="loadComprehensiveContent()">Load Test Content</button>
+            <button onclick="loadSimpleContent()">Load Simple Content</button>
+            <button onclick="clearContent()">Clear Content</button>
+            <button onclick="testCursorPositioning()">Test Cursor Positioning</button>
+            <button onclick="showPerformanceStats()">Show Stats</button>
+            <button onclick="debugHighlighting()">Debug Highlighting</button>
+            <button onclick="testBasicHTML()">Test Basic HTML</button>
+            <button class="danger" onclick="reportCursorIssue()">Report Cursor Issue</button>
+        </div>
+        
+        <div class="editor-container" id="editor-container"></div>
+        
+        <div id="stats" class="stats"></div>
+        
+        <div id="status" class="status"></div>
+
+        <h3>📋 Comprehensive Test Markdown Content</h3>
+        <div class="test-content" id="test-content"></div>
+    </div>
+
+    <script type="module">
+        import MarkdownEditor from './src/js/components/markdown-editor.js';
+
+        // Mock AppState for testing
+        class MockAppState {
+            constructor() {
+                this.data = {};
+            }
+            
+            get(key) { return this.data[key]; }
+            set(key, value) { this.data[key] = value; }
+            save() { return Promise.resolve(); }
+        }
+
+        // Comprehensive test content that covers all markdown syntax
+        const comprehensiveMarkdown = `# 🚀 Comprehensive Markdown Syntax Test
+
+This document tests **ALL** supported markdown syntax elements for cursor positioning validation.
+
+## 1. Headers and Text Formatting
+
+# Heading 1 - Test cursor positioning here
+## Heading 2 - Click at different positions  
+### Heading 3 - Navigate with arrow keys
+#### Heading 4 - Select text to test highlighting
+##### Heading 5 - Type new content to test insertion
+###### Heading 6 - Test with complex formatting
+
+**Bold text cursor test** - Click inside bold text
+*Italic text cursor test* - Navigate through italic content  
+***Bold italic combined*** - Test complex formatting
+~~Strikethrough text~~ - Verify cursor in strikethrough
+__Alternative bold syntax__ - Test underscore bold
+_Alternative italic syntax_ - Test underscore italic
+
+## 2. Code Elements (Critical for Cursor Testing)
+
+Inline code test: \`cursor positioning here\` and continue typing.
+
+\`\`\`javascript
+// JavaScript code block - test cursor positioning
+function testCursorPosition() {
+    const element = document.getElementById('test');
+    // Click here and type
+    console.log('Cursor test in code block');
+    return element.value;
+}
+
+// Add more lines to test scrolling and positioning
+const anotherLine = 'test';
+\`\`\`
+
+\`\`\`python
+# Python code block cursor test
+def test_cursor_function():
+    message = "Test cursor positioning here"
+    print(message)
+    # Try clicking at different indentation levels
+    if True:
+        nested_content = "cursor test"
+        return nested_content
+\`\`\`
+
+## 3. Links and References (Complex Cursor Tests)
+
+Test cursor in links: [Click here to test cursor](https://example.com)
+Reference style: [Test cursor positioning][1]
+URL detection: https://github.com/test/cursor-positioning
+
+[1]: https://example.com/cursor-test
+
+## 4. Lists (Indentation Cursor Tests)
+
+### Unordered Lists
+- First level item - test cursor here
+  - Second level - click and type
+    - Third level - arrow key navigation test
+  - Back to second level
+- Another first level item
+  - Test cursor at different indentation levels
+
+### Ordered Lists  
+1. First item - cursor positioning test
+2. Second item with **bold text cursor test**
+   1. Nested ordered item
+   2. Another nested item with *italic cursor test*
+3. Back to main level
+4. Test typing new items
+
+## 5. Blockquotes (Multi-level Cursor Tests)
+
+> Single level blockquote - test cursor positioning
+> Continue on same level - navigate with arrows
+
+> > Nested blockquote level 2 - click here
+> > Multi-line nested content for cursor testing
+> > Test selection across multiple lines
+
+> Back to level 1 with **formatted content cursor test**
+> 
+> > ### Headers in blockquotes with cursor tests
+> > Test complex nested content
+
+## 6. Tables (Complex Alignment Tests)
+
+| Column 1 Header | Column 2 Header | Column 3 Header |
+|-----------------|-----------------|------------------|
+| Cell 1,1 cursor | Cell 1,2 test   | Cell 1,3 pos    |
+| **Bold cell**   | *Italic cell*   | \`Code cell\`     |
+| Long content that tests cursor positioning across table cells | Normal cell | End cell |
+
+## 7. Mixed Content (Real-world Cursor Tests)
+
+This paragraph contains **bold text with \`inline code\`** and *italic text with [links](https://test.com)* for comprehensive cursor testing.
+
+> **Complex blockquote** with multiple *formatting* elements and \`inline code\` to test cursor positioning across different syntax elements.
+
+### Performance Test Section
+
+This section contains repetitive content to test cursor performance with large documents:
+
+**Repeated bold text for performance testing:** Bold Bold Bold Bold Bold Bold Bold Bold Bold Bold
+
+*Repeated italic text:* Italic Italic Italic Italic Italic Italic Italic Italic Italic Italic
+
+\`\`\`
+Code block with repeated content for cursor performance testing:
+Line 1 - cursor test
+Line 2 - cursor test  
+Line 3 - cursor test
+Line 4 - cursor test
+Line 5 - cursor test
+\`\`\`
+
+## 8. Edge Cases for Cursor Testing
+
+Empty lines above and below this text:
+
+
+Text after empty lines - cursor positioning test.
+
+Mixed **bold *italic* bold** nesting cursor test.
+
+Special characters: **cursor@test#position$here%and^continue&typing***
+
+URLs in different contexts:
+- List item with https://example.com/cursor-test  
+- **Bold text with https://bold-link.com cursor test**
+- \`Code with https://code-link.com cursor positioning\`
+
+## 9. Cursor Performance Test
+
+The following content is designed to test cursor performance with complex syntax highlighting:
+
+Lorem ipsum **dolor sit amet**, consectetur *adipiscing elit*. Sed do \`eiusmod tempor\` incididunt ut labore et **dolore magna \`aliqua\`**. Ut enim *ad minim veniam*, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea **commodo consequat**.
+
+\`\`\`javascript
+// Large code block for cursor performance testing
+const performanceTest = {
+    testCursor: function() {
+        for (let i = 0; i < 100; i++) {
+            console.log('Cursor performance test iteration ' + i);
+            // Test cursor positioning in large code blocks
+        }
+    }
+};
+\`\`\`
+
+---
+
+**Final cursor test:** This document ends with various elements to test final cursor positioning at document boundaries.
+
+That's a comprehensive test of **ALL** cursor positioning scenarios! 🎯`;
+
+        // Simple content for basic testing
+        const simpleMarkdown = `# Simple Cursor Test
+
+**Bold text** - test cursor here
+*Italic text* - and here
+
+\`inline code\` test
+
+\`\`\`
+code block
+cursor test
+\`\`\`
+
+- List item cursor test
+
+> Blockquote cursor test
+
+[Link cursor test](https://example.com)
+
+End of simple test.`;
+
+        // Initialize editor
+        let editor;
+        let appState;
+        let cursorTestResults = [];
+
+        function initializeEditor() {
+            try {
+                const container = document.getElementById('editor-container');
+                appState = new MockAppState();
+                
+                // Enable performance logging for debugging
+                const originalOptions = {
+                    debounceDelay: 300,
+                    maxLinesForFullHighlight: 1000,
+                    visibleLinesBuffer: 50,
+                    enablePerformanceLogging: true  // Enabled for debugging
+                };
+                
+                editor = new MarkdownEditor(container, appState);
+                
+                updateStatus('Editor initialized successfully');
+                
+                // Set initial comprehensive content
+                setTimeout(() => {
+                    editor.setValue(comprehensiveMarkdown);
+                    updateTestContentDisplay(comprehensiveMarkdown);
+                    updateStatus('Comprehensive test content loaded');
+                }, 200);
+                
+            } catch (error) {
+                console.error('Failed to initialize editor:', error);
+                updateStatus('Failed to initialize editor: ' + error.message);
+            }
+        }
+
+        function toggleHighlighting() {
+            if (!editor) {
+                updateStatus('Error: Editor not initialized');
+                console.error('Editor not initialized');
+                return;
+            }
+            
+            try {
+                const currentState = editor.highlightingEnabled;
+                console.log('🔄 Toggle: Current state:', currentState);
+                console.log('🔄 Toggle: Will set to:', !currentState);
+                console.log('🔄 Toggle: Editor content length:', editor.getValue().length);
+                console.log('🔄 Toggle: Overlay container exists:', !!editor.overlayContainer);
+                
+                // Toggle the highlighting
+                editor.toggleSyntaxHighlighting(!currentState);
+                
+                // Verify the change
+                const newState = editor.highlightingEnabled;
+                console.log('🔄 Toggle: New state:', newState);
+                console.log('🔄 Toggle: Overlay active class:', editor.overlayContainer.classList.contains('highlighting-active'));
+                console.log('🔄 Toggle: Overlay opacity:', editor.overlayContainer.style.opacity);
+                
+                updateStatus('Highlighting ' + (newState ? 'enabled' : 'disabled') + ' - Test cursor positioning now');
+                
+                // Force a re-render if needed
+                if (newState && editor.getValue()) {
+                    console.log('🔄 Toggle: Forcing re-render...');
+                    setTimeout(() => {
+                        console.log('🔄 Toggle: Calling updateSyntaxHighlighting');
+                        editor.updateSyntaxHighlighting();
+                    }, 100);
+                } else if (!newState) {
+                    console.log('🔄 Toggle: Highlighting disabled, overlay should be hidden');
+                }
+                
+            } catch (error) {
+                console.error('Error toggling highlighting:', error);
+                updateStatus('Error toggling highlighting: ' + error.message);
+            }
+        }
+
+        function loadComprehensiveContent() {
+            if (editor) {
+                editor.setValue(comprehensiveMarkdown);
+                updateTestContentDisplay(comprehensiveMarkdown);
+                updateStatus('📝 Comprehensive test content loaded - Test all cursor scenarios');
+            }
+        }
+
+        function loadSimpleContent() {
+            if (editor) {
+                editor.setValue(simpleMarkdown);
+                updateTestContentDisplay(simpleMarkdown);
+                updateStatus('📝 Simple test content loaded - Test basic cursor positioning');
+            }
+        }
+
+        function clearContent() {
+            if (editor) {
+                editor.setValue('');
+                updateTestContentDisplay('');
+                updateStatus('🧹 Content cleared - Test cursor in empty editor');
+            }
+        }
+
+        function testCursorPositioning() {
+            if (!editor) return;
+            
+            updateStatus('Running automated cursor positioning tests...');
+            
+            const tests = [
+                { name: 'Empty editor', content: '', position: 0 },
+                { name: 'Plain text', content: 'Hello world', position: 6 },
+                { name: 'Bold text', content: '**bold**', position: 2 },
+                { name: 'Code block', content: '```' + String.fromCharCode(10) + 'code' + String.fromCharCode(10) + '```', position: 4 },
+                { name: 'Header', content: '# Header', position: 2 },
+                { name: 'List item', content: '- Item', position: 2 }
+            ];
+            
+            let testResults = [];
+            
+            tests.forEach((test, index) => {
+                setTimeout(() => {
+                    editor.setValue(test.content);
+                    editor.setSelection(test.position, test.position);
+                    
+                    const actualPosition = editor.textarea.selectionStart;
+                    const success = actualPosition === test.position;
+                    
+                    testResults.push({
+                        name: test.name,
+                        expected: test.position,
+                        actual: actualPosition,
+                        success: success
+                    });
+                    
+                    if (index === tests.length - 1) {
+                        displayTestResults(testResults);
+                    }
+                }, index * 100);
+            });
+        }
+
+        function displayTestResults(results) {
+            const passed = results.filter(r => r.success).length;
+            const total = results.length;
+            
+            let resultText = 'Cursor Test Results: ' + passed + '/' + total + ' passed\n\n';
+            
+            results.forEach(result => {
+                const status = result.success ? 'PASS' : 'FAIL';
+                resultText += status + ' ' + result.name + ': Expected ' + result.expected + ', Got ' + result.actual + '\n';
+            });
+            
+            updateStatus(resultText);
+            
+            if (passed < total) {
+                updateStatus(resultText + '\nSome cursor positioning tests failed. Check overlay alignment.');
+            }
+        }
+
+        function debugHighlighting() {
+            if (!editor) {
+                updateStatus('Editor not initialized');
+                return;
+            }
+            
+            const overlay = editor.overlayContainer;
+            const state = {
+                highlightingEnabled: editor.highlightingEnabled,
+                content: editor.getValue().substring(0, 100) + '...',
+                contentLength: editor.getValue().length,
+                syntaxHighlighter: !!editor.syntaxHighlighter,
+                overlayContainer: !!overlay,
+                overlayHTML: overlay ? overlay.innerHTML.substring(0, 200) + '...' : 'None',
+                overlayHasHTML: overlay ? (overlay.innerHTML.includes('<span') && overlay.innerHTML.includes('</span>')) : false
+            };
+            
+            console.log('Highlighting Debug Info:', state);
+            console.log('Full overlay HTML (first 500 chars):', overlay ? overlay.innerHTML.substring(0, 500) : 'None');
+            
+            // Deep inspection of overlay element
+            if (overlay) {
+                console.log('🔍 Overlay element inspection:');
+                console.log('  - tagName:', overlay.tagName);
+                console.log('  - className:', overlay.className);
+                console.log('  - style.whiteSpace:', overlay.style.whiteSpace);
+                console.log('  - computed whiteSpace:', window.getComputedStyle(overlay).whiteSpace);
+                console.log('  - innerHTML length:', overlay.innerHTML.length);
+                console.log('  - textContent length:', overlay.textContent.length);
+                console.log('  - childNodes count:', overlay.childNodes.length);
+                console.log('  - first child type:', overlay.firstChild ? overlay.firstChild.nodeType : 'none');
+                
+                // Test setting a simple span
+                console.log('🧪 Testing simple span injection...');
+                const testDiv = document.createElement('div');
+                testDiv.innerHTML = '<span style="color: red;">TEST</span>';
+                console.log('  - test innerHTML:', testDiv.innerHTML);
+                console.log('  - test textContent:', testDiv.textContent);
+                
+                // Check if specific CSS is causing the issue
+                console.log('🔍 Checking for CSS issues:');
+                const firstSpan = overlay.querySelector('span');
+                if (firstSpan) {
+                    const spanStyles = window.getComputedStyle(firstSpan);
+                    console.log('  - first span display:', spanStyles.display);
+                    console.log('  - first span visibility:', spanStyles.visibility);
+                    console.log('  - first span opacity:', spanStyles.opacity);
+                    console.log('  - first span color:', spanStyles.color);
+                    console.log('  - first span content:', spanStyles.content);
+                    console.log('  - span textContent:', firstSpan.textContent);
+                    console.log('  - span innerHTML:', firstSpan.innerHTML);
+                } else {
+                    console.log('  - No span elements found in overlay!');
+                }
+            }
+            
+            // Check for visible HTML tags - but exclude legitimate escaped content
+            let visibleHTML = false;
+            if (overlay) {
+                // Look for actual HTML tag patterns like <span> or </span> in textContent
+                // But ignore escaped content that legitimately contains < >
+                const htmlTagPattern = /<\/?[a-zA-Z][^>]*>/;
+                visibleHTML = htmlTagPattern.test(overlay.textContent);
+                
+                if (visibleHTML) {
+                    console.warn('WARNING: Actual HTML tags are visible as text in overlay!');
+                    console.log('Visible text content:', overlay.textContent.substring(0, 200));
+                } else {
+                    console.log('✅ No HTML tags visible - any < > characters are legitimate escaped content');
+                }
+            }
+            
+            updateStatus('Debug info logged to console. Highlighting: ' + (state.highlightingEnabled ? 'ON' : 'OFF') + (visibleHTML ? ' - HTML LEAK DETECTED!' : ''));
+        }
+
+        function testBasicHTML() {
+            if (!editor || !editor.overlayContainer) {
+                updateStatus('Editor not available for HTML test');
+                return;
+            }
+            
+            // Test different HTML structures to isolate the issue
+            const tests = [
+                {
+                    name: 'Simple inline styles',
+                    html: '<span style="color: red; font-weight: bold;">RED BOLD TEXT</span> normal text <span style="color: blue;">BLUE TEXT</span>'
+                },
+                {
+                    name: 'CSS classes (like our syntax highlighting)',
+                    html: '<span class="md-header md-header-1"><span class="md-header-marker">#</span> <span class="md-header-content">Header Text</span></span>'
+                },
+                {
+                    name: 'Mixed content with escaped entities',
+                    html: 'Text with &lt;escaped&gt; content and <span style="color: green;">real HTML</span>'
+                },
+                {
+                    name: 'With line breaks',
+                    html: '<span style="color: purple;">Line 1</span><br><span style="color: orange;">Line 2</span>'
+                }
+            ];
+            
+            let currentTest = 0;
+            
+            function runNextTest() {
+                if (currentTest >= tests.length) {
+                    updateStatus('All HTML tests completed - check console for results');
+                    return;
+                }
+                
+                const test = tests[currentTest];
+                console.log(`🧪 Test ${currentTest + 1}: ${test.name}`);
+                console.log('Setting innerHTML to:', test.html);
+                
+                editor.overlayContainer.innerHTML = test.html;
+                editor.overlayContainer.style.opacity = '1';
+                editor.overlayContainer.classList.add('highlighting-active');
+                
+                setTimeout(() => {
+                    console.log('After injection:');
+                    console.log('- innerHTML:', editor.overlayContainer.innerHTML);
+                    console.log('- textContent:', editor.overlayContainer.textContent);
+                    console.log('- childNodes:', editor.overlayContainer.childNodes.length);
+                    
+                    // Debug the detection logic
+                    const textContent = editor.overlayContainer.textContent;
+                    const htmlTagPattern = /<\/?[a-zA-Z][^>]*>/;
+                    
+                    // Check if we have actual HTML tags vs escaped content
+                    // Real problem: seeing <span> or </span> as text
+                    // Not a problem: seeing <escaped> from &lt;escaped&gt; entities
+                    const innerHTML = editor.overlayContainer.innerHTML;
+                    const hasActualTags = innerHTML.includes('<span') || innerHTML.includes('</span>');
+                    const textShowsTags = htmlTagPattern.test(textContent);
+                    
+                    // Only flag as failure if we see HTML tag patterns in text AND we don't have actual HTML structure
+                    const visibleHTML = textShowsTags && !hasActualTags;
+                    
+                    console.log('Debug detection:');
+                    console.log('- textContent:', JSON.stringify(textContent));
+                    console.log('- innerHTML contains tags:', hasActualTags);
+                    console.log('- text shows tag patterns:', textShowsTags);
+                    console.log('- final result (visible HTML):', visibleHTML);
+                    
+                    const result = visibleHTML ? 'FAILED - HTML visible as text' : 'PASSED - HTML rendered properly';
+                    console.log('Result:', result);
+                    console.log('---');
+                    
+                    currentTest++;
+                    setTimeout(runNextTest, 1000);
+                }, 200);
+            }
+            
+            runNextTest();
+        }
+
+        function reportCursorIssue() {
+            const issue = {
+                timestamp: new Date().toISOString(),
+                highlightingEnabled: editor?.highlightingEnabled || false,
+                contentLength: editor?.getValue()?.length || 0,
+                cursorPosition: editor?.textarea?.selectionStart || 0,
+                userAgent: navigator.userAgent,
+                issue: 'Cursor position does not match insertion point when syntax highlighting is enabled'
+            };
+            
+            console.log('Cursor Issue Report:', issue);
+            updateStatus('Cursor issue reported to console. Check DevTools for details.');
+        }
+
+        function showPerformanceStats() {
+            if (editor) {
+                const stats = editor.getStats();
+                const syntaxStats = editor.getSyntaxHighlightingStats();
+                
+                const statsContainer = document.getElementById('stats');
+                statsContainer.innerHTML = 
+                    '<div class="stat"><strong>Content:</strong> ' + stats.contentLength + ' chars</div>' +
+                    '<div class="stat"><strong>Words:</strong> ' + stats.wordCount + ' words</div>' +
+                    '<div class="stat"><strong>Lines:</strong> ' + ((editor.getValue().match(/\n/g) || []).length + 1) + '</div>' +
+                    '<div class="stat"><strong>Cursor Position:</strong> ' + stats.cursorPosition + '</div>' +
+                    '<div class="stat"><strong>Has Selection:</strong> ' + (stats.hasSelection ? 'Yes' : 'No') + '</div>' +
+                    '<div class="stat"><strong>Highlighting:</strong> ' + (syntaxStats.enabled ? 'Enabled' : 'Disabled') + '</div>' +
+                    '<div class="stat"><strong>Last Highlight:</strong> ' + (syntaxStats.lastHighlightTime?.toFixed(2) || 'N/A') + 'ms</div>' +
+                    '<div class="stat"><strong>Total Highlights:</strong> ' + (syntaxStats.totalHighlights || 0) + '</div>' +
+                    '<div class="stat"><strong>Cache Size:</strong> ' + (syntaxStats.cacheSize || 0) + '</div>' +
+                    '<div class="stat"><strong>Average Time:</strong> ' + (syntaxStats.averageTime?.toFixed(2) || 'N/A') + 'ms</div>';
+                
+                updateStatus('Performance statistics updated');
+                
+                console.log('📊 Performance Stats:', stats);
+                console.log('✨ Syntax Highlighting Stats:', syntaxStats);
+            }
+        }
+
+        function updateTestContentDisplay(content) {
+            document.getElementById('test-content').textContent = content;
+        }
+
+        function updateStatus(message) {
+            const statusElement = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString();
+            statusElement.textContent = '[' + timestamp + '] ' + message;
+            console.log('[' + timestamp + '] ' + message);
+        }
+
+        // Make functions global for buttons
+        window.toggleHighlighting = toggleHighlighting;
+        window.loadComprehensiveContent = loadComprehensiveContent;
+        window.loadSimpleContent = loadSimpleContent;
+        window.clearContent = clearContent;
+        window.testCursorPositioning = testCursorPositioning;
+        window.debugHighlighting = debugHighlighting;
+        window.testBasicHTML = testBasicHTML;
+        window.reportCursorIssue = reportCursorIssue;
+        window.showPerformanceStats = showPerformanceStats;
+
+        // Initialize when DOM loads
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStatus('Initializing comprehensive test...');
+            initializeEditor();
+        });
+
+        // Auto-refresh stats disabled
+
+        // Monitor for errors
+        window.addEventListener('error', (event) => {
+            updateStatus('❌ Error: ' + event.message);
+            console.error('Global error:', event);
+        });
+
+        // Keyboard shortcut to quickly toggle highlighting for testing
+        document.addEventListener('keydown', (event) => {
+            if (event.ctrlKey && event.key === 'h') {
+                event.preventDefault();
+                toggleHighlighting();
+            }
+        });
+    </script>
+</body>
+</html>

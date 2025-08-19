@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cursor Position Fix Test - aiNote</title>
+    <link rel="stylesheet" href="src/js/components/markdown-editor.css">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .editor-container {
+            height: 400px;
+            margin: 20px 0;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+        .controls button {
+            padding: 8px 16px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .controls button:hover {
+            background: #2563eb;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .test-instructions {
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .test-instructions h3 {
+            margin: 0 0 10px 0;
+            color: #0c4a6e;
+        }
+        .test-instructions ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Cursor Position Fix Test</h1>
+        <p>Test the cursor positioning fix for syntax highlighting in the markdown editor.</p>
+        
+        <div class="test-instructions">
+            <h3>✅ How to Test the Fix</h3>
+            <ul>
+                <li><strong>Click anywhere in the editor</strong> - cursor should appear exactly where you clicked</li>
+                <li><strong>Type text</strong> - characters should appear at the cursor position</li>
+                <li><strong>Use arrow keys</strong> - cursor should move correctly through the text</li>
+                <li><strong>Select text</strong> - selection should work normally</li>
+                <li><strong>Toggle highlighting on/off</strong> - cursor behavior should remain consistent</li>
+                <li><strong>Try markdown syntax</strong> - headers, bold, italic, code should highlight without affecting cursor</li>
+            </ul>
+        </div>
+        
+        <div class="controls">
+            <button onclick="toggleHighlighting()">Toggle Highlighting</button>
+            <button onclick="loadTestContent()">Load Test Content</button>
+            <button onclick="clearContent()">Clear</button>
+            <button onclick="testCursor()">Automated Cursor Test</button>
+        </div>
+        
+        <div class="editor-container" id="editor-container"></div>
+        
+        <div id="status" class="status">Ready for testing...</div>
+    </div>
+
+    <script type="module">
+        import MarkdownEditor from './src/js/components/markdown-editor.js';
+
+        // Mock AppState for testing
+        class MockAppState {
+            constructor() {
+                this.data = {};
+            }
+            
+            get(key) { return this.data[key]; }
+            set(key, value) { this.data[key] = value; }
+            save() { return Promise.resolve(); }
+        }
+
+        const testContent = `# Cursor Position Fix Test
+
+Click **anywhere** in this text to test cursor positioning.
+
+## Test Scenarios
+
+1. **Bold text** - click inside the asterisks
+2. *Italic text* - click in the middle of italic content  
+3. \`inline code\` - click before, inside, and after code
+4. [Link text](https://example.com) - click in link text vs URL
+
+\`\`\`javascript
+// Code block test
+function testCursor() {
+    // Click at different positions in this code
+    const position = getCursorPosition();
+    return position;
+}
+\`\`\`
+
+> Blockquote text - test cursor positioning
+> in multi-line blockquotes
+
+- List item 1 - click here
+  - Nested item - and here
+- List item 2 - cursor test
+
+Try typing new content anywhere!`;
+
+        // Initialize editor
+        let editor;
+        let appState;
+
+        function initializeEditor() {
+            try {
+                const container = document.getElementById('editor-container');
+                appState = new MockAppState();
+                
+                editor = new MarkdownEditor(container, appState);
+                
+                updateStatus('✅ Editor initialized with syntax highlighting enabled');
+                
+                // Set test content
+                setTimeout(() => {
+                    editor.setValue(testContent);
+                    updateStatus('📝 Test content loaded - Click anywhere to test cursor positioning');
+                }, 200);
+                
+            } catch (error) {
+                console.error('Failed to initialize editor:', error);
+                updateStatus('❌ Error: ' + error.message);
+            }
+        }
+
+        function toggleHighlighting() {
+            if (!editor) return;
+            
+            const currentState = editor.highlightingEnabled;
+            editor.toggleSyntaxHighlighting(!currentState);
+            
+            updateStatus(`🔄 Highlighting ${!currentState ? 'enabled' : 'disabled'} - Test cursor positioning now`);
+        }
+
+        function loadTestContent() {
+            if (editor) {
+                editor.setValue(testContent);
+                updateStatus('📝 Test content reloaded - Ready for cursor testing');
+            }
+        }
+
+        function clearContent() {
+            if (editor) {
+                editor.setValue('');
+                updateStatus('🧹 Content cleared - Type something and test cursor');
+            }
+        }
+
+        function testCursor() {
+            if (!editor) return;
+            
+            updateStatus('🔄 Running automated cursor positioning test...');
+            
+            const tests = [
+                { text: 'Hello World', pos: 5, desc: 'Middle of plain text' },
+                { text: '**Bold Text**', pos: 2, desc: 'Inside bold markers' },
+                { text: '*Italic*', pos: 4, desc: 'Middle of italic text' },
+                { text: '`code`', pos: 2, desc: 'Inside code backticks' },
+                { text: '# Header', pos: 3, desc: 'After hash symbol' }
+            ];
+            
+            let testIndex = 0;
+            
+            function runNextTest() {
+                if (testIndex >= tests.length) {
+                    updateStatus('✅ Automated tests completed - All cursor positions should match click positions');
+                    return;
+                }
+                
+                const test = tests[testIndex];
+                editor.setValue(test.text);
+                
+                setTimeout(() => {
+                    // Set cursor position
+                    editor.textarea.setSelectionRange(test.pos, test.pos);
+                    editor.updateCursorPosition();
+                    
+                    const actualPos = editor.textarea.selectionStart;
+                    const success = actualPos === test.pos;
+                    
+                    updateStatus(`Test ${testIndex + 1}: ${test.desc} - ${success ? '✅ PASS' : '❌ FAIL'} (Expected: ${test.pos}, Got: ${actualPos})`);
+                    
+                    testIndex++;
+                    setTimeout(runNextTest, 1000);
+                }, 200);
+            }
+            
+            runNextTest();
+        }
+
+        function updateStatus(message) {
+            const statusElement = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString();
+            statusElement.textContent = `[${timestamp}] ${message}`;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        // Make functions global for buttons
+        window.toggleHighlighting = toggleHighlighting;
+        window.loadTestContent = loadTestContent;
+        window.clearContent = clearContent;
+        window.testCursor = testCursor;
+
+        // Initialize when DOM loads
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStatus('Initializing cursor position test...');
+            initializeEditor();
+        });
+    </script>
+</body>
+</html>

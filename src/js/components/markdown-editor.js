@@ -93,7 +93,7 @@ class MarkdownEditor {
       debounceDelay: 300,
       maxLinesForFullHighlight: 1000,
       visibleLinesBuffer: 50,
-      enablePerformanceLogging: false
+      enablePerformanceLogging: true // Enable for debugging
     });
 
     // Syntax highlighting state
@@ -1489,6 +1489,8 @@ class MarkdownEditor {
     this.highlightingEnabled = enabled;
     
     if (enabled && this.content.trim()) {
+      // Reset lastHighlightedContent to force re-highlighting
+      this.lastHighlightedContent = null;
       this.updateSyntaxHighlighting();
     } else {
       this.overlayContainer.classList.remove('highlighting-active');

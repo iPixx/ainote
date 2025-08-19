@@ -37,11 +37,12 @@
   padding: 1rem;
   margin: 0;
   
-  /* Typography */
+  /* Typography - must match overlay exactly */
   font-family: var(--font-family-mono, 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace);
   font-size: 14px;
   line-height: 1.6;
   letter-spacing: 0.025em;
+  font-weight: normal;
   
   /* Colors */
   background: transparent;
@@ -56,6 +57,21 @@
   overflow-x: auto;
   word-wrap: break-word;
   white-space: pre-wrap;
+  
+  /* Critical alignment properties - must match overlay */
+  box-sizing: border-box;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-indent: 0;
+  text-align: left;
+  direction: ltr;
+  word-spacing: normal;
+  tab-size: 8;
+  -moz-tab-size: 8;
   
   /* Selection */
   ::selection {
@@ -89,19 +105,19 @@
   bottom: 0;
   padding: 1rem;
   
-  /* Typography matching textarea exactly */
+  /* Typography matching textarea EXACTLY */
   font-family: var(--font-family-mono, 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace);
   font-size: 14px;
   line-height: 1.6;
   letter-spacing: 0.025em;
   font-weight: normal;
   
-  /* Critical for proper alignment */
+  /* Critical for proper alignment - must match textarea exactly */
   box-sizing: border-box;
   margin: 0;
   border: none;
   
-  /* Interaction */
+  /* CRITICAL: Must not interfere with cursor */
   pointer-events: none;
   user-select: none;
   
@@ -115,9 +131,25 @@
   opacity: 0;
   z-index: 1;
   
-  /* Ensure perfect pixel alignment */
+  /* Ensure perfect pixel alignment with textarea */
   transform: translateZ(0);
   will-change: scroll-position;
+  
+  /* CRITICAL: Ensure exact same text rendering as textarea */
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  /* Additional alignment fixes for cursor positioning */
+  text-indent: 0;
+  text-align: left;
+  direction: ltr;
+  word-spacing: normal;
+  tab-size: 8;
+  -moz-tab-size: 8;
 }
 
 /* Status bar */
@@ -531,15 +563,35 @@
   background: transparent;
 }
 
-/* Ensure textarea remains visible underneath */
+/* Critical fix for cursor positioning */
 .markdown-editor-wrapper .markdown-editor-textarea {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(31, 41, 55, 0.1);
+  background: transparent;
+  color: var(--color-text-primary, #1f2937);
+  z-index: 2;
+  /* Ensure proper text rendering alignment */
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* When highlighting is active, make text transparent but keep cursor visible */
 .markdown-editor-wrapper .markdown-editor-overlay.highlighting-active ~ .markdown-editor-textarea {
   color: transparent;
   caret-color: var(--color-text-primary, #1f2937);
+  background: transparent;
+  /* Ensure cursor events still work */
+  pointer-events: auto;
+  user-select: text;
+  /* Keep selection highlighting visible */
+  ::selection {
+    background-color: rgba(59, 130, 246, 0.3);
+    color: transparent;
+  }
+  
+  ::-moz-selection {
+    background-color: rgba(59, 130, 246, 0.3);
+    color: transparent;
+  }
 }
 
 /* Base token styling */

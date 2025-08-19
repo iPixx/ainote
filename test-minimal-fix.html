@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Fix Test - aiNote</title>
+    <link rel="stylesheet" href="src/js/components/markdown-editor.css">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .editor-container {
+            height: 300px;
+            margin: 20px 0;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .debug {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Minimal Fix Test</h1>
+        <p>Testing the exact issue with HTML rendering.</p>
+        
+        <button onclick="testDirectHTML()">Test Direct HTML</button>
+        <button onclick="testWithEditor()">Test With Editor</button>
+        <button onclick="showRawHTML()">Show Raw HTML</button>
+        
+        <div class="editor-container" id="editor-container"></div>
+        
+        <div class="debug" id="debug"></div>
+    </div>
+
+    <script type="module">
+        import MarkdownEditor from './src/js/components/markdown-editor.js';
+
+        class MockAppState {
+            constructor() { this.data = {}; }
+            get(key) { return this.data[key]; }
+            set(key, value) { this.data[key] = value; }
+            save() { return Promise.resolve(); }
+        }
+
+        let editor;
+
+        function log(message) {
+            const debug = document.getElementById('debug');
+            debug.textContent += message + '\n';
+            debug.scrollTop = debug.scrollHeight;
+            console.log(message);
+        }
+
+        window.testDirectHTML = function() {
+            log('🧪 Testing direct HTML injection on overlay...');
+            
+            if (!editor || !editor.overlayContainer) {
+                log('❌ Editor not available');
+                return;
+            }
+
+            const testHTML = '<span class="md-bold"><span class="md-bold-marker">**</span><span class="md-bold-content">Bold Text</span><span class="md-bold-marker">**</span></span>';
+            
+            log('Setting innerHTML directly: ' + testHTML);
+            editor.overlayContainer.innerHTML = testHTML;
+            editor.overlayContainer.style.opacity = '1';
+            editor.overlayContainer.classList.add('highlighting-active');
+            
+            setTimeout(() => {
+                const overlay = editor.overlayContainer;
+                log('Result:');
+                log('- innerHTML: ' + overlay.innerHTML);
+                log('- textContent: ' + JSON.stringify(overlay.textContent));
+                log('- Has span elements: ' + (overlay.querySelectorAll('span').length > 0));
+                log('- Text shows tags: ' + overlay.textContent.includes('<span'));
+                
+                if (overlay.querySelectorAll('span').length > 0 && !overlay.textContent.includes('<span')) {
+                    log('✅ Direct HTML injection works');
+                } else {
+                    log('❌ Direct HTML injection failed');
+                }
+            }, 100);
+        };
+
+        window.testWithEditor = function() {
+            log('🧪 Testing syntax highlighting through editor...');
+            
+            if (!editor) {
+                log('❌ Editor not available');
+                return;
+            }
+
+            const testContent = '**Bold text** for testing';
+            log('Setting editor content: ' + testContent);
+            
+            editor.setValue(testContent);
+            editor.toggleSyntaxHighlighting(true);
+            
+            setTimeout(() => {
+                const overlay = editor.overlayContainer;
+                log('After syntax highlighting:');
+                log('- Editor highlighting enabled: ' + editor.highlightingEnabled);
+                log('- Overlay innerHTML: ' + overlay.innerHTML.substring(0, 200));
+                log('- Overlay textContent: ' + JSON.stringify(overlay.textContent));
+                log('- Has span elements: ' + (overlay.querySelectorAll('span').length > 0));
+                log('- Text shows tags: ' + overlay.textContent.includes('<span'));
+                
+                if (overlay.querySelectorAll('span').length > 0 && !overlay.textContent.includes('<span')) {
+                    log('✅ Editor syntax highlighting works');
+                } else {
+                    log('❌ Editor syntax highlighting failed');
+                    log('❌ Likely issue in syntax highlighter processing');
+                }
+            }, 500);
+        };
+
+        window.showRawHTML = function() {
+            log('🔍 Showing raw HTML generation...');
+            
+            if (!editor || !editor.syntaxHighlighter) {
+                log('❌ Editor or syntax highlighter not available');
+                return;
+            }
+
+            // Test the syntax highlighter directly
+            const testContent = '**Bold text**';
+            log('Testing syntax highlighter with: ' + testContent);
+            
+            // Get the HTML generation result
+            editor.syntaxHighlighter.processContent(testContent).then(result => {
+                log('Generated HTML result:');
+                log(JSON.stringify(result));
+                log('Contains HTML tags: ' + result.includes('<span'));
+                log('Contains escaped HTML: ' + (result.includes('&lt;') || result.includes('&gt;')));
+                
+                if (result.includes('<span') && !(result.includes('&lt;') || result.includes('&gt;'))) {
+                    log('✅ HTML generation looks correct');
+                } else {
+                    log('❌ HTML generation has issues');
+                }
+            }).catch(error => {
+                log('❌ Error in processContent: ' + error.message);
+            });
+        };
+
+        // Initialize editor
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                const container = document.getElementById('editor-container');
+                const appState = new MockAppState();
+                editor = new MarkdownEditor(container, appState);
+                log('✅ Editor initialized for minimal testing');
+            } catch (error) {
+                log('❌ Editor initialization failed: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>

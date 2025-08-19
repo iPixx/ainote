@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Debug Test - aiNote</title>
+    <link rel="stylesheet" href="src/js/components/markdown-editor.css">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .editor-container {
+            height: 400px;
+            margin: 20px 0;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+        .controls button {
+            padding: 8px 16px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .debug-output {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f3f4f6;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Simple Debug Test</h1>
+        <p>This test focuses on the HTML rendering issue in syntax highlighting.</p>
+        
+        <div class="controls">
+            <button onclick="testBasicHTML()">Test Basic HTML</button>
+            <button onclick="testMarkdownHighlighting()">Test Markdown</button>
+            <button onclick="inspectOverlay()">Inspect Overlay</button>
+            <button onclick="clearOutput()">Clear</button>
+        </div>
+        
+        <div class="editor-container" id="editor-container"></div>
+        
+        <h3>Debug Output</h3>
+        <div class="debug-output" id="debug-output"></div>
+    </div>
+
+    <script type="module">
+        import MarkdownEditor from './src/js/components/markdown-editor.js';
+
+        // Mock AppState for testing
+        class MockAppState {
+            constructor() {
+                this.data = {};
+            }
+            get(key) { return this.data[key]; }
+            set(key, value) { this.data[key] = value; }
+            save() { return Promise.resolve(); }
+        }
+
+        let editor;
+        let appState;
+
+        // Initialize editor
+        function initializeEditor() {
+            try {
+                const container = document.getElementById('editor-container');
+                appState = new MockAppState();
+                editor = new MarkdownEditor(container, appState);
+                log('✅ Editor initialized');
+            } catch (error) {
+                log('❌ Editor initialization failed: ' + error.message);
+            }
+        }
+
+        function log(message) {
+            const output = document.getElementById('debug-output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+            console.log(message);
+        }
+
+        window.testBasicHTML = function() {
+            log('🧪 Testing basic HTML injection...');
+            
+            if (!editor || !editor.overlayContainer) {
+                log('❌ Editor not available');
+                return;
+            }
+
+            const testHTML = '<span style="color: red; font-weight: bold;">RED BOLD TEXT</span> normal text';
+            
+            log('Setting innerHTML to: ' + testHTML);
+            editor.overlayContainer.innerHTML = testHTML;
+            editor.overlayContainer.style.opacity = '1';
+            editor.overlayContainer.classList.add('highlighting-active');
+            
+            setTimeout(() => {
+                log('After injection:');
+                log('- innerHTML: ' + editor.overlayContainer.innerHTML);
+                log('- textContent: ' + JSON.stringify(editor.overlayContainer.textContent));
+                log('- childNodes: ' + editor.overlayContainer.childNodes.length);
+                
+                // Check if HTML is being rendered properly
+                const hasSpanElements = editor.overlayContainer.querySelectorAll('span').length > 0;
+                const textShowsHTML = editor.overlayContainer.textContent.includes('<span');
+                
+                log('- Has span elements: ' + hasSpanElements);
+                log('- Text shows HTML tags: ' + textShowsHTML);
+                
+                if (hasSpanElements && !textShowsHTML) {
+                    log('✅ HTML is rendering properly');
+                } else {
+                    log('❌ HTML rendering issue detected');
+                }
+            }, 100);
+        };
+
+        window.testMarkdownHighlighting = function() {
+            log('🧪 Testing markdown highlighting...');
+            
+            if (!editor) {
+                log('❌ Editor not available');
+                return;
+            }
+
+            const testContent = '# Header\n\n**Bold text** and *italic text*\n\n`inline code`';
+            
+            editor.setValue(testContent);
+            editor.toggleSyntaxHighlighting(true);
+            
+            setTimeout(() => {
+                const overlay = editor.overlayContainer;
+                log('Markdown highlighting result:');
+                log('- Content length: ' + editor.getValue().length);
+                log('- Overlay innerHTML length: ' + overlay.innerHTML.length);
+                log('- Overlay contains spans: ' + overlay.innerHTML.includes('<span'));
+                log('- Text shows HTML: ' + overlay.textContent.includes('<span'));
+                
+                if (overlay.innerHTML.includes('<span') && !overlay.textContent.includes('<span')) {
+                    log('✅ Markdown highlighting working');
+                } else {
+                    log('❌ Markdown highlighting has issues');
+                }
+            }, 500);
+        };
+
+        window.inspectOverlay = function() {
+            log('🔍 Inspecting overlay element...');
+            
+            if (!editor || !editor.overlayContainer) {
+                log('❌ Editor not available');
+                return;
+            }
+
+            const overlay = editor.overlayContainer;
+            log('Overlay inspection:');
+            log('- tagName: ' + overlay.tagName);
+            log('- className: ' + overlay.className);
+            log('- style.whiteSpace: ' + overlay.style.whiteSpace);
+            log('- computed whiteSpace: ' + window.getComputedStyle(overlay).whiteSpace);
+            log('- style.opacity: ' + overlay.style.opacity);
+            log('- style.pointerEvents: ' + overlay.style.pointerEvents);
+            
+            // Check for CSS issues that might cause problems
+            const computedStyle = window.getComputedStyle(overlay);
+            log('- computed display: ' + computedStyle.display);
+            log('- computed visibility: ' + computedStyle.visibility);
+            log('- computed position: ' + computedStyle.position);
+            
+            // Test simple text injection
+            overlay.textContent = 'Simple text test';
+            log('- After text injection: ' + overlay.textContent);
+            
+            // Test simple HTML injection
+            overlay.innerHTML = '<span>Simple HTML test</span>';
+            log('- After HTML injection innerHTML: ' + overlay.innerHTML);
+            log('- After HTML injection textContent: ' + overlay.textContent);
+        };
+
+        window.clearOutput = function() {
+            document.getElementById('debug-output').textContent = '';
+        };
+
+        // Initialize when DOM loads
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Initializing debug test...');
+            initializeEditor();
+        });
+
+        // Global error handler
+        window.addEventListener('error', (event) => {
+            log('❌ Error: ' + event.message);
+        });
+    </script>
+</body>
+</html>

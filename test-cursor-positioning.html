@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cursor Positioning Test - aiNote</title>
+    <link rel="stylesheet" href="src/js/components/markdown-editor.css">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .editor-container {
+            height: 300px;
+            margin: 20px 0;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .controls button {
+            padding: 8px 16px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .controls button:hover {
+            background: #2563eb;
+        }
+        .test-results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f3f4f6;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .instructions {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .instructions h3 {
+            margin: 0 0 10px 0;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Cursor Positioning Test</h1>
+        <p>Test cursor positioning accuracy when syntax highlighting is enabled.</p>
+        
+        <div class="instructions">
+            <h3>📝 Manual Test Instructions</h3>
+            <ol>
+                <li><strong>Toggle highlighting ON</strong> and type text - cursor should appear where text is inserted</li>
+                <li><strong>Click different positions</strong> - cursor should move to clicked location</li>
+                <li><strong>Use arrow keys</strong> to navigate - cursor should follow correctly</li>
+                <li><strong>Select text</strong> with mouse or Shift+arrows - selection should match visual highlighting</li>
+                <li><strong>Type in different content</strong> (headers, bold, code) to test various syntax elements</li>
+            </ol>
+        </div>
+        
+        <div class="controls">
+            <button onclick="toggleHighlighting()">Toggle Highlighting</button>
+            <button onclick="loadTestContent()">Load Test Content</button>
+            <button onclick="clearContent()">Clear Content</button>
+            <button onclick="testCursorPositions()">Run Cursor Tests</button>
+            <button onclick="checkAlignment()">Check Alignment</button>
+        </div>
+        
+        <div class="editor-container" id="editor-container"></div>
+        
+        <h3>Test Results</h3>
+        <div class="test-results" id="test-results"></div>
+    </div>
+
+    <script type="module">
+        import MarkdownEditor from './src/js/components/markdown-editor.js';
+
+        // Mock AppState for testing
+        class MockAppState {
+            constructor() {
+                this.data = {};
+            }
+            get(key) { return this.data[key]; }
+            set(key, value) { this.data[key] = value; }
+            save() { return Promise.resolve(); }
+        }
+
+        let editor;
+        let appState;
+
+        function log(message) {
+            const results = document.getElementById('test-results');
+            const timestamp = new Date().toLocaleTimeString();
+            results.textContent += `[${timestamp}] ${message}\n`;
+            results.scrollTop = results.scrollHeight;
+            console.log(message);
+        }
+
+        function initializeEditor() {
+            try {
+                const container = document.getElementById('editor-container');
+                appState = new MockAppState();
+                editor = new MarkdownEditor(container, appState);
+                log('✅ Editor initialized with syntax highlighting enabled');
+                
+                // Set some initial content
+                loadTestContent();
+            } catch (error) {
+                log('❌ Editor initialization failed: ' + error.message);
+            }
+        }
+
+        window.toggleHighlighting = function() {
+            if (!editor) return;
+            
+            const currentState = editor.highlightingEnabled;
+            editor.toggleSyntaxHighlighting(!currentState);
+            log(`🔄 Highlighting ${!currentState ? 'enabled' : 'disabled'}`);
+        };
+
+        window.loadTestContent = function() {
+            if (!editor) return;
+            
+            const testContent = `# Cursor Test Header
+
+**Bold text** for testing cursor position in formatted text.
+
+*Italic text* and some \`inline code\` elements.
+
+\`\`\`javascript
+// Code block test
+function testCursor() {
+    console.log('cursor position test');
+}
+\`\`\`
+
+- List item for cursor testing
+- Another list item
+
+> Blockquote for cursor position testing
+
+Click anywhere in this text to test cursor positioning!`;
+
+            editor.setValue(testContent);
+            log('📝 Test content loaded - try clicking and typing');
+        };
+
+        window.clearContent = function() {
+            if (!editor) return;
+            editor.setValue('');
+            log('🧹 Content cleared');
+        };
+
+        window.testCursorPositions = function() {
+            if (!editor) return;
+            
+            log('🧪 Running automated cursor position tests...');
+            
+            const tests = [
+                { content: 'Hello world', position: 5, description: 'Middle of plain text' },
+                { content: '# Header', position: 2, description: 'Inside header marker' },
+                { content: '**bold**', position: 3, description: 'Inside bold text' },
+                { content: '*italic*', position: 2, description: 'Inside italic text' },
+                { content: '`code`', position: 2, description: 'Inside inline code' },
+                { content: '- list item', position: 7, description: 'Inside list item' },
+                { content: '> quote', position: 4, description: 'Inside blockquote' }
+            ];
+            
+            let passCount = 0;
+            let totalTests = tests.length;
+            
+            tests.forEach((test, index) => {
+                setTimeout(() => {
+                    editor.setValue(test.content);
+                    
+                    // Set cursor position
+                    editor.setSelection(test.position, test.position);
+                    
+                    // Get actual cursor position
+                    const actualPosition = editor.textarea.selectionStart;
+                    const success = actualPosition === test.position;
+                    
+                    if (success) passCount++;
+                    
+                    log(`${success ? '✅' : '❌'} ${test.description}: Expected ${test.position}, got ${actualPosition}`);
+                    
+                    if (index === tests.length - 1) {
+                        log(`\n📊 Test Results: ${passCount}/${totalTests} tests passed`);
+                        if (passCount === totalTests) {
+                            log('🎉 All cursor positioning tests passed!');
+                        } else {
+                            log('⚠️  Some cursor tests failed - check overlay alignment');
+                        }
+                    }
+                }, index * 200);
+            });
+        };
+
+        window.checkAlignment = function() {
+            if (!editor) return;
+            
+            log('🔍 Checking textarea and overlay alignment...');
+            
+            const textarea = editor.textarea;
+            const overlay = editor.overlayContainer;
+            
+            if (!textarea || !overlay) {
+                log('❌ Missing textarea or overlay elements');
+                return;
+            }
+            
+            // Check computed styles
+            const textareaStyle = window.getComputedStyle(textarea);
+            const overlayStyle = window.getComputedStyle(overlay);
+            
+            const properties = [
+                'fontFamily', 'fontSize', 'lineHeight', 'letterSpacing', 
+                'padding', 'margin', 'border', 'boxSizing'
+            ];
+            
+            let alignmentIssues = 0;
+            
+            properties.forEach(prop => {
+                const textareaValue = textareaStyle[prop];
+                const overlayValue = overlayStyle[prop];
+                
+                if (textareaValue !== overlayValue) {
+                    log(`⚠️  Alignment mismatch - ${prop}: textarea="${textareaValue}" overlay="${overlayValue}"`);
+                    alignmentIssues++;
+                } else {
+                    log(`✅ ${prop}: aligned`);
+                }
+            });
+            
+            // Check positioning
+            const textareaRect = textarea.getBoundingClientRect();
+            const overlayRect = overlay.getBoundingClientRect();
+            
+            const positionMatch = (
+                Math.abs(textareaRect.top - overlayRect.top) < 1 &&
+                Math.abs(textareaRect.left - overlayRect.left) < 1 &&
+                Math.abs(textareaRect.width - overlayRect.width) < 1 &&
+                Math.abs(textareaRect.height - overlayRect.height) < 1
+            );
+            
+            if (positionMatch) {
+                log('✅ Element positioning: aligned');
+            } else {
+                log('⚠️  Position mismatch:');
+                log(`   textarea: ${textareaRect.left},${textareaRect.top} ${textareaRect.width}x${textareaRect.height}`);
+                log(`   overlay:  ${overlayRect.left},${overlayRect.top} ${overlayRect.width}x${overlayRect.height}`);
+                alignmentIssues++;
+            }
+            
+            if (alignmentIssues === 0) {
+                log('🎉 Perfect alignment detected!');
+            } else {
+                log(`⚠️  Found ${alignmentIssues} alignment issues`);
+            }
+        };
+
+        // Initialize when DOM loads
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Initializing cursor positioning test...');
+            initializeEditor();
+        });
+
+        // Global error handler
+        window.addEventListener('error', (event) => {
+            log('❌ Error: ' + event.message);
+        });
+    </script>
+</body>
+</html>

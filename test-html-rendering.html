@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Rendering Test - aiNote</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .test-area {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            background: #1f2937;
+            color: #f9fafb;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+        .controls button {
+            padding: 8px 16px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .debug {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin-top: 20px;
+        }
+        
+        /* Test styles for markdown elements */
+        .md-code-block {
+            display: block;
+            background-color: #1f2937;
+            color: #f9fafb;
+            padding: 1em;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.875em;
+            line-height: 1.5;
+            border: 1px solid #374151;
+            margin: 0.5em 0;
+            white-space: pre;
+        }
+        .md-code-block-marker {
+            color: #6b7280;
+            font-weight: bold;
+        }
+        .md-code-block-content {
+            color: inherit;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 HTML Rendering Test</h1>
+        <p>Testing if HTML is being rendered correctly in the overlay.</p>
+        
+        <div class="controls">
+            <button onclick="testSimpleHTML()">Test Simple HTML</button>
+            <button onclick="testComplexHTML()">Test Complex HTML</button>
+            <button onclick="testTextContent()">Test Text Content</button>
+            <button onclick="clearTest()">Clear</button>
+        </div>
+        
+        <div class="test-area" id="test-area"></div>
+        
+        <div class="debug" id="debug"></div>
+    </div>
+
+    <script>
+        function log(message) {
+            const debug = document.getElementById('debug');
+            debug.textContent += message + '\n';
+            console.log(message);
+        }
+
+        function clearTest() {
+            document.getElementById('test-area').innerHTML = '';
+            document.getElementById('debug').textContent = '';
+        }
+
+        function testSimpleHTML() {
+            log('Testing simple HTML...');
+            const testArea = document.getElementById('test-area');
+            
+            const simpleHTML = '<span style="color: red; font-weight: bold;">RED BOLD TEXT</span>';
+            
+            log('Setting innerHTML to: ' + simpleHTML);
+            testArea.innerHTML = simpleHTML;
+            
+            setTimeout(() => {
+                log('After setting:');
+                log('- innerHTML: ' + testArea.innerHTML);
+                log('- textContent: ' + JSON.stringify(testArea.textContent));
+                log('- Has span elements: ' + (testArea.querySelectorAll('span').length > 0));
+                
+                if (testArea.querySelectorAll('span').length > 0 && !testArea.textContent.includes('<span')) {
+                    log('✅ Simple HTML rendered correctly');
+                } else {
+                    log('❌ Simple HTML rendering failed');
+                }
+            }, 100);
+        }
+
+        function testComplexHTML() {
+            log('Testing complex HTML (like syntax highlighter output)...');
+            const testArea = document.getElementById('test-area');
+            
+            const complexHTML = `<span class="md-code-block">
+<span class="md-code-block-marker">\`\`\`javascript</span>
+<span class="md-code-block-content">// JavaScript code block - test cursor positioning
+function testCursorPosition() {
+    const element = document.getElementById('test');
+    // Click here and type
+    console.log('Cursor test in code block');
+    return element.value;
+}</span>
+<span class="md-code-block-marker">\`\`\`</span>
+</span>`;
+            
+            log('Setting innerHTML to complex HTML...');
+            testArea.innerHTML = complexHTML;
+            
+            setTimeout(() => {
+                log('After setting:');
+                log('- innerHTML length: ' + testArea.innerHTML.length);
+                log('- textContent: ' + JSON.stringify(testArea.textContent.substring(0, 100)) + '...');
+                log('- Has md-code-block elements: ' + (testArea.querySelectorAll('.md-code-block').length > 0));
+                log('- Has md-code-block-content elements: ' + (testArea.querySelectorAll('.md-code-block-content').length > 0));
+                
+                const hasExpectedElements = testArea.querySelectorAll('.md-code-block').length > 0;
+                const textShowsHTML = testArea.textContent.includes('<span');
+                
+                if (hasExpectedElements && !textShowsHTML) {
+                    log('✅ Complex HTML rendered correctly');
+                } else {
+                    log('❌ Complex HTML rendering failed');
+                    if (textShowsHTML) {
+                        log('   Problem: HTML tags visible as text');
+                    }
+                    if (!hasExpectedElements) {
+                        log('   Problem: Expected HTML elements not found');
+                    }
+                }
+            }, 100);
+        }
+
+        function testTextContent() {
+            log('Testing plain text content...');
+            const testArea = document.getElementById('test-area');
+            
+            const textContent = 'This is plain text without any HTML tags.';
+            
+            log('Setting textContent to: ' + textContent);
+            testArea.textContent = textContent;
+            
+            setTimeout(() => {
+                log('After setting:');
+                log('- innerHTML: ' + testArea.innerHTML);
+                log('- textContent: ' + testArea.textContent);
+                
+                if (testArea.textContent === textContent && !testArea.innerHTML.includes('<span')) {
+                    log('✅ Plain text rendered correctly');
+                } else {
+                    log('❌ Plain text rendering unexpected');
+                }
+            }, 100);
+        }
+
+        // Clear on load
+        clearTest();
+        log('HTML Rendering Test initialized');
+    </script>
+</body>
+</html>

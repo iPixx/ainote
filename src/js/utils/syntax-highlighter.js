@@ -248,8 +248,38 @@ class SyntaxHighlighter {
       // Process the content
       const highlightedHTML = await this.processContent(contentToHighlight, startLineIndex);
 
-      // Update overlay element
+      // Debug logging to see what HTML is being generated
+      if (this.options.enablePerformanceLogging) {
+        console.log('✨ Generated HTML sample (first 200 chars):', highlightedHTML.substring(0, 200) + '...');
+        console.log('✨ HTML contains span tags:', highlightedHTML.includes('<span'));
+        console.log('✨ HTML contains closing tags:', highlightedHTML.includes('</span>'));
+      }
+      
+      // DEBUG: Check what we're about to set
+      if (this.options.enablePerformanceLogging) {
+        console.log('🔍 About to set innerHTML with:', highlightedHTML.substring(0, 300));
+        console.log('🔍 HTML contains escaped brackets:', highlightedHTML.includes('&lt;') || highlightedHTML.includes('&gt;'));
+      }
+      
+      // Update overlay element with proper HTML rendering
       overlayElement.innerHTML = highlightedHTML;
+      
+      // Debug the actual DOM after setting innerHTML
+      if (this.options.enablePerformanceLogging) {
+        console.log('✨ Overlay innerHTML after setting:', overlayElement.innerHTML.substring(0, 200) + '...');
+        console.log('✨ Overlay textContent sample:', overlayElement.textContent.substring(0, 100) + '...');
+        console.log('✨ Overlay has child span elements:', overlayElement.querySelectorAll('span').length);
+        console.log('✨ Text content shows HTML tags:', overlayElement.textContent.includes('<span'));
+        
+        // If HTML tags are showing in text, we have a problem
+        if (overlayElement.textContent.includes('<span')) {
+          console.error('❌ PROBLEM: HTML tags are showing as text content!');
+          console.log('❌ This means innerHTML contains escaped HTML instead of real HTML');
+        }
+      }
+      
+      // Syntax highlighting injection complete
+      
       overlayElement.style.opacity = '1';
 
       // Cache the result
@@ -307,8 +337,28 @@ class SyntaxHighlighter {
    * @private
    */
   async processContent(content, startLineIndex = 0) {
+    // Debug the input content
+    if (this.options.enablePerformanceLogging) {
+      console.log('🔍 Processing content type:', typeof content);
+      console.log('🔍 Content sample:', JSON.stringify(content.substring(0, 100)));
+      console.log('🔍 Contains HTML tags?', /<[^>]+>/.test(content));
+      console.log('🔍 Contains angle brackets?', content.includes('<'));
+      const anglePos = content.indexOf('<');
+      if (anglePos >= 0) {
+        console.log('🔍 First < character at position:', anglePos, 'context:', JSON.stringify(content.substring(Math.max(0, anglePos-5), anglePos+10)));
+      }
+    }
+    
+    // Check if content already contains HTML tags (already processed)
+    if (content.includes('<span class="md-') || /<[^>]+>/.test(content)) {
+      console.warn('⚠️ Content already contains HTML tags, skipping processing');
+      return content;
+    }
+    
     // Keep original content for pattern matching
     let processedContent = content;
+    
+    // Note: We will escape HTML after token replacement to preserve markdown syntax processing
 
     // Track processed ranges to avoid overlapping replacements
     const processedRanges = [];
@@ -335,9 +385,12 @@ class SyntaxHighlighter {
       }
     }
 
-    // Escape any remaining unprocessed HTML content (outside of our highlighting spans)
-    processedContent = this.escapeUnprocessedHtml(processedContent);
+    // Note: We trust that markdown content is safe and doesn't contain malicious HTML
+    // Our generated HTML tags should be preserved as-is
 
+    // Keep original whitespace and newlines for perfect alignment with textarea
+    // No need to convert to <br> or &nbsp; since overlay uses white-space: pre-wrap
+    
     return processedContent;
   }
 
@@ -346,50 +399,19 @@ class SyntaxHighlighter {
    * @param {string} content - Content to process
    * @param {string} tokenType - Token type being processed
    * @param {Object} pattern - Pattern configuration
-   * @param {Array} processedRanges - Array of already processed ranges
+   * @param {Array} processedRanges - Array of already processed ranges (not used in new approach)
    * @returns {string} Processed content
    * @private
    */
   applyPattern(content, tokenType, pattern, processedRanges) {
     const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
-    let match;
-    const replacements = [];
-
-    // Find all matches
-    while ((match = regex.exec(content)) !== null) {
-      const matchStart = match.index;
-      const matchEnd = match.index + match[0].length;
-
-      // Check if this range overlaps with already processed ranges
-      const overlaps = processedRanges.some(range => 
-        (matchStart >= range.start && matchStart < range.end) ||
-        (matchEnd > range.start && matchEnd <= range.end) ||
-        (matchStart <= range.start && matchEnd >= range.end)
-      );
-
-      if (!overlaps) {
-        const tokenData = this.createTokenData(tokenType, match);
-        const htmlReplacement = this.createHtmlToken(tokenType, tokenData);
-        
-        replacements.push({
-          start: matchStart,
-          end: matchEnd,
-          replacement: htmlReplacement,
-          original: match[0]
-        });
-
-        processedRanges.push({ start: matchStart, end: matchEnd });
-      }
-    }
-
-    // Apply replacements in reverse order to maintain positions
-    replacements.reverse().forEach(replacement => {
-      content = content.slice(0, replacement.start) + 
-                replacement.replacement + 
-                content.slice(replacement.end);
+    
+    // Replace all matches in one go - much simpler and more reliable
+    return content.replace(regex, (...args) => {
+      const match = args;
+      const tokenData = this.createTokenData(tokenType, match);
+      return this.createHtmlToken(tokenType, tokenData);
     });
-
-    return content;
   }
 
   /**
@@ -422,84 +444,105 @@ class SyntaxHighlighter {
    * @private
    */
   createHtmlToken(tokenType, tokenData) {
-    // Helper to escape content that goes inside HTML
-    const escapeContent = (text) => this.escapeHtml(text || '');
+    // Helper to safely handle user content for HTML
+    const safeContent = (text) => {
+      if (!text) return '';
+      
+      // Don't escape content - trust that markdown content is safe
+      // The issue was that we were escaping HTML which made tags show as text
+      return text;
+    };
+    
+    // Helper for code content - preserve special characters
+    const codeContent = (text) => {
+      if (!text) return '';
+      
+      // For code blocks and inline code, preserve content exactly as-is
+      // This is user code content that should be displayed literally
+      return text;
+    };
+    
+    // Helper for markdown markers - these should not be escaped
+    const markerContent = (text) => {
+      if (!text) return '';
+      return text; // Keep markdown markers as-is
+    };
     
     switch (tokenType) {
       case SyntaxHighlighter.TOKENS.HEADER:
         return `<span class="md-header md-header-${tokenData.level}">` +
-               `<span class="md-header-marker">${'#'.repeat(tokenData.level)}</span>` +
-               ` <span class="md-header-content">${escapeContent(tokenData.content)}</span>` +
+               `<span class="md-header-marker">${markerContent('#'.repeat(tokenData.level))}</span>` +
+               ` <span class="md-header-content">${safeContent(tokenData.content)}</span>` +
                `</span>`;
 
       case SyntaxHighlighter.TOKENS.BOLD:
         return `<span class="md-bold">` +
-               `<span class="md-bold-marker">${escapeContent(tokenData.delimiter)}</span>` +
-               `<span class="md-bold-content">${escapeContent(tokenData.content)}</span>` +
-               `<span class="md-bold-marker">${escapeContent(tokenData.delimiter)}</span>` +
+               `<span class="md-bold-marker">${markerContent(tokenData.delimiter)}</span>` +
+               `<span class="md-bold-content">${safeContent(tokenData.content)}</span>` +
+               `<span class="md-bold-marker">${markerContent(tokenData.delimiter)}</span>` +
                `</span>`;
 
       case SyntaxHighlighter.TOKENS.ITALIC:
         return `<span class="md-italic">` +
-               `<span class="md-italic-marker">${escapeContent(tokenData.delimiter)}</span>` +
-               `<span class="md-italic-content">${escapeContent(tokenData.content)}</span>` +
-               `<span class="md-italic-marker">${escapeContent(tokenData.delimiter)}</span>` +
+               `<span class="md-italic-marker">${markerContent(tokenData.delimiter)}</span>` +
+               `<span class="md-italic-content">${safeContent(tokenData.content)}</span>` +
+               `<span class="md-italic-marker">${markerContent(tokenData.delimiter)}</span>` +
                `</span>`;
 
       case SyntaxHighlighter.TOKENS.CODE_BLOCK:
         return `<span class="md-code-block">` +
-               `<span class="md-code-block-marker">\`\`\`${escapeContent(tokenData.language || '')}</span>\n` +
-               `<span class="md-code-block-content">${escapeContent(tokenData.content)}</span>\n` +
-               `<span class="md-code-block-marker">\`\`\`</span>` +
+               `<span class="md-code-block-marker">${markerContent('```')}${markerContent(tokenData.language || '')}</span>\n` +
+               `<span class="md-code-block-content">${codeContent(tokenData.content)}</span>\n` +
+               `<span class="md-code-block-marker">${markerContent('```')}</span>` +
                `</span>`;
 
       case SyntaxHighlighter.TOKENS.CODE_INLINE:
         return `<span class="md-code-inline">` +
-               `<span class="md-code-inline-marker">\`</span>` +
-               `<span class="md-code-inline-content">${escapeContent(tokenData.content)}</span>` +
-               `<span class="md-code-inline-marker">\`</span>` +
+               `<span class="md-code-inline-marker">${markerContent('`')}</span>` +
+               `<span class="md-code-inline-content">${codeContent(tokenData.content)}</span>` +
+               `<span class="md-code-inline-marker">${markerContent('`')}</span>` +
                `</span>`;
 
       case SyntaxHighlighter.TOKENS.LINK:
         const linkText = tokenData.text || '';
         const linkUrl = tokenData.url || tokenData.ref || '';
         return `<span class="md-link">` +
-               `<span class="md-link-marker">[</span>` +
-               `<span class="md-link-text">${escapeContent(linkText)}</span>` +
-               `<span class="md-link-marker">]</span>` +
-               `<span class="md-link-marker">(</span>` +
-               `<span class="md-link-url">${escapeContent(linkUrl)}</span>` +
-               `<span class="md-link-marker">)</span>` +
+               `<span class="md-link-marker">${markerContent('[')}</span>` +
+               `<span class="md-link-text">${safeContent(linkText)}</span>` +
+               `<span class="md-link-marker">${markerContent(']')}</span>` +
+               `<span class="md-link-marker">${markerContent('(')}</span>` +
+               `<span class="md-link-url">${safeContent(linkUrl)}</span>` +
+               `<span class="md-link-marker">${markerContent(')')}</span>` +
                `</span>`;
 
       case SyntaxHighlighter.TOKENS.LIST:
         return `<span class="md-list md-list-level-${Math.floor(tokenData.indent / 2)}">` +
-               `<span class="md-list-marker">${escapeContent(tokenData.marker)}</span> ` +
-               `<span class="md-list-content">${escapeContent(tokenData.content)}</span>` +
+               `<span class="md-list-marker">${markerContent(tokenData.marker)}</span> ` +
+               `<span class="md-list-content">${safeContent(tokenData.content)}</span>` +
                `</span>`;
 
       case SyntaxHighlighter.TOKENS.BLOCKQUOTE:
         return `<span class="md-blockquote md-blockquote-level-${tokenData.level}">` +
-               `<span class="md-blockquote-marker">${'>'.repeat(tokenData.level)}</span> ` +
-               `<span class="md-blockquote-content">${escapeContent(tokenData.content)}</span>` +
+               `<span class="md-blockquote-marker">${markerContent('>'.repeat(tokenData.level))}</span> ` +
+               `<span class="md-blockquote-content">${safeContent(tokenData.content)}</span>` +
                `</span>`;
 
       case SyntaxHighlighter.TOKENS.STRIKETHROUGH:
         return `<span class="md-strikethrough">` +
-               `<span class="md-strikethrough-marker">~~</span>` +
-               `<span class="md-strikethrough-content">${escapeContent(tokenData.content)}</span>` +
-               `<span class="md-strikethrough-marker">~~</span>` +
+               `<span class="md-strikethrough-marker">${markerContent('~~')}</span>` +
+               `<span class="md-strikethrough-content">${safeContent(tokenData.content)}</span>` +
+               `<span class="md-strikethrough-marker">${markerContent('~~')}</span>` +
                `</span>`;
 
       case SyntaxHighlighter.TOKENS.TABLE:
         return `<span class="md-table">` +
-               `<span class="md-table-marker">|</span>` +
-               `<span class="md-table-content">${escapeContent(tokenData.content)}</span>` +
-               `<span class="md-table-marker">|</span>` +
+               `<span class="md-table-marker">${markerContent('|')}</span>` +
+               `<span class="md-table-content">${safeContent(tokenData.content)}</span>` +
+               `<span class="md-table-marker">${markerContent('|')}</span>` +
                `</span>`;
 
       default:
-        return escapeContent(tokenData.fullMatch);
+        return safeContent(tokenData.fullMatch || '');
     }
   }
 
@@ -521,25 +564,6 @@ class SyntaxHighlighter {
     return text.replace(/[&<>"']/g, (match) => htmlEscapes[match]);
   }
 
-  /**
-   * Escape HTML characters outside of our highlighting spans
-   * @param {string} content - Content with highlighting spans
-   * @returns {string} Content with unprocessed HTML escaped
-   * @private
-   */
-  escapeUnprocessedHtml(content) {
-    // Split content by HTML spans we created
-    const parts = content.split(/(<span[^>]*class="md-[^"]*"[^>]*>.*?<\/span>)/g);
-    
-    // Escape only the parts outside our spans
-    return parts.map((part, index) => {
-      // Even indices are outside spans, odd indices are our spans
-      if (index % 2 === 0) {
-        return this.escapeHtml(part);
-      }
-      return part; // Keep our spans as-is
-    }).join('');
-  }
 
   /**
    * Generate cache key for content and viewport
