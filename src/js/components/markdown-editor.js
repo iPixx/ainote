@@ -256,16 +256,16 @@ class MarkdownEditor {
     };
 
     // Register event listeners
-    this.addEventListener(this.textarea, 'input', inputHandler);
-    this.addEventListener(this.textarea, 'selectionchange', selectionHandler);
-    this.addEventListener(this.textarea, 'select', selectionHandler);
-    this.addEventListener(this.textarea, 'keyup', selectionHandler);
-    this.addEventListener(this.textarea, 'mouseup', selectionHandler);
-    this.addEventListener(this.textarea, 'keydown', keyHandler);
-    this.addEventListener(this.textarea, 'paste', pasteHandler);
+    this.addDOMEventListener(this.textarea, 'input', inputHandler);
+    this.addDOMEventListener(this.textarea, 'selectionchange', selectionHandler);
+    this.addDOMEventListener(this.textarea, 'select', selectionHandler);
+    this.addDOMEventListener(this.textarea, 'keyup', selectionHandler);
+    this.addDOMEventListener(this.textarea, 'mouseup', selectionHandler);
+    this.addDOMEventListener(this.textarea, 'keydown', keyHandler);
+    this.addDOMEventListener(this.textarea, 'paste', pasteHandler);
 
     // Scroll synchronization (prepare for preview mode)
-    this.addEventListener(this.textarea, 'scroll', () => {
+    this.addDOMEventListener(this.textarea, 'scroll', () => {
       // Future implementation: sync with preview pane
       this.overlayContainer.scrollTop = this.textarea.scrollTop;
     });
@@ -278,7 +278,7 @@ class MarkdownEditor {
    * @param {Function} handler - Event handler
    * @private
    */
-  addEventListener(element, event, handler) {
+  addDOMEventListener(element, event, handler) {
     element.addEventListener(event, handler);
     
     if (!this.eventListeners.has(element)) {
