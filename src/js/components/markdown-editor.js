@@ -862,15 +862,26 @@ class MarkdownEditor {
         return;
       }
       
-      // Auto-complete if next character is whitespace or end of line
-      if (!currentChar || /\s/.test(currentChar) || currentChar === '\n') {
-        // For quotes, avoid auto-completion if we're inside a word
-        if ((key === '"' || key === "'" || key === '`') && 
-            this.selectionStart > 0 && 
-            /\w/.test(this.content[this.selectionStart - 1])) {
-          return;
+      // Determine if we should auto-complete based on the character type
+      let shouldAutoComplete = false;
+      
+      // For brackets, be more permissive - complete unless next char is the same closing bracket
+      if (key === '(' || key === '[' || key === '{') {
+        shouldAutoComplete = !currentChar || currentChar !== closingChar;
+      }
+      // For quotes, use more restrictive logic to avoid issues in text
+      else if (key === '"' || key === "'" || key === '`') {
+        // Don't complete if we're inside a word or next char is the same quote
+        if (this.selectionStart > 0 && /\w/.test(this.content[this.selectionStart - 1])) {
+          shouldAutoComplete = false;
+        } else if (currentChar === key) {
+          shouldAutoComplete = false; // Avoid double quotes
+        } else {
+          shouldAutoComplete = !currentChar || /\s/.test(currentChar) || currentChar === '\n';
         }
-        
+      }
+      
+      if (shouldAutoComplete) {
         event.preventDefault();
         this.saveUndoState();
         
