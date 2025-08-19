@@ -19,7 +19,10 @@ class MarkdownEditor {
     CONTENT_CHANGED: 'content_changed',
     SELECTION_CHANGED: 'selection_changed',
     CURSOR_MOVED: 'cursor_moved',
-    WORD_COUNT_CHANGED: 'word_count_changed'
+    WORD_COUNT_CHANGED: 'word_count_changed',
+    SHORTCUT_EXECUTED: 'shortcut_executed',
+    FORMAT_APPLIED: 'format_applied',
+    FIND_REPLACE_OPENED: 'find_replace_opened'
   };
 
   /**
@@ -62,6 +65,26 @@ class MarkdownEditor {
     this.wordCount = 0;
     this.charCount = 0;
     
+    // Keyboard shortcuts and formatting state
+    this.keyboardShortcuts = new Map();
+    this.undoStack = [];
+    this.redoStack = [];
+    this.maxUndoSize = 100;
+    this.findReplaceModal = null;
+    this.currentSearchTerm = '';
+    this.currentReplaceTerm = '';
+    this.searchHighlights = [];
+    
+    // Auto-completion pairs
+    this.autoCompletePairs = {
+      '(': ')',
+      '[': ']',
+      '{': '}',
+      '"': '"',
+      "'": "'",
+      '`': '`'
+    };
+    
     // Initialize editor
     this.init();
   }
@@ -77,10 +100,11 @@ class MarkdownEditor {
 
     this.createEditorStructure();
     this.setupEventListeners();
+    this.setupKeyboardShortcuts();
     this.updateWordCount();
     this.isInitialized = true;
     
-    console.log('✅ MarkdownEditor initialized');
+    console.log('✅ MarkdownEditor initialized with keyboard shortcuts');
   }
 
   /**
@@ -184,17 +208,51 @@ class MarkdownEditor {
       });
     };
 
-    // Key events for cursor movement
+    // Key events for keyboard shortcuts and cursor movement
     const keyHandler = (event) => {
       // Track keystroke performance
       this.lastKeystroke = performance.now();
       
-      // Allow future keyboard shortcut system to hook here
-      // This will be implemented in sub-issue #39
+      // Handle keyboard shortcuts
+      const shortcutHandled = this.handleKeyboardShortcut(event);
+      
+      // Handle auto-completion for brackets and quotes
+      if (!shortcutHandled && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        this.handleAutoCompletion(event);
+      }
+      
+      // Handle tab indentation
+      if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault();
+        this.handleTabIndentation(event.shiftKey);
+        return;
+      }
+      
+      // Emit cursor moved event
       this.emit(MarkdownEditor.EVENTS.CURSOR_MOVED, {
         key: event.key,
-        position: this.cursorPosition
+        position: this.cursorPosition,
+        shortcutHandled
       });
+    };
+
+    // Paste handler for smart paste functionality
+    const pasteHandler = (event) => {
+      event.preventDefault();
+      
+      // Get clipboard text as plain text
+      const clipboardData = event.clipboardData || window.clipboardData;
+      const pastedText = clipboardData.getData('text/plain');
+      
+      if (pastedText) {
+        // Save state before paste for undo
+        this.saveUndoState();
+        
+        // Insert plain text
+        this.insertText(pastedText, true);
+        
+        console.log('📋 Smart paste: converted to plain text');
+      }
     };
 
     // Register event listeners
@@ -204,6 +262,7 @@ class MarkdownEditor {
     this.addEventListener(this.textarea, 'keyup', selectionHandler);
     this.addEventListener(this.textarea, 'mouseup', selectionHandler);
     this.addEventListener(this.textarea, 'keydown', keyHandler);
+    this.addEventListener(this.textarea, 'paste', pasteHandler);
 
     // Scroll synchronization (prepare for preview mode)
     this.addEventListener(this.textarea, 'scroll', () => {
@@ -307,10 +366,16 @@ class MarkdownEditor {
   /**
    * Set editor content
    * @param {string} content - New content for the editor
+   * @param {boolean} saveUndo - Whether to save to undo stack (default: false for external calls)
    */
-  setValue(content) {
+  setValue(content, saveUndo = false) {
     if (typeof content !== 'string') {
       content = String(content || '');
+    }
+
+    // Save undo state if requested (usually for internal changes)
+    if (saveUndo && this.content !== content) {
+      this.saveUndoState();
     }
 
     this.content = content;
@@ -459,6 +524,787 @@ class MarkdownEditor {
    */
   removeEventListener(eventType, handler) {
     this.container.removeEventListener(eventType, handler);
+  }
+
+  /**
+   * Setup keyboard shortcuts for formatting and editing
+   * @private
+   */
+  setupKeyboardShortcuts() {
+    // Text formatting shortcuts
+    this.addKeyboardShortcut('Ctrl+B', () => this.formatSelection('bold'), 'Bold formatting');
+    this.addKeyboardShortcut('Cmd+B', () => this.formatSelection('bold'), 'Bold formatting');
+    
+    this.addKeyboardShortcut('Ctrl+I', () => this.formatSelection('italic'), 'Italic formatting');
+    this.addKeyboardShortcut('Cmd+I', () => this.formatSelection('italic'), 'Italic formatting');
+    
+    this.addKeyboardShortcut('Ctrl+K', () => this.formatSelection('link'), 'Insert link');
+    this.addKeyboardShortcut('Cmd+K', () => this.formatSelection('link'), 'Insert link');
+    
+    this.addKeyboardShortcut('Ctrl+L', () => this.formatSelection('list'), 'Insert list item');
+    this.addKeyboardShortcut('Cmd+L', () => this.formatSelection('list'), 'Insert list item');
+    
+    // Blockquote controls
+    this.addKeyboardShortcut('Ctrl+>', () => this.adjustBlockquoteLevel(1), 'Increase blockquote level');
+    this.addKeyboardShortcut('Cmd+>', () => this.adjustBlockquoteLevel(1), 'Increase blockquote level');
+    
+    this.addKeyboardShortcut('Ctrl+<', () => this.adjustBlockquoteLevel(-1), 'Decrease blockquote level');
+    this.addKeyboardShortcut('Cmd+<', () => this.adjustBlockquoteLevel(-1), 'Decrease blockquote level');
+    
+    // Undo/Redo
+    this.addKeyboardShortcut('Ctrl+Z', () => this.undo(), 'Undo');
+    this.addKeyboardShortcut('Cmd+Z', () => this.undo(), 'Undo');
+    
+    this.addKeyboardShortcut('Ctrl+Y', () => this.redo(), 'Redo');
+    this.addKeyboardShortcut('Cmd+Y', () => this.redo(), 'Redo');
+    this.addKeyboardShortcut('Ctrl+Shift+Z', () => this.redo(), 'Redo');
+    this.addKeyboardShortcut('Cmd+Shift+Z', () => this.redo(), 'Redo');
+    
+    // Find and Replace
+    this.addKeyboardShortcut('Ctrl+F', () => this.openFindReplace('find'), 'Find');
+    this.addKeyboardShortcut('Cmd+F', () => this.openFindReplace('find'), 'Find');
+    
+    this.addKeyboardShortcut('Ctrl+H', () => this.openFindReplace('replace'), 'Find and Replace');
+    this.addKeyboardShortcut('Cmd+H', () => this.openFindReplace('replace'), 'Find and Replace');
+    
+    // Manual save (this will be handled by parent application)
+    this.addKeyboardShortcut('Ctrl+S', () => this.emitSaveRequest(), 'Save file');
+    this.addKeyboardShortcut('Cmd+S', () => this.emitSaveRequest(), 'Save file');
+    
+    console.log(`✅ Keyboard shortcuts configured: ${this.keyboardShortcuts.size} shortcuts`);
+  }
+
+  /**
+   * Add a keyboard shortcut
+   * @param {string} shortcut - Keyboard shortcut (e.g., 'Ctrl+B', 'Cmd+I')
+   * @param {Function} action - Function to execute
+   * @param {string} description - Human-readable description
+   */
+  addKeyboardShortcut(shortcut, action, description = '') {
+    this.keyboardShortcuts.set(shortcut.toLowerCase(), {
+      action,
+      description,
+      shortcut
+    });
+  }
+
+  /**
+   * Handle keyboard shortcut events
+   * @param {KeyboardEvent} event - The keyboard event
+   * @returns {boolean} True if shortcut was handled
+   * @private
+   */
+  handleKeyboardShortcut(event) {
+    // Build shortcut string
+    const parts = [];
+    
+    if (event.ctrlKey) parts.push('ctrl');
+    if (event.metaKey) parts.push('cmd');
+    if (event.shiftKey) parts.push('shift');
+    if (event.altKey) parts.push('alt');
+    
+    // Add the main key
+    let key = event.key.toLowerCase();
+    if (key === ' ') key = 'space';
+    parts.push(key);
+    
+    const shortcutString = parts.join('+');
+    
+    // Check if we have a handler for this shortcut
+    const shortcutData = this.keyboardShortcuts.get(shortcutString);
+    
+    if (shortcutData) {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      try {
+        shortcutData.action();
+        
+        // Emit shortcut executed event
+        this.emit(MarkdownEditor.EVENTS.SHORTCUT_EXECUTED, {
+          shortcut: shortcutData.shortcut,
+          description: shortcutData.description,
+          timestamp: Date.now()
+        });
+        
+        console.log(`⌨️ Executed shortcut: ${shortcutData.shortcut}`);
+        return true;
+      } catch (error) {
+        console.error(`❌ Error executing shortcut ${shortcutData.shortcut}:`, error);
+        return false;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Format selected text with markdown syntax
+   * @param {string} formatType - Type of formatting (bold, italic, link, list)
+   */
+  formatSelection(formatType) {
+    const selection = this.getSelectedText();
+    const start = this.selectionStart;
+    const end = this.selectionEnd;
+    
+    // Save state for undo
+    this.saveUndoState();
+    
+    let formattedText = '';
+    let newCursorPos = start;
+    
+    switch (formatType) {
+      case 'bold':
+        if (selection) {
+          formattedText = `**${selection}**`;
+          newCursorPos = start + formattedText.length;
+        } else {
+          formattedText = '****';
+          newCursorPos = start + 2; // Position cursor between asterisks
+        }
+        break;
+        
+      case 'italic':
+        if (selection) {
+          formattedText = `*${selection}*`;
+          newCursorPos = start + formattedText.length;
+        } else {
+          formattedText = '**';
+          newCursorPos = start + 1; // Position cursor between asterisks
+        }
+        break;
+        
+      case 'link':
+        if (selection) {
+          // Check if selection looks like a URL
+          const isUrl = /^https?:\/\//.test(selection);
+          if (isUrl) {
+            formattedText = `[Link](${selection})`;
+            newCursorPos = start + 1; // Select "Link" text
+          } else {
+            formattedText = `[${selection}](url)`;
+            newCursorPos = start + formattedText.length - 4; // Position at "url"
+          }
+        } else {
+          formattedText = '[text](url)';
+          newCursorPos = start + 1; // Select "text"
+        }
+        break;
+        
+      case 'list':
+        // Handle list formatting at line level
+        const lines = this.content.split('\n');
+        const textBeforeStart = this.content.substring(0, start);
+        const currentLineIndex = textBeforeStart.split('\n').length - 1;
+        
+        if (lines[currentLineIndex] && !lines[currentLineIndex].trim().startsWith('- ')) {
+          lines[currentLineIndex] = `- ${lines[currentLineIndex]}`;
+          
+          // Update content
+          const newContent = lines.join('\n');
+          this.setValue(newContent, false); // Don't save undo again
+          
+          // Position cursor
+          newCursorPos = start + 2;
+          this.textarea.setSelectionRange(newCursorPos, newCursorPos);
+          
+          this.emit(MarkdownEditor.EVENTS.FORMAT_APPLIED, {
+            type: formatType,
+            selection,
+            timestamp: Date.now()
+          });
+          
+          return;
+        }
+        break;
+        
+      default:
+        console.warn(`Unknown format type: ${formatType}`);
+        return;
+    }
+    
+    // Apply the formatting
+    this.insertText(formattedText, true);
+    
+    // Set cursor position
+    if (formatType === 'bold' && !selection) {
+      this.textarea.setSelectionRange(newCursorPos, newCursorPos);
+    } else if (formatType === 'italic' && !selection) {
+      this.textarea.setSelectionRange(newCursorPos, newCursorPos);
+    } else if (formatType === 'link') {
+      // Select the placeholder text
+      if (selection && /^https?:\/\//.test(selection)) {
+        this.textarea.setSelectionRange(start + 1, start + 5); // Select "Link"
+      } else if (!selection) {
+        this.textarea.setSelectionRange(start + 1, start + 5); // Select "text"
+      } else {
+        this.textarea.setSelectionRange(newCursorPos - 4, newCursorPos - 1); // Select "url"
+      }
+    }
+    
+    this.updateCursorPosition();
+    this.textarea.focus();
+    
+    // Emit format applied event
+    this.emit(MarkdownEditor.EVENTS.FORMAT_APPLIED, {
+      type: formatType,
+      selection,
+      formattedText,
+      timestamp: Date.now()
+    });
+    
+    console.log(`✨ Applied formatting: ${formatType}`);
+  }
+
+  /**
+   * Adjust blockquote level for current line
+   * @param {number} direction - 1 to increase, -1 to decrease
+   */
+  adjustBlockquoteLevel(direction) {
+    this.saveUndoState();
+    
+    const lines = this.content.split('\n');
+    const textBeforeStart = this.content.substring(0, this.selectionStart);
+    const currentLineIndex = textBeforeStart.split('\n').length - 1;
+    
+    if (currentLineIndex >= 0 && currentLineIndex < lines.length) {
+      let line = lines[currentLineIndex];
+      
+      if (direction > 0) {
+        // Increase blockquote level
+        lines[currentLineIndex] = `> ${line}`;
+      } else {
+        // Decrease blockquote level
+        if (line.startsWith('> ')) {
+          lines[currentLineIndex] = line.substring(2);
+        }
+      }
+      
+      // Update content
+      const newContent = lines.join('\n');
+      this.setValue(newContent, false);
+      
+      // Adjust cursor position
+      const adjustment = direction > 0 ? 2 : (line.startsWith('> ') ? -2 : 0);
+      const newCursorPos = this.selectionStart + adjustment;
+      this.textarea.setSelectionRange(newCursorPos, newCursorPos);
+      this.updateCursorPosition();
+      
+      console.log(`📝 Adjusted blockquote level: ${direction > 0 ? 'increased' : 'decreased'}`);
+    }
+  }
+
+  /**
+   * Handle tab indentation
+   * @param {boolean} shiftPressed - Whether Shift key was pressed (for outdent)
+   * @private
+   */
+  handleTabIndentation(shiftPressed) {
+    this.saveUndoState();
+    
+    const tabString = '  '; // Two spaces for indentation
+    
+    if (shiftPressed) {
+      // Outdent - remove indentation
+      const lines = this.content.split('\n');
+      const textBeforeStart = this.content.substring(0, this.selectionStart);
+      const currentLineIndex = textBeforeStart.split('\n').length - 1;
+      
+      if (currentLineIndex >= 0 && currentLineIndex < lines.length) {
+        const line = lines[currentLineIndex];
+        if (line.startsWith(tabString)) {
+          lines[currentLineIndex] = line.substring(tabString.length);
+          
+          // Update content
+          const newContent = lines.join('\n');
+          this.setValue(newContent, false);
+          
+          // Adjust cursor position
+          const newCursorPos = this.selectionStart - tabString.length;
+          this.textarea.setSelectionRange(newCursorPos, newCursorPos);
+          this.updateCursorPosition();
+        }
+      }
+    } else {
+      // Indent - add indentation
+      this.insertText(tabString, false);
+    }
+  }
+
+  /**
+   * Handle auto-completion for brackets and quotes
+   * @param {KeyboardEvent} event - The keyboard event
+   * @private
+   */
+  handleAutoCompletion(event) {
+    const key = event.key;
+    const closingChar = this.autoCompletePairs[key];
+    
+    if (closingChar) {
+      // Check if we should auto-complete
+      const currentChar = this.content[this.selectionStart];
+      const selection = this.getSelectedText();
+      
+      // If there's a selection, wrap it
+      if (selection) {
+        event.preventDefault();
+        this.saveUndoState();
+        
+        const wrappedText = key + selection + closingChar;
+        this.insertText(wrappedText, true);
+        
+        // Position cursor after the wrapped text
+        const newCursorPos = this.selectionStart;
+        this.textarea.setSelectionRange(newCursorPos, newCursorPos);
+        this.updateCursorPosition();
+        
+        console.log(`🔗 Auto-wrapped selection with ${key}${closingChar}`);
+        return;
+      }
+      
+      // Auto-complete if next character is whitespace or end of line
+      if (!currentChar || /\s/.test(currentChar) || currentChar === '\n') {
+        // For quotes, avoid auto-completion if we're inside a word
+        if ((key === '"' || key === "'" || key === '`') && 
+            this.selectionStart > 0 && 
+            /\w/.test(this.content[this.selectionStart - 1])) {
+          return;
+        }
+        
+        event.preventDefault();
+        this.saveUndoState();
+        
+        // Insert both opening and closing characters
+        const completedText = key + closingChar;
+        this.insertText(completedText, false);
+        
+        // Position cursor between them
+        const newCursorPos = this.selectionStart - 1;
+        this.textarea.setSelectionRange(newCursorPos, newCursorPos);
+        this.updateCursorPosition();
+        
+        console.log(`🔧 Auto-completed ${key} with ${closingChar}`);
+      }
+    }
+  }
+
+  /**
+   * Save current state to undo stack
+   * @private
+   */
+  saveUndoState() {
+    // Don't save duplicate states
+    if (this.undoStack.length > 0 && 
+        this.undoStack[this.undoStack.length - 1].content === this.content) {
+      return;
+    }
+    
+    this.undoStack.push({
+      content: this.content,
+      selectionStart: this.selectionStart,
+      selectionEnd: this.selectionEnd,
+      timestamp: Date.now()
+    });
+    
+    // Limit undo stack size
+    if (this.undoStack.length > this.maxUndoSize) {
+      this.undoStack.shift();
+    }
+    
+    // Clear redo stack when new state is saved
+    this.redoStack = [];
+  }
+
+  /**
+   * Undo last action
+   */
+  undo() {
+    if (this.undoStack.length === 0) {
+      console.log('📝 Nothing to undo');
+      return false;
+    }
+    
+    // Save current state to redo stack
+    this.redoStack.push({
+      content: this.content,
+      selectionStart: this.selectionStart,
+      selectionEnd: this.selectionEnd,
+      timestamp: Date.now()
+    });
+    
+    // Restore previous state
+    const previousState = this.undoStack.pop();
+    this.setValue(previousState.content, false); // Don't save undo when undoing
+    
+    // Restore cursor position
+    this.textarea.setSelectionRange(previousState.selectionStart, previousState.selectionEnd);
+    this.updateCursorPosition();
+    this.textarea.focus();
+    
+    console.log('↶ Undo executed');
+    return true;
+  }
+
+  /**
+   * Redo last undone action
+   */
+  redo() {
+    if (this.redoStack.length === 0) {
+      console.log('📝 Nothing to redo');
+      return false;
+    }
+    
+    // Save current state to undo stack
+    this.saveUndoState();
+    
+    // Restore next state
+    const nextState = this.redoStack.pop();
+    this.setValue(nextState.content, false); // Don't save undo when redoing
+    
+    // Restore cursor position
+    this.textarea.setSelectionRange(nextState.selectionStart, nextState.selectionEnd);
+    this.updateCursorPosition();
+    this.textarea.focus();
+    
+    console.log('↷ Redo executed');
+    return true;
+  }
+
+  /**
+   * Open find and replace dialog
+   * @param {string} mode - 'find' or 'replace'
+   */
+  openFindReplace(mode = 'find') {
+    // Create find/replace modal if it doesn't exist
+    if (!this.findReplaceModal) {
+      this.createFindReplaceModal();
+    }
+    
+    // Show the modal
+    this.findReplaceModal.style.display = 'flex';
+    
+    // Set mode
+    const replaceSection = this.findReplaceModal.querySelector('.replace-section');
+    if (mode === 'replace') {
+      replaceSection.style.display = 'block';
+    } else {
+      replaceSection.style.display = 'none';
+    }
+    
+    // Focus search input
+    const searchInput = this.findReplaceModal.querySelector('.search-input');
+    searchInput.focus();
+    searchInput.select();
+    
+    // Emit event
+    this.emit(MarkdownEditor.EVENTS.FIND_REPLACE_OPENED, {
+      mode,
+      timestamp: Date.now()
+    });
+    
+    console.log(`🔍 Opened find/replace in ${mode} mode`);
+  }
+
+  /**
+   * Create find and replace modal
+   * @private
+   */
+  createFindReplaceModal() {
+    this.findReplaceModal = document.createElement('div');
+    this.findReplaceModal.className = 'markdown-editor-find-replace-modal';
+    this.findReplaceModal.innerHTML = `
+      <div class="find-replace-content">
+        <h3>Find and Replace</h3>
+        
+        <div class="search-section">
+          <label for="search-input">Find:</label>
+          <input type="text" class="search-input" placeholder="Search text..." />
+          <button class="btn-find-next">Find Next</button>
+          <button class="btn-find-prev">Find Previous</button>
+        </div>
+        
+        <div class="replace-section">
+          <label for="replace-input">Replace:</label>
+          <input type="text" class="replace-input" placeholder="Replace with..." />
+          <button class="btn-replace">Replace</button>
+          <button class="btn-replace-all">Replace All</button>
+        </div>
+        
+        <div class="find-replace-controls">
+          <button class="btn-close">Close</button>
+          <div class="search-status"></div>
+        </div>
+      </div>
+    `;
+    
+    // Add to container
+    this.container.appendChild(this.findReplaceModal);
+    
+    // Set up event handlers
+    this.setupFindReplaceHandlers();
+  }
+
+  /**
+   * Set up find and replace event handlers
+   * @private
+   */
+  setupFindReplaceHandlers() {
+    const modal = this.findReplaceModal;
+    const searchInput = modal.querySelector('.search-input');
+    const replaceInput = modal.querySelector('.replace-input');
+    
+    // Search input handling
+    searchInput.addEventListener('input', (e) => {
+      this.currentSearchTerm = e.target.value;
+      this.highlightSearchResults();
+    });
+    
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.findNext();
+      } else if (e.key === 'Escape') {
+        this.closeFindReplace();
+      }
+    });
+    
+    // Replace input handling
+    replaceInput.addEventListener('input', (e) => {
+      this.currentReplaceTerm = e.target.value;
+    });
+    
+    replaceInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.replaceNext();
+      }
+    });
+    
+    // Button handlers
+    modal.querySelector('.btn-find-next').addEventListener('click', () => this.findNext());
+    modal.querySelector('.btn-find-prev').addEventListener('click', () => this.findPrevious());
+    modal.querySelector('.btn-replace').addEventListener('click', () => this.replaceNext());
+    modal.querySelector('.btn-replace-all').addEventListener('click', () => this.replaceAll());
+    modal.querySelector('.btn-close').addEventListener('click', () => this.closeFindReplace());
+    
+    // Close on outside click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        this.closeFindReplace();
+      }
+    });
+  }
+
+  /**
+   * Find next occurrence of search term
+   */
+  findNext() {
+    if (!this.currentSearchTerm) return;
+    
+    const searchTerm = this.currentSearchTerm.toLowerCase();
+    const content = this.content.toLowerCase();
+    const currentPos = this.selectionEnd;
+    
+    const nextIndex = content.indexOf(searchTerm, currentPos);
+    
+    if (nextIndex !== -1) {
+      // Found next occurrence
+      this.textarea.setSelectionRange(nextIndex, nextIndex + this.currentSearchTerm.length);
+      this.textarea.focus();
+      this.updateCursorPosition();
+      this.updateSearchStatus(`Found at position ${nextIndex}`);
+    } else {
+      // Search from beginning
+      const fromStart = content.indexOf(searchTerm, 0);
+      if (fromStart !== -1 && fromStart < currentPos) {
+        this.textarea.setSelectionRange(fromStart, fromStart + this.currentSearchTerm.length);
+        this.textarea.focus();
+        this.updateCursorPosition();
+        this.updateSearchStatus('Search wrapped to beginning');
+      } else {
+        this.updateSearchStatus('Not found');
+      }
+    }
+  }
+
+  /**
+   * Find previous occurrence of search term
+   */
+  findPrevious() {
+    if (!this.currentSearchTerm) return;
+    
+    const searchTerm = this.currentSearchTerm.toLowerCase();
+    const content = this.content.toLowerCase();
+    const currentPos = this.selectionStart;
+    
+    const prevIndex = content.lastIndexOf(searchTerm, currentPos - 1);
+    
+    if (prevIndex !== -1) {
+      this.textarea.setSelectionRange(prevIndex, prevIndex + this.currentSearchTerm.length);
+      this.textarea.focus();
+      this.updateCursorPosition();
+      this.updateSearchStatus(`Found at position ${prevIndex}`);
+    } else {
+      // Search from end
+      const fromEnd = content.lastIndexOf(searchTerm);
+      if (fromEnd !== -1 && fromEnd >= currentPos) {
+        this.textarea.setSelectionRange(fromEnd, fromEnd + this.currentSearchTerm.length);
+        this.textarea.focus();
+        this.updateCursorPosition();
+        this.updateSearchStatus('Search wrapped to end');
+      } else {
+        this.updateSearchStatus('Not found');
+      }
+    }
+  }
+
+  /**
+   * Replace next occurrence
+   */
+  replaceNext() {
+    if (!this.currentSearchTerm || this.currentReplaceTerm === undefined) return;
+    
+    const selectedText = this.getSelectedText();
+    
+    if (selectedText.toLowerCase() === this.currentSearchTerm.toLowerCase()) {
+      // Replace current selection
+      this.saveUndoState();
+      this.insertText(this.currentReplaceTerm, true);
+      this.updateSearchStatus('Replaced 1 occurrence');
+    }
+    
+    // Find next
+    this.findNext();
+  }
+
+  /**
+   * Replace all occurrences
+   */
+  replaceAll() {
+    if (!this.currentSearchTerm || this.currentReplaceTerm === undefined) return;
+    
+    this.saveUndoState();
+    
+    // Use case-insensitive replacement with regex
+    const regex = new RegExp(this.escapeRegExp(this.currentSearchTerm), 'gi');
+    const newContent = this.content.replace(regex, this.currentReplaceTerm);
+    
+    if (newContent !== this.content) {
+      const replacementCount = (this.content.match(regex) || []).length;
+      this.setValue(newContent, false);
+      this.updateSearchStatus(`Replaced ${replacementCount} occurrence${replacementCount !== 1 ? 's' : ''}`);
+    } else {
+      this.updateSearchStatus('No matches found');
+    }
+  }
+
+  /**
+   * Escape special regex characters
+   * @param {string} string - String to escape
+   * @returns {string} Escaped string
+   * @private
+   */
+  escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * Update search status message
+   * @param {string} message - Status message
+   * @private
+   */
+  updateSearchStatus(message) {
+    if (this.findReplaceModal) {
+      const statusElement = this.findReplaceModal.querySelector('.search-status');
+      statusElement.textContent = message;
+      
+      // Clear status after 3 seconds
+      setTimeout(() => {
+        if (statusElement) {
+          statusElement.textContent = '';
+        }
+      }, 3000);
+    }
+  }
+
+  /**
+   * Close find and replace modal
+   */
+  closeFindReplace() {
+    if (this.findReplaceModal) {
+      this.findReplaceModal.style.display = 'none';
+      this.clearSearchHighlights();
+      this.textarea.focus();
+    }
+  }
+
+  /**
+   * Highlight search results (placeholder for future implementation)
+   * @private
+   */
+  highlightSearchResults() {
+    // This will be implemented with syntax highlighting in sub-issue #40
+    // For now, just update the status
+    if (this.currentSearchTerm) {
+      const regex = new RegExp(this.escapeRegExp(this.currentSearchTerm), 'gi');
+      const matches = (this.content.match(regex) || []).length;
+      this.updateSearchStatus(`${matches} match${matches !== 1 ? 'es' : ''} found`);
+    }
+  }
+
+  /**
+   * Clear search highlights (placeholder for future implementation)
+   * @private
+   */
+  clearSearchHighlights() {
+    // This will be implemented with syntax highlighting in sub-issue #40
+    this.searchHighlights = [];
+  }
+
+  /**
+   * Emit save request to parent application
+   * @private
+   */
+  emitSaveRequest() {
+    // Create custom event for save request
+    const saveEvent = new CustomEvent('save_requested', {
+      detail: {
+        content: this.content,
+        timestamp: Date.now()
+      },
+      bubbles: true
+    });
+    
+    this.container.dispatchEvent(saveEvent);
+    console.log('💾 Save request emitted');
+  }
+
+  /**
+   * Get list of available keyboard shortcuts
+   * @returns {Array} Array of shortcut objects
+   */
+  getKeyboardShortcuts() {
+    return Array.from(this.keyboardShortcuts.entries()).map(([key, data]) => ({
+      shortcut: data.shortcut,
+      description: data.description,
+      key
+    }));
+  }
+
+  /**
+   * Check if undo is available
+   * @returns {boolean} True if undo is available
+   */
+  canUndo() {
+    return this.undoStack.length > 0;
+  }
+
+  /**
+   * Check if redo is available
+   * @returns {boolean} True if redo is available
+   */
+  canRedo() {
+    return this.redoStack.length > 0;
   }
 
   /**

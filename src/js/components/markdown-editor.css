@@ -277,6 +277,226 @@
   box-sizing: border-box;
 }
 
+/* Find and Replace Modal */
+.markdown-editor-find-replace-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.find-replace-content {
+  background: var(--color-bg-primary, #ffffff);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  min-width: 400px;
+  max-width: 500px;
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.find-replace-content h3 {
+  margin: 0 0 1rem 0;
+  color: var(--color-text-primary, #1f2937);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.search-section,
+.replace-section {
+  margin-bottom: 1rem;
+}
+
+.search-section label,
+.replace-section label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--color-text-primary, #1f2937);
+  font-size: 14px;
+}
+
+.search-input,
+.replace-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 4px;
+  font-size: 14px;
+  margin-bottom: 0.75rem;
+  background: var(--color-bg-primary, #ffffff);
+  color: var(--color-text-primary, #1f2937);
+}
+
+.search-input:focus,
+.replace-input:focus {
+  outline: none;
+  border-color: var(--color-accent, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.btn-find-next,
+.btn-find-prev,
+.btn-replace,
+.btn-replace-all,
+.btn-close {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 4px;
+  background: var(--color-bg-secondary, #f8fafc);
+  color: var(--color-text-primary, #1f2937);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+  transition: all 0.15s ease;
+}
+
+.btn-find-next:hover,
+.btn-find-prev:hover,
+.btn-replace:hover,
+.btn-replace-all:hover,
+.btn-close:hover {
+  background: var(--color-accent-light, #3b82f6);
+  color: white;
+  border-color: var(--color-accent, #3b82f6);
+}
+
+.btn-find-next:active,
+.btn-find-prev:active,
+.btn-replace:active,
+.btn-replace-all:active,
+.btn-close:active {
+  transform: translateY(1px);
+}
+
+.find-replace-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.search-status {
+  font-size: 12px;
+  color: var(--color-text-muted, #6b7280);
+  font-style: italic;
+  flex: 1;
+  text-align: right;
+  margin-left: 1rem;
+}
+
+/* Replace section - hidden by default for find-only mode */
+.replace-section {
+  display: none;
+}
+
+/* Dark theme support for modal */
+@media (prefers-color-scheme: dark) {
+  .markdown-editor-find-replace-modal {
+    background: rgba(0, 0, 0, 0.7);
+  }
+  
+  .find-replace-content {
+    background: var(--color-bg-primary-dark, #1f2937);
+    border-color: var(--color-border-dark, #4b5563);
+  }
+  
+  .find-replace-content h3 {
+    color: var(--color-text-primary-dark, #f9fafb);
+  }
+  
+  .search-section label,
+  .replace-section label {
+    color: var(--color-text-primary-dark, #f9fafb);
+  }
+  
+  .search-input,
+  .replace-input {
+    background: var(--color-bg-secondary-dark, #374151);
+    color: var(--color-text-primary-dark, #f9fafb);
+    border-color: var(--color-border-dark, #4b5563);
+  }
+  
+  .btn-find-next,
+  .btn-find-prev,
+  .btn-replace,
+  .btn-replace-all,
+  .btn-close {
+    background: var(--color-bg-secondary-dark, #374151);
+    color: var(--color-text-primary-dark, #f9fafb);
+    border-color: var(--color-border-dark, #4b5563);
+  }
+  
+  .find-replace-controls {
+    border-top-color: var(--color-border-dark, #4b5563);
+  }
+  
+  .search-status {
+    color: var(--color-text-muted-dark, #9ca3af);
+  }
+}
+
+/* Mobile responsive design for modal */
+@media (max-width: 480px) {
+  .find-replace-content {
+    margin: 1rem;
+    min-width: auto;
+    max-width: none;
+  }
+  
+  .btn-find-next,
+  .btn-find-prev,
+  .btn-replace,
+  .btn-replace-all,
+  .btn-close {
+    padding: 0.375rem 0.75rem;
+    font-size: 12px;
+    margin-right: 0.25rem;
+  }
+  
+  .find-replace-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-status {
+    text-align: center;
+    margin-left: 0;
+    margin-top: 0.5rem;
+  }
+}
+
+/* High contrast mode support for modal */
+@media (prefers-contrast: high) {
+  .find-replace-content {
+    border: 2px solid;
+  }
+  
+  .search-input,
+  .replace-input {
+    border: 2px solid;
+  }
+  
+  .btn-find-next,
+  .btn-find-prev,
+  .btn-replace,
+  .btn-replace-all,
+  .btn-close {
+    border: 2px solid;
+  }
+}
+
 /* Ensure proper layer stacking for future overlay features */
 .markdown-editor-wrapper {
   isolation: isolate;
