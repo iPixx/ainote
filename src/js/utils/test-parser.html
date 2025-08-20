@@ -357,24 +357,24 @@ That's a comprehensive demonstration of all supported markdown syntax elements!<
             const input = document.getElementById('markdownInput');
             const output = document.getElementById('testOutput');
             
-            const edgeCaseContent = `# Edge Case Testing Suite
+            const edgeCaseContent = `# 🧪 Edge Case Testing Suite
 
-## Header Level Testing
+## 📋 Header Level Testing
 
-# H1 Header
-## H2 Header
-### H3 Header
-#### H4 Header
-##### H5 Header
-###### H6 Header
+# 🎯 H1 Header
+## 🚀 H2 Header
+### 💡 H3 Header
+#### ⚡ H4 Header
+##### ✨ H5 Header
+###### 🔥 H6 Header
 
-## Deep Nesting Combinations
+## 🔗 Deep Nesting Combinations
 
 **Bold with _italic and \`code\` inside_ and ~~strikethrough~~**
 
 ***Bold italic*** with regular text and \`inline code with **bold** inside\`
 
-## Extreme Link Testing
+## 🌐 Extreme Link Testing
 
 Multiple [link1](http://example1.com) and [link2](http://example2.com) in paragraph.
 
@@ -389,7 +389,7 @@ External images: ![Random Image 1](https://picsum.photos/200/300) and ![Square I
 [ref1]: http://reference1.com
 [ref2]: http://reference2.com "With title"
 
-## Code Block Variations
+## 💻 Code Block Variations
 
 \`\`\`javascript
 // JavaScript with special chars
@@ -409,7 +409,7 @@ def test():
 plain code block with script tag
 \`\`\`
 
-## Mixed List Complexity
+## 📝 Mixed List Complexity
 
 1. First ordered item
    * Nested unordered item
@@ -421,7 +421,7 @@ plain code block with script tag
   1. With nested ordered
 * Back to unordered
 
-## Blockquote Complexity
+## 💬 Blockquote Complexity
 
 > Simple quote
 
@@ -433,7 +433,7 @@ plain code block with script tag
 
 > **Formatted quote** with _emphasis_ and \`code\`
 
-## Pathological Patterns
+## ⚠️ Pathological Patterns
 
 **Unclosed bold **bold **bold text
 
@@ -441,15 +441,31 @@ _Unclosed italic _italic _italic text
 
 Mixed **bold _italic \`code **bold text
 
-## Unicode and Special Characters
+## 🌍 Unicode and Special Characters
 
-Text with unicode chars and emojis
+Text with unicode chars and emojis: 🚀 💻 📝 🎯 ⚡ 🔥 💡 ✨
 
 Special HTML chars: & < > " and quotes
 
-Mathematical symbols: sum prod delta
+Mathematical symbols: ∑ ∏ ∆ ∇ ∂ ∫ → ∞ ≠ ± α β γ δ
 
-## Performance Stress Patterns
+More emojis: 🎉 🌟 🔧 🛠️ ⭐ 🎨 📊 📈
+
+## 📊 Tables (Future Feature)
+
+| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| Cell 1   | **Bold** | \`Code\`  |
+| Cell 2   | _Italic_ | [Link](http://example.com) |
+
+| Left | Center | Right |
+|:-----|:------:|------:|
+| L1   |   C1   |    R1 |
+| L2   |   C2   |    R2 |
+
+> **Note:** Table parsing will be implemented in sub-issue #48
+
+## 🌟 Performance Stress Patterns
 
 ${'**Bold text repeated** '.repeat(50)}
 
@@ -457,15 +473,15 @@ ${'_Italic text repeated_ '.repeat(50)}
 
 ${'[Link repeated](http://example.com) '.repeat(25)}
 
-## Memory Efficiency Test
+## 🧠 Memory Efficiency Test
 
 ${'This is line with **bold** and _italic_ and `code` and [link](http://test.com)\n'.repeat(100)}
 
 ---
 
-## End of Edge Case Testing
+## 🏁 End of Edge Case Testing
 
-That is comprehensive edge case testing!`;
+That is comprehensive edge case testing! 🎯 ✅ 🚀`;
 
             input.value = edgeCaseContent;
             updatePreview();
