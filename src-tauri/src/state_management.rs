@@ -110,6 +110,28 @@ pub fn save_window_state_internal(
     save_app_state_internal(&state)
 }
 
+/// Save vault preferences (recent vaults list)
+pub fn save_vault_preferences_internal(recent_vaults: Vec<String>) -> FileSystemResult<()> {
+    let mut state = load_app_state_internal().unwrap_or_default();
+    
+    // Limit to max 5 recent vaults and ensure no duplicates
+    let mut unique_vaults = Vec::new();
+    for vault in recent_vaults.into_iter().take(5) {
+        if !unique_vaults.contains(&vault) && !vault.trim().is_empty() {
+            unique_vaults.push(vault);
+        }
+    }
+    
+    state.vault_preferences.recent_vaults = unique_vaults;
+    save_app_state_internal(&state)
+}
+
+/// Get vault preferences (recent vaults list)
+pub fn get_vault_preferences_internal() -> FileSystemResult<Vec<String>> {
+    let state = load_app_state_internal().unwrap_or_default();
+    Ok(state.vault_preferences.recent_vaults)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,6 +195,9 @@ mod tests {
                 current_vault: Some("/test/vault".to_string()),
                 current_file: Some("/test/vault/file.md".to_string()),
                 view_mode: "preview".to_string(),
+            },
+            vault_preferences: crate::types::VaultPreferences {
+                recent_vaults: vec!["/test/vault".to_string(), "/another/vault".to_string()],
             },
         };
 
@@ -379,6 +404,9 @@ mod tests {
                 current_vault: Some("/home/user/notes".to_string()),
                 current_file: Some("/home/user/notes/daily.md".to_string()),
                 view_mode: "preview".to_string(),
+            },
+            vault_preferences: crate::types::VaultPreferences {
+                recent_vaults: vec!["/home/user/notes".to_string()],
             },
         };
 

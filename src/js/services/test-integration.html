@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Services Integration Test - aiNote</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #007acc;
+            background: #f8f9fa;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .test-pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .test-fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #005999;
+        }
+        .status {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Services Integration Test</h1>
+        <p>Testing VaultManager and AutoSave integration with AppState and app_state.json backend</p>
+        
+        <div class="test-section">
+            <h3>Test Controls</h3>
+            <button onclick="runAllTests()">Run All Tests</button>
+            <button onclick="testAppState()">Test AppState</button>
+            <button onclick="testVaultManager()">Test VaultManager</button>
+            <button onclick="testAutoSave()">Test AutoSave</button>
+            <button onclick="clearResults()">Clear Results</button>
+        </div>
+
+        <div class="test-section">
+            <h3>Current Status</h3>
+            <div id="status" class="status">Ready to run tests...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Results</h3>
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <!-- Mock Tauri API for testing -->
+    <script>
+        // Mock Tauri API for testing
+        window.__TAURI__ = {
+            core: {
+                invoke: async (command, args) => {
+                    console.log('Mock Tauri invoke:', command, args);
+                    
+                    switch (command) {
+                        case 'select_vault':
+                            return '/mock/vault/path';
+                        case 'validate_vault':
+                            console.log('Mock: Validating vault', args);
+                            if (args && args.vault_path) {
+                                console.log('Vault path to validate:', args.vault_path);
+                                return true;
+                            }
+                            return false;
+                        case 'load_vault':
+                            console.log('Mock: Loading vault', args);
+                            if (args && args.vault_path) {
+                                console.log('Vault path to load:', args.vault_path);
+                                return [
+                                    { name: 'note1.md', is_dir: false, size: 1024 },
+                                    { name: 'note2.md', is_dir: false, size: 2048 },
+                                    { name: 'folder1', is_dir: true, size: 0 }
+                                ];
+                            }
+                            return [];
+                        case 'save_session_state':
+                            return null;
+                        case 'load_app_state':
+                            return {
+                                session: {
+                                    current_vault: null,
+                                    current_file: null,
+                                    view_mode: 'editor'
+                                }
+                            };
+                        case 'write_file':
+                        case 'auto_save_file':
+                            // Simulate save delay
+                            console.log(`Mock ${command} called with:`, args);
+                            if (args && args.file_path && args.content !== undefined) {
+                                console.log(`Saving to: ${args.file_path}, content length: ${args.content.length}`);
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                                return null;
+                            } else {
+                                console.error(`${command} missing required parameters:`, args);
+                                throw new Error(`${command} requires file_path and content parameters`);
+                            }
+                        case 'save_vault_preferences':
+                            // Mock saving vault preferences  
+                            console.log('Mock: Saving vault preferences', args);
+                            if (args && args.recent_vaults) {
+                                console.log('Recent vaults to save:', args.recent_vaults);
+                            }
+                            return null;
+                        case 'get_vault_preferences':
+                            // Mock getting vault preferences
+                            return ['/mock/vault/path', '/another/mock/vault'];
+                        default:
+                            throw new Error(`Mock command not implemented: ${command}`);
+                    }
+                }
+            }
+        };
+    </script>
+
+    <!-- Load modules -->
+    <script type="module">
+        import AppState from '../state.js';
+        import VaultManager from './vault-manager.js';
+        import AutoSave from './auto-save.js';
+
+        let appState, vaultManager, autoSave;
+        let testResults = [];
+
+        function addResult(test, passed, message) {
+            testResults.push({ test, passed, message });
+            updateResults();
+        }
+
+        function updateResults() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = testResults.map(result => 
+                `<div class="test-result ${result.passed ? 'test-pass' : 'test-fail'}">
+                    <strong>${result.test}:</strong> ${result.message}
+                </div>`
+            ).join('');
+        }
+
+        function updateStatus(status) {
+            document.getElementById('status').textContent = status;
+        }
+
+        window.clearResults = function() {
+            testResults = [];
+            updateResults();
+            updateStatus('Results cleared. Ready to run tests...');
+        };
+
+        window.runAllTests = async function() {
+            clearResults();
+            updateStatus('Running all tests...');
+            
+            await testAppState();
+            await testVaultManager();
+            await testAutoSave();
+            
+            const passed = testResults.filter(r => r.passed).length;
+            const total = testResults.length;
+            updateStatus(`All tests completed. ${passed}/${total} tests passed.`);
+        };
+
+        window.testAppState = async function() {
+            updateStatus('Testing AppState...');
+            
+            try {
+                // Initialize AppState
+                appState = new AppState();
+                addResult('AppState', true, 'AppState initialized successfully');
+
+                // Test event system
+                let eventReceived = false;
+                appState.addEventListener(AppState.EVENTS.VAULT_CHANGED, () => {
+                    eventReceived = true;
+                });
+
+                // Test vault setting
+                await appState.setVault('/test/vault');
+                addResult('AppState Events', eventReceived, 
+                    eventReceived ? 'Event system working' : 'Event not received');
+
+                // Test state validation
+                const isValid = appState.isValid();
+                addResult('AppState Validation', isValid, 
+                    isValid ? 'State is valid' : 'State validation failed');
+
+            } catch (error) {
+                addResult('AppState', false, `Error: ${error.message}`);
+            }
+        };
+
+        window.testVaultManager = async function() {
+            updateStatus('Testing VaultManager...');
+            
+            try {
+                // Ensure AppState exists
+                if (!appState) {
+                    appState = new AppState();
+                }
+
+                // Initialize VaultManager
+                vaultManager = new VaultManager(appState);
+                addResult('VaultManager Init', true, 'VaultManager initialized successfully');
+
+                // Test vault selection (mocked)
+                const selectedVault = await vaultManager.selectVault();
+                addResult('Vault Selection', !!selectedVault, 
+                    selectedVault ? `Selected: ${selectedVault}` : 'No vault selected');
+
+                // Test vault validation
+                const isValid = await vaultManager.validateVault('/test/path');
+                addResult('Vault Validation', isValid, 
+                    isValid ? 'Validation passed' : 'Validation failed');
+
+                // Test vault loading
+                if (selectedVault) {
+                    const files = await vaultManager.loadVault(selectedVault);
+                    addResult('Vault Loading', Array.isArray(files), 
+                        `Loaded ${files?.length || 0} items`);
+                }
+
+                // Test status
+                const status = vaultManager.getStatus();
+                addResult('VaultManager Status', status.initialized, 
+                    `Status: ${JSON.stringify(status, null, 2)}`);
+
+            } catch (error) {
+                addResult('VaultManager', false, `Error: ${error.message}`);
+            }
+        };
+
+        window.testAutoSave = async function() {
+            updateStatus('Testing AutoSave...');
+            
+            try {
+                // Ensure AppState exists and is properly configured
+                if (!appState) {
+                    appState = new AppState();
+                }
+                // Always ensure vault and file are set for AutoSave tests
+                await appState.setVault('/test/vault');
+                await appState.setCurrentFile('/test/vault/note.md');
+
+                // Initialize AutoSave
+                autoSave = new AutoSave(appState);
+                addResult('AutoSave Init', true, 'AutoSave initialized successfully');
+
+                // Test enable/disable
+                autoSave.disable();
+                autoSave.enable();
+                addResult('AutoSave Enable/Disable', autoSave.isEnabled, 
+                    'Enable/disable functionality working');
+
+                // Test save delay setting
+                autoSave.setSaveDelay(1000);
+                addResult('Save Delay', autoSave.saveDelay === 1000, 
+                    `Delay set to ${autoSave.saveDelay}ms`);
+
+                // Test content getter
+                autoSave.setContentGetter(() => 'Test content for auto-save');
+                addResult('Content Getter', !!autoSave.getEditorContent, 
+                    'Content getter set successfully');
+
+                // Test event system
+                let saveEventReceived = false;
+                autoSave.addEventListener(AutoSave.EVENTS.SAVE_SUCCESS, () => {
+                    saveEventReceived = true;
+                });
+
+                // Test manual save (with mocked file)
+                console.log('Testing manual save...');
+                console.log('Current file:', appState.currentFile);
+                console.log('Content getter exists:', !!autoSave.getEditorContent);
+                
+                try {
+                    const saveResult = await autoSave.saveNow();
+                    addResult('Manual Save', saveResult, 
+                        saveResult ? 'Manual save successful' : 'Manual save failed');
+                } catch (saveError) {
+                    console.error('Manual save error:', saveError);
+                    addResult('Manual Save', false, `Manual save failed: ${saveError.message}`);
+                }
+
+                // Test content change (debounced)
+                autoSave.handleContentChange('New content');
+                addResult('Content Change', true, 'Content change handled');
+
+                // Test status
+                const status = autoSave.getStatus();
+                addResult('AutoSave Status', status.enabled, 
+                    `Status: ${JSON.stringify(status, null, 2)}`);
+
+                // Test stats
+                const stats = autoSave.getStats();
+                addResult('AutoSave Stats', typeof stats.totalSaves === 'number', 
+                    `Stats: ${JSON.stringify(stats, null, 2)}`);
+
+            } catch (error) {
+                addResult('AutoSave', false, `Error: ${error.message}`);
+            }
+        };
+
+        // Initialize on page load
+        updateStatus('Page loaded. Ready to run tests.');
+    </script>
+</body>
+</html>

@@ -78,6 +78,21 @@ impl Default for SessionState {
     }
 }
 
+/// Vault preferences structure for persistence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultPreferences {
+    /// Recently used vault paths (max 5)
+    pub recent_vaults: Vec<String>,
+}
+
+impl Default for VaultPreferences {
+    fn default() -> Self {
+        Self {
+            recent_vaults: Vec::new(),
+        }
+    }
+}
+
 /// Combined application state
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppState {
@@ -87,6 +102,9 @@ pub struct AppState {
     pub layout: LayoutState,
     /// Session state
     pub session: SessionState,
+    /// Vault preferences (optional for backward compatibility)
+    #[serde(default)]
+    pub vault_preferences: VaultPreferences,
 }
 
 /// FileInfo struct representing file metadata for frontend communication
