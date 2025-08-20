@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PreviewRenderer Test - aiNote</title>
+    <link rel="stylesheet" href="../../styles.css">
+    <style>
+        body {
+            margin: 0;
+            padding: var(--space-4);
+            background-color: var(--color-bg-secondary);
+        }
+        
+        .test-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-4);
+            height: calc(100vh - 2 * var(--space-4));
+        }
+        
+        .test-input {
+            display: flex;
+            flex-direction: column;
+            background: var(--color-bg-primary);
+            border-radius: 8px;
+            border: 1px solid var(--color-border-primary);
+        }
+        
+        .test-output {
+            background: var(--color-bg-primary);
+            border-radius: 8px;
+            border: 1px solid var(--color-border-primary);
+            overflow: hidden;
+        }
+        
+        .panel-header {
+            padding: var(--space-3) var(--space-4);
+            background: var(--color-bg-tertiary);
+            border-bottom: 1px solid var(--color-border-primary);
+            font-weight: 600;
+            font-size: var(--font-size-sm);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .test-textarea {
+            flex: 1;
+            padding: var(--space-4);
+            border: none;
+            font-family: var(--font-family-mono);
+            font-size: var(--font-size-sm);
+            resize: none;
+            background: var(--color-bg-primary);
+            color: var(--color-text-primary);
+            line-height: 1.6;
+        }
+        
+        .test-textarea:focus {
+            outline: none;
+        }
+        
+        .stats-display {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-tertiary);
+        }
+        
+        .render-button {
+            background: var(--color-bg-accent);
+            color: var(--color-text-inverse);
+            padding: var(--space-2) var(--space-4);
+            border-radius: 4px;
+            font-size: var(--font-size-sm);
+            cursor: pointer;
+            transition: background-color var(--transition-fast);
+        }
+        
+        .render-button:hover {
+            background: var(--color-info);
+        }
+        
+        .performance-stats {
+            position: fixed;
+            top: var(--space-4);
+            right: var(--space-4);
+            background: var(--color-bg-primary);
+            border: 1px solid var(--color-border-primary);
+            border-radius: 6px;
+            padding: var(--space-3);
+            font-size: var(--font-size-xs);
+            min-width: 200px;
+            box-shadow: var(--shadow-md);
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: var(--space-1);
+        }
+        
+        .stat-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .warning {
+            color: var(--color-warning);
+        }
+        
+        .error {
+            color: var(--color-error);
+        }
+        
+        .success {
+            color: var(--color-success);
+        }
+        
+        @media (max-width: 768px) {
+            .test-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 1fr;
+            }
+            
+            .performance-stats {
+                position: relative;
+                top: auto;
+                right: auto;
+                margin: var(--space-2) 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-input">
+            <div class="panel-header">
+                <span>Markdown Input</span>
+                <button class="render-button" onclick="renderPreview()">Render Preview</button>
+            </div>
+            <textarea class="test-textarea" id="markdownInput" placeholder="Enter markdown content here...">
+# Preview Renderer Test
+
+## Performance Testing
+This is a **comprehensive test** of the `PreviewRenderer` component with various markdown elements.
+
+### Text Formatting
+- **Bold text** and __bold text__
+- *Italic text* and _italic text_
+- ~~Strikethrough text~~
+- `inline code` formatting
+
+### Lists
+1. Ordered list item 1
+2. Ordered list item 2
+   - Nested unordered item
+   - Another nested item
+3. Ordered list item 3
+
+### Unordered Lists
+- First item
+- Second item
+  1. Nested ordered item
+  2. Another nested item
+- Third item
+
+### Code Blocks
+```javascript
+// JavaScript code block
+function renderPreview() {
+    const input = document.getElementById('markdownInput').value;
+    renderer.render(input);
+}
+```
+
+```python
+# Python code block
+def calculate_performance(render_time, memory_usage):
+    return {
+        'efficient': render_time < 50 and memory_usage < 3,
+        'render_time': render_time,
+        'memory_usage': memory_usage
+    }
+```
+
+### Blockquotes
+> This is a blockquote with **bold** and *italic* text.
+> 
+> > Nested blockquote with `inline code`.
+> 
+> Back to first level blockquote.
+
+### Links and Images
+- [Internal link](./test-file.md)
+- [External link](https://github.com/anthropics/claude-code)
+- ![Test image](https://via.placeholder.com/300x200?text=Test+Image)
+
+### Tables
+| Feature | Status | Performance |
+|---------|--------|-------------|
+| HTML Generation | ✅ Working | <50ms |
+| Memory Management | ✅ Working | <3MB |
+| Accessibility | ✅ Working | WCAG 2.1 |
+| Theme Support | ✅ Working | Auto-detect |
+
+### Horizontal Rule
+---
+
+### Complex Nesting
+1. **First level**
+   - *Nested list with* `code`
+   - Another item with [link](https://example.com)
+     1. **Third level** with ~~strikethrough~~
+     2. More nesting
+2. **Back to first level**
+
+### Mathematical Expressions (as code)
+```
+E = mc²
+∀x ∈ ℝ: f(x) = ax + b
+```
+
+### Long Content Performance Test
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+### Accessibility Features
+- Proper semantic HTML structure
+- ARIA labels and descriptions
+- Keyboard navigation support
+- Screen reader compatibility
+- High contrast mode support
+
+### Performance Metrics
+The renderer tracks:
+- Render time (target: <50ms)
+- Memory usage (target: <3MB)
+- Update frequency (target: 60fps)
+- DOM efficiency metrics
+
+---
+*Test completed successfully! 🎉*
+            </textarea>
+        </div>
+        
+        <div class="test-output">
+            <div class="panel-header">
+                <span>Preview Output</span>
+                <span class="stats-display" id="renderStats">Ready to render</span>
+            </div>
+            <div id="previewContainer"></div>
+        </div>
+    </div>
+
+    <div class="performance-stats" id="performanceStats">
+        <h4 style="margin: 0 0 var(--space-2) 0;">Performance Stats</h4>
+        <div class="stat-item">
+            <span>Renders:</span>
+            <span id="totalRenders">0</span>
+        </div>
+        <div class="stat-item">
+            <span>Avg Time:</span>
+            <span id="avgTime">0ms</span>
+        </div>
+        <div class="stat-item">
+            <span>Max Time:</span>
+            <span id="maxTime">0ms</span>
+        </div>
+        <div class="stat-item">
+            <span>Memory:</span>
+            <span id="memoryUsage">0MB</span>
+        </div>
+        <div class="stat-item">
+            <span>Last Render:</span>
+            <span id="lastRender">-</span>
+        </div>
+    </div>
+
+    <!-- Accessibility helper -->
+    <div id="external-link-description" style="position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden;">
+        Opens in a new tab
+    </div>
+
+    <script type="module">
+        import PreviewRenderer from '../components/preview-renderer.js';
+        
+        // Create renderer instance
+        const container = document.getElementById('previewContainer');
+        const renderer = new PreviewRenderer(container, null);
+        
+        // Global render function
+        window.renderPreview = async function() {
+            const input = document.getElementById('markdownInput').value;
+            const startTime = performance.now();
+            
+            try {
+                await renderer.render(input);
+                const endTime = performance.now();
+                const renderTime = endTime - startTime;
+                
+                // Update stats display
+                updateStatsDisplay(renderTime);
+                updatePerformanceStats();
+                
+            } catch (error) {
+                console.error('Render error:', error);
+                document.getElementById('renderStats').textContent = `Error: ${error.message}`;
+                document.getElementById('renderStats').className = 'stats-display error';
+            }
+        };
+        
+        function updateStatsDisplay(renderTime) {
+            const statsEl = document.getElementById('renderStats');
+            const className = renderTime < 50 ? 'success' : renderTime < 100 ? 'warning' : 'error';
+            
+            statsEl.textContent = `Rendered in ${renderTime.toFixed(2)}ms`;
+            statsEl.className = `stats-display ${className}`;
+        }
+        
+        function updatePerformanceStats() {
+            const stats = renderer.getPerformanceStats();
+            
+            document.getElementById('totalRenders').textContent = stats.totalRenders;
+            
+            const avgEl = document.getElementById('avgTime');
+            avgEl.textContent = `${stats.averageRenderTime}ms`;
+            avgEl.className = stats.averageRenderTime < 50 ? 'success' : stats.averageRenderTime < 100 ? 'warning' : 'error';
+            
+            const maxEl = document.getElementById('maxTime');
+            maxEl.textContent = `${stats.maxRenderTime}ms`;
+            maxEl.className = stats.maxRenderTime < 50 ? 'success' : stats.maxRenderTime < 100 ? 'warning' : 'error';
+            
+            const memEl = document.getElementById('memoryUsage');
+            memEl.textContent = `${stats.memoryUsage}MB`;
+            memEl.className = stats.memoryUsage < 3 ? 'success' : stats.memoryUsage < 5 ? 'warning' : 'error';
+            
+            document.getElementById('lastRender').textContent = new Date().toLocaleTimeString();
+        }
+        
+        // Auto-render on input change (debounced)
+        let renderTimeout;
+        document.getElementById('markdownInput').addEventListener('input', function() {
+            clearTimeout(renderTimeout);
+            renderTimeout = setTimeout(() => {
+                renderPreview();
+            }, 500);
+        });
+        
+        // Initial render
+        renderPreview();
+        
+        // Test keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+                e.preventDefault();
+                renderPreview();
+            }
+            
+            if (e.key === 'F5') {
+                e.preventDefault();
+                location.reload();
+            }
+        });
+        
+        // Theme toggle for testing
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+                e.preventDefault();
+                document.documentElement.classList.toggle('force-dark');
+                // Trigger renderer theme update
+                const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                renderer.handleThemeChange({ matches: document.documentElement.classList.contains('force-dark') });
+            }
+        });
+        
+        console.log('✅ PreviewRenderer test loaded successfully');
+        console.log('📋 Available shortcuts:');
+        console.log('  • Ctrl/Cmd+R: Manual render');
+        console.log('  • Ctrl/Cmd+T: Toggle theme');
+        console.log('  • F5: Reload test');
+        console.log('  • Auto-render: 500ms after typing');
+    </script>
+    
+    <style>
+        /* Force dark theme class for testing */
+        html.force-dark {
+            --color-bg-primary: #0f172a;
+            --color-bg-secondary: #1e293b;
+            --color-bg-tertiary: #334155;
+            --color-bg-hover: #475569;
+            --color-bg-active: #64748b;
+            --color-text-primary: #f8fafc;
+            --color-text-secondary: #cbd5e1;
+            --color-text-tertiary: #94a3b8;
+            --color-border-primary: #334155;
+            --color-border-secondary: #475569;
+        }
+    </style>
+</body>
+</html>
