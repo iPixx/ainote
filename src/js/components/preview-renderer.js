@@ -258,7 +258,7 @@ class PreviewRenderer {
   }
 
   /**
-   * Update accessibility attributes
+   * Update accessibility attributes and setup advanced features
    */
   updateAccessibility() {
     if (!this.elements.content) return;
@@ -270,13 +270,8 @@ class PreviewRenderer {
       heading.setAttribute('tabindex', '0');
     });
 
-    // Update links for external navigation
-    const links = this.elements.content.querySelectorAll('a[href^="http"]');
-    links.forEach(link => {
-      link.setAttribute('target', '_blank');
-      link.setAttribute('rel', 'noopener noreferrer');
-      link.setAttribute('aria-describedby', 'external-link-description');
-    });
+    // Setup link click handling
+    this.handleLinkClicks();
 
     // Update code blocks for better accessibility
     const codeBlocks = this.elements.content.querySelectorAll('pre code');
@@ -287,14 +282,11 @@ class PreviewRenderer {
       pre.setAttribute('tabindex', '0');
     });
 
-    // Update images with proper alt text handling
-    const images = this.elements.content.querySelectorAll('img');
-    images.forEach(img => {
-      if (!img.getAttribute('alt')) {
-        img.setAttribute('alt', 'Image without description');
-      }
-      img.setAttribute('loading', 'lazy');
-    });
+    // Setup image loading and error handling
+    this.loadImages();
+
+    // Setup table enhancements
+    this.renderTables();
   }
 
   /**
@@ -507,6 +499,607 @@ class PreviewRenderer {
   }
 
   /**
+   * Handle link clicks and navigation
+   * Target: <5ms response time for link handling
+   */
+  handleLinkClicks() {
+    if (!this.elements.content) return;
+
+    const links = this.elements.content.querySelectorAll('a');
+    
+    links.forEach(link => {
+      const href = link.getAttribute('href');
+      
+      if (!href) return;
+      
+      // Handle external links
+      if (href.startsWith('http://') || href.startsWith('https://')) {
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+        link.setAttribute('aria-describedby', 'external-link-description');
+        
+        // Add click handler for external link validation
+        link.addEventListener('click', (e) => {
+          const startTime = performance.now();
+          this.validateExternalLink(e, href);
+          const responseTime = performance.now() - startTime;
+          
+          if (responseTime > 5) {
+            console.warn(`⚠️ Link handling exceeded target: ${responseTime.toFixed(2)}ms (target: <5ms)`);
+          }
+        });
+      }
+      // Handle internal/relative links (for future file navigation)
+      else if (href.startsWith('./') || href.startsWith('../') || href.endsWith('.md')) {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const startTime = performance.now();
+          this.handleInternalLink(href);
+          const responseTime = performance.now() - startTime;
+          
+          if (responseTime > 5) {
+            console.warn(`⚠️ Link handling exceeded target: ${responseTime.toFixed(2)}ms (target: <5ms)`);
+          }
+        });
+      }
+      // Handle anchor links
+      else if (href.startsWith('#')) {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const startTime = performance.now();
+          this.scrollToAnchor(href.substring(1));
+          const responseTime = performance.now() - startTime;
+          
+          if (responseTime > 5) {
+            console.warn(`⚠️ Link handling exceeded target: ${responseTime.toFixed(2)}ms (target: <5ms)`);
+          }
+        });
+      }
+    });
+    
+    // Add external link description for accessibility
+    if (!document.getElementById('external-link-description')) {
+      const description = document.createElement('div');
+      description.id = 'external-link-description';
+      description.className = 'sr-only';
+      description.textContent = 'Opens in a new window';
+      document.body.appendChild(description);
+    }
+  }
+
+  /**
+   * Validate external link before opening
+   * @param {Event} e - Click event
+   * @param {string} href - Link URL
+   */
+  validateExternalLink(e, href) {
+    try {
+      // Basic URL validation
+      const url = new URL(href);
+      
+      // Check for suspicious protocols
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        e.preventDefault();
+        console.warn('⚠️ Blocked suspicious link protocol:', url.protocol);
+        return;
+      }
+      
+      // Emit event for app state tracking (future feature)
+      if (this.appState && this.appState.emit) {
+        this.appState.emit('preview:external-link', { url: href });
+      }
+      
+    } catch (error) {
+      e.preventDefault();
+      console.error('❌ Invalid URL:', href, error);
+    }
+  }
+
+  /**
+   * Handle internal link navigation (for future file navigation)
+   * @param {string} href - Internal link path
+   */
+  handleInternalLink(href) {
+    console.log('🔗 Internal link clicked:', href);
+    
+    // Emit event for app state (future file navigation)
+    if (this.appState && this.appState.emit) {
+      this.appState.emit('preview:internal-link', { path: href });
+    }
+    
+    // Future: integrate with file tree navigation
+    // For now, just log the action
+  }
+
+  /**
+   * Scroll to anchor link within the document
+   * @param {string} anchor - Anchor ID to scroll to
+   */
+  scrollToAnchor(anchor) {
+    if (!this.elements.content) return;
+    
+    const targetElement = this.elements.content.querySelector(`#${anchor}, [name="${anchor}"]`);
+    
+    if (targetElement) {
+      targetElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+      
+      // Focus the element for accessibility
+      if (targetElement.hasAttribute('tabindex')) {
+        targetElement.focus();
+      }
+      
+      console.log('⚓ Scrolled to anchor:', anchor);
+    } else {
+      console.warn('⚠️ Anchor not found:', anchor);
+    }
+  }
+
+  /**
+   * Load images with proper sizing and error handling
+   */
+  loadImages() {
+    if (!this.elements.content) return;
+
+    const images = this.elements.content.querySelectorAll('img');
+    
+    images.forEach((img, index) => {
+      // Set default attributes
+      if (!img.getAttribute('alt')) {
+        img.setAttribute('alt', `Image ${index + 1} - No description provided`);
+      }
+      
+      img.setAttribute('loading', 'lazy');
+      img.setAttribute('decoding', 'async');
+      
+      // Add responsive sizing classes
+      img.classList.add('preview-image');
+      
+      // Handle image loading
+      img.addEventListener('load', () => {
+        img.classList.add('loaded');
+        console.log('🖼️ Image loaded successfully:', img.src);
+      });
+      
+      // Handle image errors
+      img.addEventListener('error', (e) => {
+        img.classList.add('error');
+        img.setAttribute('alt', `Failed to load image: ${img.src}`);
+        
+        // Create error placeholder
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'image-error';
+        errorDiv.innerHTML = `
+          <div class="image-error-content">
+            <span class="image-error-icon">🚫</span>
+            <p class="image-error-text">Image failed to load</p>
+            <p class="image-error-src">${this.escapeHtml(img.src)}</p>
+          </div>
+        `;
+        
+        img.parentNode.insertBefore(errorDiv, img);
+        img.style.display = 'none';
+        
+        console.error('❌ Image failed to load:', img.src);
+      });
+      
+      // Set proper sizing based on container
+      this.optimizeImageSize(img);
+    });
+  }
+
+  /**
+   * Optimize image size for the preview container
+   * @param {HTMLImageElement} img - Image element to optimize
+   */
+  optimizeImageSize(img) {
+    if (!img || !this.elements.content) return;
+    
+    // Wait for image to load to get natural dimensions
+    if (img.complete) {
+      this.applyImageSizing(img);
+    } else {
+      img.addEventListener('load', () => this.applyImageSizing(img));
+    }
+  }
+
+  /**
+   * Apply responsive sizing to loaded image
+   * @param {HTMLImageElement} img - Loaded image element
+   */
+  applyImageSizing(img) {
+    const containerWidth = this.elements.content.clientWidth;
+    const naturalRatio = img.naturalHeight / img.naturalWidth;
+    
+    // Set max width based on container
+    const maxWidth = Math.min(containerWidth - 40, 800); // 40px for padding
+    
+    if (img.naturalWidth > maxWidth) {
+      img.style.maxWidth = `${maxWidth}px`;
+      img.style.height = 'auto';
+    }
+    
+    // Add size classes for styling
+    if (img.naturalWidth > containerWidth * 0.8) {
+      img.classList.add('large-image');
+    } else if (img.naturalWidth < 200) {
+      img.classList.add('small-image');
+    } else {
+      img.classList.add('medium-image');
+    }
+    
+    // Add aspect ratio class for styling
+    if (naturalRatio > 1.5) {
+      img.classList.add('portrait');
+    } else if (naturalRatio < 0.7) {
+      img.classList.add('landscape');
+    } else {
+      img.classList.add('square');
+    }
+  }
+
+  /**
+   * Enhance table rendering with alignment and accessibility
+   */
+  renderTables() {
+    if (!this.elements.content) return;
+
+    const tables = this.elements.content.querySelectorAll('table');
+    
+    tables.forEach((table, index) => {
+      // Add table wrapper for scrolling on small screens
+      if (!table.parentElement.classList.contains('table-wrapper')) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'table-wrapper';
+        table.parentNode.insertBefore(wrapper, table);
+        wrapper.appendChild(table);
+      }
+      
+      // Add accessibility attributes
+      table.setAttribute('role', 'table');
+      table.setAttribute('aria-label', `Table ${index + 1}`);
+      
+      // Process table headers
+      const headers = table.querySelectorAll('th');
+      headers.forEach((th, colIndex) => {
+        th.setAttribute('scope', 'col');
+        th.setAttribute('role', 'columnheader');
+        
+        // Apply text alignment from markdown table syntax
+        const textAlign = this.getTableColumnAlignment(th);
+        if (textAlign) {
+          th.style.textAlign = textAlign;
+        }
+      });
+      
+      // Process table cells
+      const cells = table.querySelectorAll('td');
+      cells.forEach((td, cellIndex) => {
+        td.setAttribute('role', 'cell');
+        
+        // Apply column alignment to cells
+        const columnIndex = Array.from(td.parentElement.children).indexOf(td);
+        const headerCell = table.querySelector(`th:nth-child(${columnIndex + 1})`);
+        
+        if (headerCell) {
+          const alignment = headerCell.style.textAlign;
+          if (alignment) {
+            td.style.textAlign = alignment;
+          }
+        }
+      });
+      
+      // Add table navigation for keyboard users
+      table.setAttribute('tabindex', '0');
+      table.addEventListener('keydown', (e) => {
+        this.handleTableNavigation(e, table);
+      });
+      
+      console.log(`📊 Table ${index + 1} enhanced with accessibility features`);
+    });
+  }
+
+  /**
+   * Get table column alignment from markdown syntax
+   * @param {HTMLElement} header - Table header element
+   * @returns {string|null} CSS text-align value
+   */
+  getTableColumnAlignment(header) {
+    // Check for alignment indicators in the header content
+    const text = header.textContent.trim();
+    
+    // Look for markdown alignment syntax that might be preserved
+    if (text.startsWith(':') && text.endsWith(':')) {
+      return 'center';
+    } else if (text.endsWith(':')) {
+      return 'right';
+    } else if (text.startsWith(':')) {
+      return 'left';
+    }
+    
+    return null;
+  }
+
+  /**
+   * Handle keyboard navigation within tables
+   * @param {KeyboardEvent} e - Keyboard event
+   * @param {HTMLTableElement} table - Table element
+   */
+  handleTableNavigation(e, table) {
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      return;
+    }
+    
+    e.preventDefault();
+    
+    const cells = table.querySelectorAll('td, th');
+    const currentCell = document.activeElement;
+    const currentIndex = Array.from(cells).indexOf(currentCell);
+    
+    if (currentIndex === -1) return;
+    
+    let targetIndex = currentIndex;
+    const cols = table.rows[0].cells.length;
+    
+    switch (e.key) {
+      case 'ArrowRight':
+        targetIndex = Math.min(currentIndex + 1, cells.length - 1);
+        break;
+      case 'ArrowLeft':
+        targetIndex = Math.max(currentIndex - 1, 0);
+        break;
+      case 'ArrowDown':
+        targetIndex = Math.min(currentIndex + cols, cells.length - 1);
+        break;
+      case 'ArrowUp':
+        targetIndex = Math.max(currentIndex - cols, 0);
+        break;
+    }
+    
+    if (cells[targetIndex]) {
+      cells[targetIndex].focus();
+    }
+  }
+
+  /**
+   * Export preview content to HTML format
+   * Target: <200ms for typical documents
+   * @param {Object} options - Export options
+   * @returns {Promise<string>} Generated HTML
+   */
+  async exportToHTML(options = {}) {
+    const startTime = performance.now();
+    
+    try {
+      if (!this.elements.content) {
+        throw new Error('No content to export');
+      }
+      
+      const {
+        includeStyles = true,
+        includeMetadata = true,
+        title = 'Exported Document',
+        theme = 'auto'
+      } = options;
+      
+      // Get current theme
+      const currentTheme = theme === 'auto' 
+        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : theme;
+      
+      // Create HTML document structure
+      const htmlDocument = this.generateHTMLDocument({
+        title,
+        content: this.elements.content.innerHTML,
+        includeStyles,
+        includeMetadata,
+        theme: currentTheme
+      });
+      
+      const exportTime = performance.now() - startTime;
+      
+      if (exportTime > 200) {
+        console.warn(`⚠️ Export time exceeded target: ${exportTime.toFixed(2)}ms (target: <200ms)`);
+      }
+      
+      console.log(`📤 HTML export completed in ${exportTime.toFixed(2)}ms`);
+      return htmlDocument;
+      
+    } catch (error) {
+      console.error('❌ HTML export failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate complete HTML document for export
+   * @param {Object} params - Document parameters
+   * @returns {string} Complete HTML document
+   */
+  generateHTMLDocument({ title, content, includeStyles, includeMetadata, theme }) {
+    const styles = includeStyles ? this.generateExportStyles(theme) : '';
+    const metadata = includeMetadata ? this.generateMetadata(title) : '';
+    
+    return `<!DOCTYPE html>
+<html lang="en" data-theme="${theme}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${this.escapeHtml(title)}</title>
+  ${metadata}
+  ${styles}
+</head>
+<body>
+  <main class="exported-content">
+    ${content}
+  </main>
+  <footer class="export-footer">
+    <p>Generated by aiNote - ${new Date().toISOString()}</p>
+  </footer>
+</body>
+</html>`;
+  }
+
+  /**
+   * Generate CSS styles for export
+   * @param {string} theme - Theme (light/dark)
+   * @returns {string} CSS styles
+   */
+  generateExportStyles(theme) {
+    return `<style>
+/* Export styles for aiNote markdown preview */
+:root {
+  --text-color: ${theme === 'dark' ? '#e4e4e4' : '#333333'};
+  --background-color: ${theme === 'dark' ? '#1a1a1a' : '#ffffff'};
+  --border-color: ${theme === 'dark' ? '#404040' : '#e1e1e1'};
+  --code-background: ${theme === 'dark' ? '#2d2d2d' : '#f5f5f5'};
+  --link-color: ${theme === 'dark' ? '#58a6ff' : '#0066cc'};
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  color: var(--text-color);
+  background-color: var(--background-color);
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.exported-content {
+  margin-bottom: 3rem;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+h1 { font-size: 2.25rem; }
+h2 { font-size: 1.875rem; }
+h3 { font-size: 1.5rem; }
+h4 { font-size: 1.25rem; }
+h5 { font-size: 1.125rem; }
+h6 { font-size: 1rem; }
+
+/* Links */
+a {
+  color: var(--link-color);
+  text-decoration: underline;
+}
+
+a:hover {
+  text-decoration: none;
+}
+
+/* Code */
+code {
+  background-color: var(--code-background);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: 'SFMono-Regular', Monaco, 'Cascadia Code', monospace;
+  font-size: 0.875rem;
+}
+
+pre {
+  background-color: var(--code-background);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+}
+
+/* Tables */
+.table-wrapper {
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border-color);
+}
+
+th, td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+th {
+  background-color: var(--code-background);
+  font-weight: 600;
+}
+
+/* Images */
+.preview-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+
+.image-error {
+  background-color: var(--code-background);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+  margin: 1rem 0;
+}
+
+/* Footer */
+.export-footer {
+  border-top: 1px solid var(--border-color);
+  padding-top: 1rem;
+  margin-top: 2rem;
+  font-size: 0.875rem;
+  color: #666;
+  text-align: center;
+}
+
+/* Print styles */
+@media print {
+  body {
+    max-width: none;
+    margin: 0;
+    padding: 1rem;
+  }
+  
+  .export-footer {
+    page-break-inside: avoid;
+  }
+}
+</style>`;
+  }
+
+  /**
+   * Generate metadata for export
+   * @param {string} title - Document title
+   * @returns {string} HTML metadata
+   */
+  generateMetadata(title) {
+    const now = new Date().toISOString();
+    
+    return `<meta name="generator" content="aiNote">
+  <meta name="created" content="${now}">
+  <meta name="description" content="Exported markdown document from aiNote">
+  <meta property="og:title" content="${this.escapeHtml(title)}">
+  <meta property="og:type" content="article">
+  <meta property="og:description" content="Exported markdown document from aiNote">`;
+  }
+
+  /**
    * Cleanup method for removing event listeners and clearing memory
    */
   destroy() {
@@ -519,6 +1112,22 @@ class PreviewRenderer {
     
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     mediaQuery.removeListener(this.handleThemeChange);
+    
+    // Clean up link event listeners
+    if (this.elements.content) {
+      const links = this.elements.content.querySelectorAll('a');
+      links.forEach(link => {
+        link.removeEventListener('click', this.validateExternalLink);
+        link.removeEventListener('click', this.handleInternalLink);
+        link.removeEventListener('click', this.scrollToAnchor);
+      });
+      
+      // Clean up table event listeners
+      const tables = this.elements.content.querySelectorAll('table');
+      tables.forEach(table => {
+        table.removeEventListener('keydown', this.handleTableNavigation);
+      });
+    }
     
     // Clear DOM elements
     this.clear();
