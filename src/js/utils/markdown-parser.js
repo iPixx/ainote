@@ -30,7 +30,10 @@ class MarkdownParser {
       listStack: [],
       linkReferences: new Map(),
       currentLine: 0,
-      totalLines: 0
+      totalLines: 0,
+      inTable: false,
+      tableHeaders: [],
+      tableAlignments: []
     };
     this.html = [];
     this.currentParagraph = [];
@@ -57,6 +60,10 @@ class MarkdownParser {
       
       // Blockquotes
       blockquote: /^(\s*>)+\s?(.*)$/,
+      
+      // Tables
+      tableRow: /^\s*\|.*\|\s*$/,
+      tableSeparator: /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/,
       
       // Inline patterns
       strongDouble: /\*\*((?:(?!\*\*).)+)\*\*/g,
@@ -101,8 +108,9 @@ class MarkdownParser {
     // Second pass: parse content
     this.parseLines(lines);
 
-    // Finalize any remaining paragraph
+    // Finalize any remaining content
     this.finalizeParagraph();
+    this.finalizeTable();
 
     const result = this.html.join('\n');
     const parseTime = performance.now() - startTime;
@@ -157,6 +165,7 @@ class MarkdownParser {
     // Handle block-level elements
     if (this.handleHeader(trimmed)) return;
     if (this.handleHorizontalRule(trimmed)) return;
+    if (this.handleTable(line, trimmed)) return;
     if (this.handleList(line)) return;
     if (this.handleBlockquote(line, trimmed)) return;
 
@@ -351,11 +360,131 @@ class MarkdownParser {
   }
 
   /**
+   * Handle table rows and separators
+   * @param {string} line - Original line
+   * @param {string} trimmed - Trimmed line
+   * @returns {boolean} True if handled
+   */
+  handleTable(line, trimmed) {
+    const isTableRow = this.patterns.tableRow.test(trimmed);
+    const isTableSeparator = this.patterns.tableSeparator.test(trimmed);
+    
+    if (!isTableRow && !isTableSeparator && this.state.inTable) {
+      // End of table
+      this.finalizeTable();
+      return false;
+    }
+    
+    if (isTableRow || isTableSeparator) {
+      this.finalizeParagraph();
+      
+      if (!this.state.inTable) {
+        // Start new table
+        this.state.inTable = true;
+        this.state.tableHeaders = [];
+        this.state.tableAlignments = [];
+      }
+      
+      if (isTableSeparator) {
+        // Handle table separator row (defines alignment)
+        this.parseTableAlignment(trimmed);
+        return true;
+      } else {
+        // Handle table row
+        this.parseTableRow(trimmed);
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Parse table alignment from separator row
+   * @param {string} line - Table separator line
+   */
+  parseTableAlignment(line) {
+    const cells = line.split('|').filter(cell => cell.trim());
+    this.state.tableAlignments = cells.map(cell => {
+      const trimmed = cell.trim();
+      if (trimmed.startsWith(':') && trimmed.endsWith(':')) {
+        return 'center';
+      } else if (trimmed.endsWith(':')) {
+        return 'right';
+      } else {
+        return 'left';
+      }
+    });
+    
+    // If we have headers, create the table with headers
+    if (this.state.tableHeaders.length > 0) {
+      this.html.push('<table>');
+      this.html.push('<thead>');
+      this.html.push('<tr>');
+      
+      this.state.tableHeaders.forEach((header, index) => {
+        const alignment = this.state.tableAlignments[index] || 'left';
+        const style = alignment !== 'left' ? ` style="text-align: ${alignment}"` : '';
+        this.html.push(`<th${style}>${this.parseInlineElements(header)}</th>`);
+      });
+      
+      this.html.push('</tr>');
+      this.html.push('</thead>');
+      this.html.push('<tbody>');
+    }
+  }
+
+  /**
+   * Parse table row
+   * @param {string} line - Table row line
+   */
+  parseTableRow(line) {
+    const cells = line.split('|').filter((cell, index, arr) => {
+      // Remove first and last empty cells (from leading/trailing |)
+      return !(index === 0 && cell.trim() === '') && 
+             !(index === arr.length - 1 && cell.trim() === '');
+    });
+    
+    if (this.state.tableHeaders.length === 0 && this.state.tableAlignments.length === 0) {
+      // This is the header row
+      this.state.tableHeaders = cells.map(cell => cell.trim());
+    } else {
+      // This is a data row
+      this.html.push('<tr>');
+      cells.forEach((cell, index) => {
+        const alignment = this.state.tableAlignments[index] || 'left';
+        const style = alignment !== 'left' ? ` style="text-align: ${alignment}"` : '';
+        const content = this.parseInlineElements(cell.trim());
+        this.html.push(`<td${style}>${content}</td>`);
+      });
+      this.html.push('</tr>');
+    }
+  }
+
+  /**
+   * Finalize table and add closing tags
+   */
+  finalizeTable() {
+    if (this.state.inTable) {
+      if (this.state.tableAlignments.length > 0) {
+        this.html.push('</tbody>');
+      }
+      this.html.push('</table>');
+      
+      // Reset table state
+      this.state.inTable = false;
+      this.state.tableHeaders = [];
+      this.state.tableAlignments = [];
+    }
+  }
+
+  /**
    * Handle empty lines
    */
   handleEmptyLine() {
     this.finalizeParagraph();
     this.closeAllLists();
+    this.finalizeTable();
     
     if (this.state.inBlockquote) {
       for (let i = 0; i < this.state.blockquoteDepth; i++) {
