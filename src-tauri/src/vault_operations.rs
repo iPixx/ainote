@@ -165,6 +165,65 @@ fn sort_files_efficiently(files: &mut [FileInfo]) {
     });
 }
 
+/// Internal validate vault function to check if a path is a valid vault
+pub fn validate_vault_internal(vault_path: &str) -> FileSystemResult<bool> {
+    time_operation!({
+        let vault_path = Path::new(vault_path);
+        
+        // Check basic validity
+        if !vault_path.exists() {
+            return Ok(false);
+        }
+        
+        if !vault_path.is_dir() {
+            return Ok(false);
+        }
+        
+        // Try to read the directory to check accessibility
+        match fs::read_dir(vault_path) {
+            Ok(_) => Ok(true),
+            Err(_) => Ok(false), // Directory exists but not accessible
+        }
+    }, &format!("validate_vault({})", vault_path))
+}
+
+/// Internal load vault function that validates and scans vault files
+pub fn load_vault_internal(vault_path: &str) -> FileSystemResult<Vec<FileInfo>> {
+    time_operation!({
+        let tracker = PerformanceTracker::start("load_vault");
+        let vault_path = Path::new(vault_path);
+        
+        // First validate the vault
+        validation::validate_path_exists(vault_path)?;
+        validation::validate_is_directory(vault_path)?;
+        
+        tracker.checkpoint("validation_complete");
+        
+        // Check if we can access the directory
+        match fs::read_dir(vault_path) {
+            Ok(_) => {
+                tracker.checkpoint("access_verified");
+                
+                // If validation passes, scan the files
+                let files = scan_vault_files_internal(&vault_path.to_string_lossy())?;
+                
+                tracker.checkpoint("scanning_complete");
+                let _duration = tracker.finish();
+                
+                Ok(files)
+            },
+            Err(e) => match e.kind() {
+                std::io::ErrorKind::PermissionDenied => Err(FileSystemError::PermissionDenied { 
+                    path: vault_path.to_string_lossy().to_string() 
+                }),
+                _ => Err(FileSystemError::IOError { 
+                    message: format!("Failed to load vault {}: {}", vault_path.display(), e) 
+                }),
+            }
+        }
+    }, &format!("load_vault({})", vault_path))
+}
+
 /// Internal watch vault function for file system change notifications
 pub fn watch_vault_internal(vault_path: &str) -> FileSystemResult<()> {
     time_operation!({
@@ -555,5 +614,84 @@ mod tests {
 
         let result = watch_vault_internal(&test_file);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_vault_success() {
+        let env = TestEnv::new();
+        
+        // Create a valid vault structure
+        env.create_test_file("note1.md", "# Note 1").unwrap();
+        env.create_test_file("note2.md", "# Note 2").unwrap();
+        
+        let result = validate_vault_internal(&env.get_path());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), true);
+    }
+
+    #[test]
+    fn test_validate_vault_nonexistent() {
+        let result = validate_vault_internal("nonexistent_directory");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), false);
+    }
+
+    #[test]
+    fn test_validate_vault_file_instead_of_directory() {
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
+        env.create_test_file("test.md", "content").unwrap();
+
+        let result = validate_vault_internal(&test_file);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), false);
+    }
+
+    #[test]
+    fn test_load_vault_success() {
+        let env = TestEnv::new();
+        
+        // Create a valid vault structure
+        env.create_directory_structure(&["notes", "projects"]).unwrap();
+        env.create_test_file("notes/daily.md", "# Daily Notes").unwrap();
+        env.create_test_file("projects/work.md", "# Work Notes").unwrap();
+        env.create_test_file("readme.txt", "Not markdown").unwrap(); // Should be ignored
+        
+        let result = load_vault_internal(&env.get_path());
+        assert!(result.is_ok());
+        
+        let files = result.unwrap();
+        let md_files: Vec<_> = files.iter().filter(|f| !f.is_dir && f.name.ends_with(".md")).collect();
+        let directories: Vec<_> = files.iter().filter(|f| f.is_dir).collect();
+        
+        assert_eq!(md_files.len(), 2);
+        assert_eq!(directories.len(), 2);
+    }
+
+    #[test]
+    fn test_load_vault_nonexistent() {
+        let result = load_vault_internal("nonexistent_directory");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_vault_file_instead_of_directory() {
+        let env = TestEnv::new();
+        let test_file = env.get_test_file("test.md");
+        env.create_test_file("test.md", "content").unwrap();
+
+        let result = load_vault_internal(&test_file);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_vault_empty_directory() {
+        let env = TestEnv::new();
+        
+        let result = load_vault_internal(&env.get_path());
+        assert!(result.is_ok());
+        
+        let files = result.unwrap();
+        assert_eq!(files.len(), 0);
     }
 }
