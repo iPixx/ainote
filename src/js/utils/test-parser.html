@@ -295,10 +295,13 @@ That's a comprehensive demonstration of all supported markdown syntax elements!<
             const input = document.getElementById('markdownInput');
             const output = document.getElementById('testOutput');
             
-            // Generate a large stress test document
+            // Generate a large stress test document with proper header hierarchy
             const lines = [];
             for (let i = 0; i < 500; i++) {
-                lines.push(`# Header Level ${i % 6 + 1}: Performance Section ${i}`);
+                // Cycle through header levels H1-H6 for realistic document structure
+                const headerLevel = (i % 6) + 1;
+                const headerPrefix = '#'.repeat(headerLevel);
+                lines.push(`${headerPrefix} Header Level ${headerLevel}: Performance Section ${i}`);
                 lines.push('');
                 lines.push(`This is paragraph ${i} with **bold text containing _nested italic_** and various other elements including \`inline code\`, [links](https://example${i}.com), and ~~strikethrough~~ content.`);
                 lines.push('');
@@ -328,7 +331,7 @@ That's a comprehensive demonstration of all supported markdown syntax elements!<
             
             input.value = lines.join('\n');
             updatePreview();
-            output.innerHTML = '<span class="success">✅ Stress test loaded (500 sections, complex nesting)!</span>';
+            output.innerHTML = '<span class="success">✅ Stress test loaded (500 sections with H1-H6 hierarchy, complex nesting)!</span>';
         };
 
         // Load edge case test function
@@ -336,7 +339,14 @@ That's a comprehensive demonstration of all supported markdown syntax elements!<
             const input = document.getElementById('markdownInput');
             const output = document.getElementById('testOutput');
             
-            const edgeCaseContent = '# 🧪 Edge Case Testing Suite\\n\\n' +
+            const edgeCaseContent = '# Edge Case Testing Suite\\n\\n' +
+'## Header Level Testing\\n\\n' +
+'# H1 Header\\n' +
+'## H2 Header\\n' +
+'### H3 Header\\n' +
+'#### H4 Header\\n' +
+'##### H5 Header\\n' +
+'###### H6 Header\\n\\n' +
 '## Deep Nesting Combinations\\n\\n' +
 '**Bold with _italic and `code` inside_ and ~~strikethrough~~**\\n\\n' +
 '***Bold italic*** with regular text and `inline code with **bold** inside`\\n\\n' +
