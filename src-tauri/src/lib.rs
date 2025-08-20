@@ -70,6 +70,23 @@ async fn select_vault_folder() -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
+async fn select_vault() -> Result<Option<String>, String> {
+    // Alias for select_vault_folder to match the API requirements
+    select_vault_folder().await
+}
+
+#[tauri::command]
+fn validate_vault(vault_path: String) -> Result<bool, String> {
+    vault_operations::validate_vault_internal(&vault_path).map_err(|e| e.into())
+}
+
+#[tauri::command]
+fn load_vault(vault_path: String) -> Result<Vec<FileInfo>, String> {
+    // Enhanced vault loading with validation
+    vault_operations::load_vault_internal(&vault_path).map_err(|e| e.into())
+}
+
+#[tauri::command]
 fn scan_vault_files(vault_path: String) -> Result<Vec<FileInfo>, String> {
     vault_operations::scan_vault_files_internal(&vault_path).map_err(|e| e.into())
 }
@@ -221,6 +238,9 @@ pub fn run() {
             delete_file,
             rename_file,
             select_vault_folder,
+            select_vault,
+            validate_vault,
+            load_vault,
             scan_vault_files,
             scan_vault_files_chunked,
             get_file_info,
@@ -614,6 +634,43 @@ mod tests {
         
         // At least one should succeed
         assert!(successful >= 1, "No concurrent operations succeeded");
+    }
+
+    #[test]
+    fn test_new_vault_commands() {
+        let env = TestEnv::new();
+        
+        // Create test vault structure
+        env.create_directory_structure(&["notes", "projects"]).unwrap();
+        env.create_test_file("notes/daily.md", "# Daily Notes").unwrap();
+        env.create_test_file("projects/work.md", "# Work Notes").unwrap();
+        
+        let vault_path = env.get_path();
+        
+        // Test validate_vault command
+        let validate_result = validate_vault(vault_path.clone());
+        assert!(validate_result.is_ok());
+        assert_eq!(validate_result.unwrap(), true);
+        
+        // Test validate_vault with nonexistent path
+        let invalid_validate = validate_vault("nonexistent_path".to_string());
+        assert!(invalid_validate.is_ok());
+        assert_eq!(invalid_validate.unwrap(), false);
+        
+        // Test load_vault command
+        let load_result = load_vault(vault_path);
+        assert!(load_result.is_ok());
+        
+        let files = load_result.unwrap();
+        let md_files: Vec<_> = files.iter().filter(|f| !f.is_dir && f.name.ends_with(".md")).collect();
+        let directories: Vec<_> = files.iter().filter(|f| f.is_dir).collect();
+        
+        assert_eq!(md_files.len(), 2);
+        assert_eq!(directories.len(), 2);
+        
+        // Test load_vault with nonexistent path
+        let invalid_load = load_vault("nonexistent_path".to_string());
+        assert!(invalid_load.is_err());
     }
 
     #[test]
