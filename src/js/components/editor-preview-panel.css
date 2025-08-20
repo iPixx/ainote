@@ -1,0 +1,577 @@
+/**
+ * EditorPreviewPanel CSS - Styling for editor/preview toggle system
+ * 
+ * Provides smooth transitions, mode indicators, and responsive design
+ * for seamless editor/preview switching experience.
+ */
+
+/* Panel Container */
+.editor-preview-panel {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary, #ffffff);
+}
+
+/* When EditorPreviewPanel is used, remove default editor-content padding */
+.editor-content:has(.editor-preview-panel) {
+  padding: 0;
+}
+
+/* Fallback for browsers that don't support :has() */
+.editor-content .editor-preview-panel {
+  margin: calc(-1 * var(--space-6, -1.5rem));
+}
+
+/* Mode Indicator */
+.mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--mode-indicator-bg, rgba(0, 0, 0, 0.05));
+  border-bottom: 1px solid var(--border-color, #e1e1e1);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-color, #333333);
+  min-height: 2.5rem;
+  box-sizing: border-box;
+  transition: background-color 0.2s ease;
+}
+
+.mode-indicator.mode-editor {
+  background: var(--editor-mode-bg, rgba(59, 130, 246, 0.1));
+  border-color: var(--editor-mode-border, rgba(59, 130, 246, 0.2));
+}
+
+.mode-indicator.mode-preview {
+  background: var(--preview-mode-bg, rgba(16, 185, 129, 0.1));
+  border-color: var(--preview-mode-border, rgba(16, 185, 129, 0.2));
+}
+
+.mode-icon {
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.mode-text {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+}
+
+/* Container Styles */
+.editor-container,
+.preview-container {
+  flex: 1 1 auto;
+  position: relative;
+  width: 100%;
+  height: calc(100% - 2.5rem); /* Account for mode indicator */
+  transition: opacity 0.25s cubic-bezier(0.4, 0.0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* Important for flex shrinking */
+}
+
+/* Allow scrolling in containers */
+.editor-container {
+  overflow: hidden; /* Editor handles its own scrolling */
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-container {
+  overflow-y: auto; /* Allow preview to scroll vertically */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  padding: 1rem; /* Add padding for better reading experience */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure child elements grow to fill containers */
+.editor-container > * {
+  flex: 1 1 auto;
+  min-height: 0; /* Important for flex children to shrink */
+  height: 100%; /* Explicit height for nested components */
+}
+
+.preview-container > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Specific styling for markdown editor inside editor container */
+.editor-container .markdown-editor-container {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.editor-container .markdown-editor-wrapper {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+
+.editor-container .markdown-editor-textarea {
+  height: 100% !important;
+  resize: none !important;
+}
+
+/* Ensure preview content has proper spacing */
+.preview-container .preview-content {
+  flex: 1;
+  min-height: 100%;
+}
+
+/* Improve preview scrollbar styling */
+.preview-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.preview-container::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary, #f1f1f1);
+  border-radius: 4px;
+}
+
+.preview-container::-webkit-scrollbar-thumb {
+  background: var(--color-border-primary, #c1c1c1);
+  border-radius: 4px;
+}
+
+.preview-container::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-secondary, #a1a1a1);
+}
+
+.editor-container[aria-hidden="true"],
+.preview-container[aria-hidden="true"] {
+  pointer-events: none;
+}
+
+/* Animation States */
+.editor-container.transitioning,
+.preview-container.transitioning {
+  position: absolute;
+  top: 2.5rem; /* Below mode indicator */
+  left: 0;
+  width: 100%;
+  height: calc(100% - 2.5rem);
+  z-index: 10;
+}
+
+.editor-container.fade-out,
+.preview-container.fade-out {
+  opacity: 0;
+}
+
+.editor-container.fade-in,
+.preview-container.fade-in {
+  opacity: 1;
+}
+
+/* Mode Toggle Button Enhancement */
+.control-btn.mode-editor {
+  background: var(--editor-mode-btn-bg, rgba(59, 130, 246, 0.1));
+  border-color: var(--editor-mode-btn-border, rgba(59, 130, 246, 0.3));
+  color: var(--editor-mode-btn-color, #1d4ed8);
+}
+
+.control-btn.mode-preview {
+  background: var(--preview-mode-btn-bg, rgba(16, 185, 129, 0.1));
+  border-color: var(--preview-mode-btn-border, rgba(16, 185, 129, 0.3));
+  color: var(--preview-mode-btn-color, #047857);
+}
+
+.control-btn:hover.mode-editor {
+  background: var(--editor-mode-btn-hover-bg, rgba(59, 130, 246, 0.2));
+  transform: translateY(-1px);
+}
+
+.control-btn:hover.mode-preview {
+  background: var(--preview-mode-btn-hover-bg, rgba(16, 185, 129, 0.2));
+  transform: translateY(-1px);
+}
+
+.control-btn:active.mode-editor {
+  background: var(--editor-mode-btn-active-bg, rgba(59, 130, 246, 0.3));
+  transform: translateY(0);
+}
+
+.control-btn:active.mode-preview {
+  background: var(--preview-mode-btn-active-bg, rgba(16, 185, 129, 0.3));
+  transform: translateY(0);
+}
+
+/* Smooth Transitions */
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutToLeft {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes slideOutToRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Animation Classes */
+.slide-in-left {
+  animation: slideInFromLeft 0.25s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+}
+
+.slide-in-right {
+  animation: slideInFromRight 0.25s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+}
+
+.slide-out-left {
+  animation: slideOutToLeft 0.25s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+}
+
+.slide-out-right {
+  animation: slideOutToRight 0.25s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+}
+
+.fade-in-animation {
+  animation: fadeIn 0.25s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+}
+
+.fade-out-animation {
+  animation: fadeOut 0.25s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .mode-indicator {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8125rem;
+    min-height: 2.25rem;
+  }
+  
+  .mode-text {
+    display: none; /* Show only icon on mobile */
+  }
+  
+  .editor-container,
+  .preview-container {
+    height: calc(100% - 2.25rem);
+  }
+  
+  .editor-container.transitioning,
+  .preview-container.transitioning {
+    top: 2.25rem;
+    height: calc(100% - 2.25rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .mode-indicator {
+    padding: 0.375rem 0.5rem;
+    min-height: 2rem;
+  }
+  
+  .mode-icon {
+    font-size: 0.875rem;
+    width: 1rem;
+    height: 1rem;
+  }
+  
+  .editor-container,
+  .preview-container {
+    height: calc(100% - 2rem);
+  }
+  
+  .editor-container.transitioning,
+  .preview-container.transitioning {
+    top: 2rem;
+    height: calc(100% - 2rem);
+  }
+}
+
+/* Dark Theme Support */
+@media (prefers-color-scheme: dark) {
+  .editor-preview-panel {
+    background: var(--editor-background-dark, #1a1a1a);
+  }
+  
+  .mode-indicator {
+    background: var(--mode-indicator-bg-dark, rgba(255, 255, 255, 0.05));
+    border-color: var(--border-color-dark, #404040);
+    color: var(--text-color-dark, #e4e4e4);
+  }
+  
+  .mode-indicator.mode-editor {
+    background: var(--editor-mode-bg-dark, rgba(96, 165, 250, 0.15));
+    border-color: var(--editor-mode-border-dark, rgba(96, 165, 250, 0.25));
+  }
+  
+  .mode-indicator.mode-preview {
+    background: var(--preview-mode-bg-dark, rgba(52, 211, 153, 0.15));
+    border-color: var(--preview-mode-border-dark, rgba(52, 211, 153, 0.25));
+  }
+  
+  .control-btn.mode-editor {
+    background: var(--editor-mode-btn-bg-dark, rgba(96, 165, 250, 0.15));
+    border-color: var(--editor-mode-btn-border-dark, rgba(96, 165, 250, 0.3));
+    color: var(--editor-mode-btn-color-dark, #60a5fa);
+  }
+  
+  .control-btn.mode-preview {
+    background: var(--preview-mode-btn-bg-dark, rgba(52, 211, 153, 0.15));
+    border-color: var(--preview-mode-btn-border-dark, rgba(52, 211, 153, 0.3));
+    color: var(--preview-mode-btn-color-dark, #34d399);
+  }
+  
+  .control-btn:hover.mode-editor {
+    background: var(--editor-mode-btn-hover-bg-dark, rgba(96, 165, 250, 0.25));
+  }
+  
+  .control-btn:hover.mode-preview {
+    background: var(--preview-mode-btn-hover-bg-dark, rgba(52, 211, 153, 0.25));
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  .mode-indicator {
+    border-width: 2px;
+    font-weight: 700;
+  }
+  
+  .mode-indicator.mode-editor {
+    background: var(--editor-mode-bg-contrast, #e1f5fe);
+    border-color: var(--editor-mode-border-contrast, #0277bd);
+  }
+  
+  .mode-indicator.mode-preview {
+    background: var(--preview-mode-bg-contrast, #e8f5e8);
+    border-color: var(--preview-mode-border-contrast, #2e7d32);
+  }
+  
+  .control-btn.mode-editor,
+  .control-btn.mode-preview {
+    border-width: 2px;
+    font-weight: 600;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .editor-container,
+  .preview-container,
+  .mode-indicator,
+  .control-btn {
+    transition: none;
+    animation: none;
+  }
+  
+  .slide-in-left,
+  .slide-in-right,
+  .slide-out-left,
+  .slide-out-right,
+  .fade-in-animation,
+  .fade-out-animation {
+    animation: none;
+  }
+}
+
+/* Focus States for Accessibility */
+.mode-indicator:focus-within {
+  outline: 2px solid var(--focus-color, #3b82f6);
+  outline-offset: 2px;
+}
+
+.editor-container:focus-within,
+.preview-container:focus-within {
+  outline: 1px solid var(--focus-color, #3b82f6);
+  outline-offset: -1px;
+}
+
+/* Loading States */
+.editor-preview-panel.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.editor-preview-panel.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid var(--border-color, #e1e1e1);
+  border-top: 3px solid var(--primary-color, #3b82f6);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 1000;
+}
+
+@keyframes spin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Error States */
+.editor-preview-panel.error {
+  border: 2px solid var(--error-color, #dc2626);
+  background: var(--error-bg, #fef2f2);
+}
+
+.editor-preview-panel.error .mode-indicator {
+  background: var(--error-indicator-bg, #fee2e2);
+  color: var(--error-color, #dc2626);
+}
+
+/* Print Styles */
+@media print {
+  .mode-indicator {
+    display: none;
+  }
+  
+  .editor-container,
+  .preview-container {
+    height: 100% !important;
+    position: static !important;
+    opacity: 1 !important;
+  }
+  
+  .editor-container[aria-hidden="true"] {
+    display: none !important;
+  }
+  
+  .preview-container[aria-hidden="false"] {
+    display: block !important;
+  }
+}
+
+/* Custom Scrollbars */
+.editor-container::-webkit-scrollbar,
+.preview-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.editor-container::-webkit-scrollbar-track,
+.preview-container::-webkit-scrollbar-track {
+  background: var(--scrollbar-track, #f1f1f1);
+  border-radius: 4px;
+}
+
+.editor-container::-webkit-scrollbar-thumb,
+.preview-container::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, #c1c1c1);
+  border-radius: 4px;
+}
+
+.editor-container::-webkit-scrollbar-thumb:hover,
+.preview-container::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover, #a1a1a1);
+}
+
+/* Performance Optimization */
+.editor-preview-panel * {
+  will-change: transform, opacity;
+}
+
+.editor-container,
+.preview-container {
+  contain: layout style paint;
+  transform: translateZ(0); /* Force hardware acceleration */
+}
+
+/* Utility Classes */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.visually-hidden {
+  clip: rect(1px, 1px, 1px, 1px);
+  -webkit-clip-path: inset(50%);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+/* Performance Indicators (Development Only) */
+.performance-debug .editor-preview-panel::before {
+  content: 'Mode: ' attr(data-current-mode) ' | Transitions: ' attr(data-transition-count);
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: rgba(255, 0, 0, 0.1);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-family: monospace;
+  z-index: 9999;
+  pointer-events: none;
+}
