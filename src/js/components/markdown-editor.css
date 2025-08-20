@@ -497,15 +497,259 @@
   }
 }
 
-/* Ensure proper layer stacking for future overlay features */
+/* Line Numbers Container */
+.markdown-editor-line-numbers {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50px;
+  height: 100%;
+  background: var(--color-bg-secondary, #f8fafc);
+  border-right: 1px solid var(--color-border, #e5e7eb);
+  padding: 1rem 0.5rem;
+  font-family: var(--font-family-mono, 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-muted, #6b7280);
+  user-select: none;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.line-number {
+  text-align: right;
+  padding-right: 8px;
+  font-weight: 500;
+  min-height: 1.6em;
+}
+
+/* Loading Overlay */
+.markdown-editor-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  backdrop-filter: blur(2px);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-border, #e5e7eb);
+  border-top-color: var(--color-accent, #3b82f6);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+.loading-text {
+  color: var(--color-text-muted, #6b7280);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Virtual Scrolling Optimizations */
+.markdown-editor-container.large-document .markdown-editor-textarea {
+  /* Optimize for large documents */
+  will-change: scroll-position, contents;
+  contain: layout style paint;
+}
+
+.markdown-editor-container.virtual-scrolling .markdown-editor-textarea {
+  /* Enhanced scrolling performance */
+  overflow-anchor: none;
+  scroll-behavior: auto;
+}
+
+/* Performance Indicators */
+.markdown-editor-status-bar .performance-indicator {
+  color: var(--color-accent, #3b82f6);
+  font-size: 11px;
+  margin-left: 0.5rem;
+  padding: 2px 6px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 3px;
+}
+
+.markdown-editor-status-bar .performance-indicator.warning {
+  color: var(--color-warning, #f59e0b);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.markdown-editor-status-bar .performance-indicator.error {
+  color: var(--color-error, #ef4444);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Auto-save Indicator */
+.markdown-editor-status-bar .auto-save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 11px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.auto-save-status.saving {
+  color: var(--color-accent, #3b82f6);
+}
+
+.auto-save-status.error {
+  color: var(--color-error, #ef4444);
+}
+
+.auto-save-status::before {
+  content: '💾';
+  font-size: 10px;
+}
+
+.auto-save-status.saving::before {
+  content: '⏳';
+  animation: pulse 1s infinite;
+}
+
+.auto-save-status.error::before {
+  content: '❌';
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Dark theme support for new elements */
+@media (prefers-color-scheme: dark) {
+  .markdown-editor-line-numbers {
+    background: var(--color-bg-secondary-dark, #374151);
+    border-right-color: var(--color-border-dark, #4b5563);
+    color: var(--color-text-muted-dark, #9ca3af);
+  }
+  
+  .markdown-editor-loading-overlay {
+    background: rgba(31, 41, 55, 0.9);
+  }
+  
+  .loading-spinner {
+    border-color: var(--color-border-dark, #4b5563);
+    border-top-color: var(--color-accent, #3b82f6);
+  }
+  
+  .loading-text {
+    color: var(--color-text-muted-dark, #9ca3af);
+  }
+}
+
+/* Accessibility improvements */
+.markdown-editor-container[aria-busy="true"] {
+  cursor: wait;
+}
+
+.markdown-editor-textarea:focus {
+  outline: 2px solid var(--color-accent, #3b82f6);
+  outline-offset: -2px;
+}
+
+/* Reduced motion support for new animations */
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner {
+    animation: none;
+    border-top-color: var(--color-accent, #3b82f6);
+  }
+  
+  .auto-save-status.saving::before {
+    animation: none;
+  }
+  
+  .markdown-editor-container.large-document .markdown-editor-textarea {
+    will-change: auto;
+  }
+}
+
+/* High contrast mode support for new elements */
+@media (prefers-contrast: high) {
+  .markdown-editor-line-numbers {
+    border-right: 2px solid;
+  }
+  
+  .markdown-editor-loading-overlay {
+    border: 2px solid;
+  }
+  
+  .loading-spinner {
+    border-width: 2px;
+  }
+}
+
+/* Mobile responsive adjustments for new elements */
+@media (max-width: 768px) {
+  .markdown-editor-line-numbers {
+    width: 40px;
+    font-size: 11px;
+    padding: 0.75rem 0.25rem;
+  }
+  
+  .loading-spinner {
+    width: 24px;
+    height: 24px;
+    border-width: 2px;
+  }
+  
+  .loading-text {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .markdown-editor-line-numbers {
+    width: 35px;
+    font-size: 10px;
+    padding: 0.75rem 0.125rem;
+  }
+  
+  .line-number {
+    padding-right: 4px;
+  }
+}
+
+/* Ensure proper layer stacking for all overlay features */
 .markdown-editor-wrapper {
   isolation: isolate;
 }
 
 .markdown-editor-textarea {
-  z-index: 2;
+  z-index: 3;
 }
 
 .markdown-editor-overlay {
+  z-index: 2;
+}
+
+.markdown-editor-line-numbers {
   z-index: 1;
+}
+
+.markdown-editor-loading-overlay {
+  z-index: 10;
+}
+
+/* Print styles for new elements */
+@media print {
+  .markdown-editor-line-numbers,
+  .markdown-editor-loading-overlay {
+    display: none !important;
+  }
 }

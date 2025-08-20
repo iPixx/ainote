@@ -343,6 +343,42 @@ async function openFile(filePath) {
         saveFile();
       });
       
+      // Listen for auto-save requests
+      markdownEditor.addEventListener('auto_save_requested', async (event) => {
+        const { content, fileSize } = event.detail;
+        try {
+          const state = appState.getState();
+          if (state.currentFile) {
+            await invoke('write_file', { filePath: state.currentFile, content });
+            console.log(`💾 Auto-saved ${(fileSize / 1024).toFixed(1)}KB`);
+            
+            // Update UI to show saved state
+            const fileName = state.currentFile.split('/').pop();
+            updateCurrentFileName(fileName, false);
+            appState.markDirty(false);
+          }
+        } catch (error) {
+          console.error('❌ Auto-save failed:', error);
+          showNotification('Auto-save failed', 'error');
+        }
+      });
+      
+      // Listen for performance events
+      markdownEditor.addEventListener(MarkdownEditor.EVENTS.LARGE_DOCUMENT_DETECTED, (event) => {
+        const { size } = event.detail;
+        showNotification(`Large document detected (${(size / 1024).toFixed(1)}KB) - optimizations enabled`, 'info');
+      });
+      
+      markdownEditor.addEventListener(MarkdownEditor.EVENTS.AUTO_SAVE_COMPLETED, (event) => {
+        const { duration, fileSize } = event.detail;
+        console.log(`💾 Auto-save: ${duration.toFixed(1)}ms, ${(fileSize / 1024).toFixed(1)}KB`);
+      });
+      
+      markdownEditor.addEventListener(MarkdownEditor.EVENTS.AUTO_SAVE_ERROR, (event) => {
+        console.error('❌ Auto-save error:', event.detail.error);
+        showNotification('Auto-save failed', 'error');
+      });
+      
       console.log('✅ MarkdownEditor initialized for file editing');
     }
     

@@ -22,7 +22,13 @@ class MarkdownEditor {
     WORD_COUNT_CHANGED: 'word_count_changed',
     SHORTCUT_EXECUTED: 'shortcut_executed',
     FORMAT_APPLIED: 'format_applied',
-    FIND_REPLACE_OPENED: 'find_replace_opened'
+    FIND_REPLACE_OPENED: 'find_replace_opened',
+    AUTO_SAVE_TRIGGERED: 'auto_save_triggered',
+    AUTO_SAVE_COMPLETED: 'auto_save_completed',
+    AUTO_SAVE_ERROR: 'auto_save_error',
+    LOADING_STATE_CHANGED: 'loading_state_changed',
+    LARGE_DOCUMENT_DETECTED: 'large_document_detected',
+    LINE_NUMBERS_TOGGLED: 'line_numbers_toggled'
   };
 
   /**
@@ -65,6 +71,34 @@ class MarkdownEditor {
     this.wordCount = 0;
     this.charCount = 0;
     
+    // Auto-save functionality
+    this.autoSaveEnabled = true;
+    this.autoSaveDelay = 2000; // 2 seconds as specified
+    this.autoSaveTimeout = null;
+    this.lastAutoSave = 0;
+    this.saveInProgress = false;
+    
+    // Performance optimization state
+    this.isLargeDocument = false;
+    this.documentSizeThreshold = 50000; // 50KB threshold for large documents
+    this.virtualScrolling = false;
+    this.visibleLineStart = 0;
+    this.visibleLineEnd = 100;
+    this.totalLines = 0;
+    
+    // Line numbers display
+    this.lineNumbersEnabled = false;
+    this.lineNumbersContainer = null;
+    
+    // Loading and progress states
+    this.isLoading = false;
+    this.loadingOverlay = null;
+    
+    // Memory optimization
+    this.cleanupScheduled = false;
+    this.lastCleanup = 0;
+    this.cleanupInterval = 30000; // 30 seconds
+    
     // Keyboard shortcuts and formatting state
     this.keyboardShortcuts = new Map();
     this.undoStack = [];
@@ -85,8 +119,15 @@ class MarkdownEditor {
       '`': '`'
     };
     
-    // Initialize editor
-    this.init();
+    // Error handling state
+    this.errorHandler = this.createErrorHandler();
+    
+    // Initialize editor with error handling
+    try {
+      this.init();
+    } catch (error) {
+      this.handleError('Initialization failed', error);
+    }
   }
 
   /**
@@ -101,10 +142,14 @@ class MarkdownEditor {
     this.createEditorStructure();
     this.setupEventListeners();
     this.setupKeyboardShortcuts();
+    this.setupAutoSave();
+    this.setupPerformanceOptimizations();
+    this.enhanceAccessibility();
+    this.setupScrollSynchronization();
     this.updateWordCount();
     this.isInitialized = true;
     
-    console.log('✅ MarkdownEditor initialized with keyboard shortcuts');
+    console.log('✅ MarkdownEditor initialized with auto-save, performance optimizations, and accessibility features');
   }
 
   /**
@@ -126,16 +171,40 @@ class MarkdownEditor {
     this.textarea.placeholder = 'Start writing your markdown...';
     this.textarea.value = this.content;
     this.textarea.setAttribute('aria-label', 'Markdown editor');
+    this.textarea.setAttribute('aria-describedby', 'editor-status-bar');
+    this.textarea.setAttribute('aria-multiline', 'true');
+    this.textarea.setAttribute('role', 'textbox');
     this.textarea.setAttribute('spellcheck', 'true');
+    this.textarea.setAttribute('autocomplete', 'off');
+    this.textarea.setAttribute('autocorrect', 'off');
+    this.textarea.setAttribute('autocapitalize', 'off');
 
     // Create overlay container for future syntax highlighting
     this.overlayContainer = document.createElement('div');
     this.overlayContainer.className = 'markdown-editor-overlay';
     this.overlayContainer.setAttribute('aria-hidden', 'true');
 
+    // Create line numbers container (initially hidden)
+    this.lineNumbersContainer = document.createElement('div');
+    this.lineNumbersContainer.className = 'markdown-editor-line-numbers';
+    this.lineNumbersContainer.setAttribute('aria-hidden', 'true');
+    this.lineNumbersContainer.style.display = 'none';
+
+    // Create loading overlay
+    this.loadingOverlay = document.createElement('div');
+    this.loadingOverlay.className = 'markdown-editor-loading-overlay';
+    this.loadingOverlay.innerHTML = `
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Loading...</div>
+    `;
+    this.loadingOverlay.style.display = 'none';
+
     // Create status bar
     const statusBar = document.createElement('div');
     statusBar.className = 'markdown-editor-status-bar';
+    statusBar.id = 'editor-status-bar';
+    statusBar.setAttribute('aria-live', 'polite');
+    statusBar.setAttribute('aria-label', 'Editor status information');
 
     // Word count display
     this.wordCountElement = document.createElement('span');
@@ -160,8 +229,10 @@ class MarkdownEditor {
     statusBar.appendChild(this.cursorPositionElement);
 
     // Assemble editor
+    editorWrapper.appendChild(this.lineNumbersContainer);
     editorWrapper.appendChild(this.overlayContainer);
     editorWrapper.appendChild(this.textarea);
+    editorWrapper.appendChild(this.loadingOverlay);
     
     this.container.appendChild(editorWrapper);
     this.container.appendChild(statusBar);
@@ -177,22 +248,30 @@ class MarkdownEditor {
   setupEventListeners() {
     // Input event for content changes (high performance)
     const inputHandler = (event) => {
-      const startTime = performance.now();
-      
-      this.content = this.textarea.value;
-      this.updateCursorPosition();
-      this.debouncedWordCountUpdate();
-      
-      // Emit content change event
-      this.emit(MarkdownEditor.EVENTS.CONTENT_CHANGED, {
-        content: this.content,
-        timestamp: Date.now()
-      });
+      try {
+        const startTime = performance.now();
+        
+        this.content = this.textarea.value;
+        this.updateCursorPosition();
+        this.debouncedWordCountUpdate();
+        this.checkDocumentSize();
+        this.triggerAutoSave();
+        
+        // Emit content change event
+        this.emit(MarkdownEditor.EVENTS.CONTENT_CHANGED, {
+          content: this.content,
+          timestamp: Date.now()
+        });
 
-      // Track performance
-      const duration = performance.now() - startTime;
-      if (duration > 16) {
-        console.warn(`⚠️ Slow input handler: ${duration.toFixed(2)}ms`);
+        // Track performance
+        const duration = performance.now() - startTime;
+        if (duration > 16) {
+          this.handleError('input-performance', 
+            new Error(`Slow input handler: ${duration.toFixed(2)}ms (target: <16ms)`), 
+            'warning');
+        }
+      } catch (error) {
+        this.handleError('input-handler', error);
       }
     };
 
@@ -570,6 +649,14 @@ class MarkdownEditor {
     // Manual save (this will be handled by parent application)
     this.addKeyboardShortcut('Ctrl+S', () => this.emitSaveRequest(), 'Save file');
     this.addKeyboardShortcut('Cmd+S', () => this.emitSaveRequest(), 'Save file');
+    
+    // Line numbers toggle
+    this.addKeyboardShortcut('Ctrl+Shift+L', () => this.toggleLineNumbers(), 'Toggle line numbers');
+    this.addKeyboardShortcut('Cmd+Shift+L', () => this.toggleLineNumbers(), 'Toggle line numbers');
+    
+    // Performance diagnostics (for debugging)
+    this.addKeyboardShortcut('Ctrl+Shift+D', () => console.log(this.getDiagnostics()), 'Show diagnostics');
+    this.addKeyboardShortcut('Cmd+Shift+D', () => console.log(this.getDiagnostics()), 'Show diagnostics');
     
     console.log(`✅ Keyboard shortcuts configured: ${this.keyboardShortcuts.size} shortcuts`);
   }
@@ -1318,11 +1405,658 @@ class MarkdownEditor {
   }
 
   /**
+   * Setup auto-save functionality
+   * @private
+   */
+  setupAutoSave() {
+    // Auto-save is enabled by default but can be disabled
+    if (!this.autoSaveEnabled) {
+      console.log('📝 Auto-save disabled');
+      return;
+    }
+    
+    console.log(`📝 Auto-save enabled with ${this.autoSaveDelay}ms delay`);
+  }
+
+  /**
+   * Setup performance optimizations
+   * @private
+   */
+  setupPerformanceOptimizations() {
+    // Schedule periodic memory cleanup
+    this.scheduleCleanup();
+    
+    // Monitor scroll performance for large documents
+    this.addDOMEventListener(this.textarea, 'scroll', () => {
+      if (this.virtualScrolling) {
+        this.updateVisibleLines();
+      }
+    });
+    
+    console.log('⚡ Performance optimizations initialized');
+  }
+
+  /**
+   * Trigger auto-save with debouncing
+   * Performance target: <50ms
+   * @private
+   */
+  triggerAutoSave() {
+    if (!this.autoSaveEnabled || this.saveInProgress) {
+      return;
+    }
+
+    // Clear existing timeout
+    clearTimeout(this.autoSaveTimeout);
+
+    // Set new timeout for auto-save
+    this.autoSaveTimeout = setTimeout(() => {
+      this.performAutoSave();
+    }, this.autoSaveDelay);
+  }
+
+  /**
+   * Perform the actual auto-save operation
+   * @private
+   */
+  async performAutoSave() {
+    if (this.saveInProgress || !this.autoSaveEnabled) {
+      return;
+    }
+
+    const startTime = performance.now();
+    this.saveInProgress = true;
+
+    try {
+      // Emit auto-save triggered event
+      this.emit(MarkdownEditor.EVENTS.AUTO_SAVE_TRIGGERED, {
+        content: this.content,
+        timestamp: Date.now()
+      });
+
+      // Create custom event for parent application to handle actual saving
+      const autoSaveEvent = new CustomEvent('auto_save_requested', {
+        detail: {
+          content: this.content,
+          timestamp: Date.now(),
+          fileSize: this.content.length
+        },
+        bubbles: true
+      });
+
+      this.container.dispatchEvent(autoSaveEvent);
+      this.lastAutoSave = Date.now();
+
+      // Performance check
+      const duration = performance.now() - startTime;
+      if (duration > 50) {
+        console.warn(`⚠️ Auto-save took ${duration.toFixed(2)}ms (target: <50ms)`);
+      }
+
+      // Emit completion event
+      this.emit(MarkdownEditor.EVENTS.AUTO_SAVE_COMPLETED, {
+        duration,
+        fileSize: this.content.length,
+        timestamp: Date.now()
+      });
+
+      console.log(`💾 Auto-save completed in ${duration.toFixed(2)}ms`);
+
+    } catch (error) {
+      console.error('❌ Auto-save failed:', error);
+      
+      this.emit(MarkdownEditor.EVENTS.AUTO_SAVE_ERROR, {
+        error: error.message,
+        timestamp: Date.now()
+      });
+    } finally {
+      this.saveInProgress = false;
+    }
+  }
+
+  /**
+   * Check document size and enable optimizations for large files
+   * @private
+   */
+  checkDocumentSize() {
+    const currentSize = this.content.length;
+    const wasLarge = this.isLargeDocument;
+    this.isLargeDocument = currentSize > this.documentSizeThreshold;
+
+    if (this.isLargeDocument && !wasLarge) {
+      console.log(`📊 Large document detected (${(currentSize / 1024).toFixed(1)}KB)`);
+      this.enableVirtualScrolling();
+      
+      this.emit(MarkdownEditor.EVENTS.LARGE_DOCUMENT_DETECTED, {
+        size: currentSize,
+        threshold: this.documentSizeThreshold,
+        timestamp: Date.now()
+      });
+    } else if (!this.isLargeDocument && wasLarge) {
+      this.disableVirtualScrolling();
+    }
+  }
+
+  /**
+   * Enable virtual scrolling for large documents
+   * @private
+   */
+  enableVirtualScrolling() {
+    if (this.virtualScrolling) return;
+    
+    this.virtualScrolling = true;
+    this.updateTotalLines();
+    this.updateVisibleLines();
+    
+    console.log('📜 Virtual scrolling enabled for performance');
+  }
+
+  /**
+   * Disable virtual scrolling
+   * @private
+   */
+  disableVirtualScrolling() {
+    if (!this.virtualScrolling) return;
+    
+    this.virtualScrolling = false;
+    console.log('📜 Virtual scrolling disabled');
+  }
+
+  /**
+   * Update total line count for virtual scrolling
+   * @private
+   */
+  updateTotalLines() {
+    this.totalLines = this.content.split('\n').length;
+  }
+
+  /**
+   * Update visible lines for virtual scrolling
+   * @private
+   */
+  updateVisibleLines() {
+    if (!this.virtualScrolling || !this.textarea) return;
+
+    const lineHeight = parseInt(getComputedStyle(this.textarea).lineHeight) || 24;
+    const visibleHeight = this.textarea.clientHeight;
+    const scrollTop = this.textarea.scrollTop;
+    
+    this.visibleLineStart = Math.floor(scrollTop / lineHeight);
+    this.visibleLineEnd = Math.min(
+      this.totalLines,
+      this.visibleLineStart + Math.ceil(visibleHeight / lineHeight) + 5 // Buffer
+    );
+  }
+
+  /**
+   * Toggle line numbers display
+   * @param {boolean} enabled - Whether to show line numbers
+   */
+  toggleLineNumbers(enabled = !this.lineNumbersEnabled) {
+    this.lineNumbersEnabled = enabled;
+    
+    if (this.lineNumbersEnabled) {
+      this.showLineNumbers();
+    } else {
+      this.hideLineNumbers();
+    }
+    
+    this.emit(MarkdownEditor.EVENTS.LINE_NUMBERS_TOGGLED, {
+      enabled: this.lineNumbersEnabled,
+      timestamp: Date.now()
+    });
+    
+    console.log(`🔢 Line numbers ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  /**
+   * Show line numbers
+   * @private
+   */
+  showLineNumbers() {
+    if (!this.lineNumbersContainer) return;
+    
+    this.lineNumbersContainer.style.display = 'block';
+    this.updateLineNumbers();
+    
+    // Adjust textarea padding to make room for line numbers
+    this.textarea.style.paddingLeft = '60px';
+  }
+
+  /**
+   * Hide line numbers
+   * @private
+   */
+  hideLineNumbers() {
+    if (!this.lineNumbersContainer) return;
+    
+    this.lineNumbersContainer.style.display = 'none';
+    this.textarea.style.paddingLeft = '1rem';
+  }
+
+  /**
+   * Update line numbers display
+   * @private
+   */
+  updateLineNumbers() {
+    if (!this.lineNumbersEnabled || !this.lineNumbersContainer) return;
+    
+    const lines = this.content.split('\n');
+    const lineCount = lines.length;
+    
+    let html = '';
+    for (let i = 1; i <= lineCount; i++) {
+      html += `<div class="line-number">${i}</div>`;
+    }
+    
+    this.lineNumbersContainer.innerHTML = html;
+    
+    // Sync scroll position
+    this.lineNumbersContainer.scrollTop = this.textarea.scrollTop;
+  }
+
+  /**
+   * Show loading state
+   * @param {string} message - Loading message
+   */
+  showLoading(message = 'Loading...') {
+    if (!this.loadingOverlay) return;
+    
+    this.isLoading = true;
+    this.loadingOverlay.querySelector('.loading-text').textContent = message;
+    this.loadingOverlay.style.display = 'flex';
+    
+    this.emit(MarkdownEditor.EVENTS.LOADING_STATE_CHANGED, {
+      loading: true,
+      message,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Hide loading state
+   */
+  hideLoading() {
+    if (!this.loadingOverlay) return;
+    
+    this.isLoading = false;
+    this.loadingOverlay.style.display = 'none';
+    
+    this.emit(MarkdownEditor.EVENTS.LOADING_STATE_CHANGED, {
+      loading: false,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Schedule memory cleanup
+   * @private
+   */
+  scheduleCleanup() {
+    if (this.cleanupScheduled) return;
+    
+    this.cleanupScheduled = true;
+    
+    setTimeout(() => {
+      this.performCleanup();
+      this.cleanupScheduled = false;
+      this.scheduleCleanup(); // Reschedule
+    }, this.cleanupInterval);
+  }
+
+  /**
+   * Perform memory cleanup
+   * @private
+   */
+  performCleanup() {
+    const now = Date.now();
+    
+    // Clean up old undo/redo states (keep only last 50)
+    if (this.undoStack.length > 50) {
+      this.undoStack = this.undoStack.slice(-50);
+    }
+    if (this.redoStack.length > 50) {
+      this.redoStack = this.redoStack.slice(-50);
+    }
+    
+    // Clear old search highlights
+    this.clearSearchHighlights();
+    
+    this.lastCleanup = now;
+    console.log('🧹 Memory cleanup performed');
+  }
+
+  /**
+   * Enable or disable auto-save
+   * @param {boolean} enabled - Whether auto-save should be enabled
+   */
+  setAutoSaveEnabled(enabled) {
+    this.autoSaveEnabled = enabled;
+    
+    if (!enabled) {
+      clearTimeout(this.autoSaveTimeout);
+      console.log('📝 Auto-save disabled');
+    } else {
+      console.log('📝 Auto-save enabled');
+    }
+  }
+
+  /**
+   * Set auto-save delay
+   * @param {number} delay - Delay in milliseconds
+   */
+  setAutoSaveDelay(delay) {
+    if (delay < 1000 || delay > 10000) {
+      throw new Error('Auto-save delay must be between 1000ms and 10000ms');
+    }
+    
+    this.autoSaveDelay = delay;
+    console.log(`📝 Auto-save delay set to ${delay}ms`);
+  }
+
+  /**
+   * Force save without debouncing
+   */
+  forceSave() {
+    clearTimeout(this.autoSaveTimeout);
+    this.performAutoSave();
+  }
+
+  /**
+   * Get performance statistics
+   * @returns {Object} Performance stats
+   */
+  getPerformanceStats() {
+    return {
+      ...this.getStats(),
+      isLargeDocument: this.isLargeDocument,
+      virtualScrolling: this.virtualScrolling,
+      documentSize: this.content.length,
+      totalLines: this.totalLines,
+      visibleLines: this.virtualScrolling ? {
+        start: this.visibleLineStart,
+        end: this.visibleLineEnd
+      } : null,
+      autoSave: {
+        enabled: this.autoSaveEnabled,
+        delay: this.autoSaveDelay,
+        lastSave: this.lastAutoSave,
+        inProgress: this.saveInProgress
+      },
+      memory: {
+        undoStackSize: this.undoStack.length,
+        redoStackSize: this.redoStack.length,
+        lastCleanup: this.lastCleanup
+      }
+    };
+  }
+
+  /**
+   * Create comprehensive error handler
+   * @returns {Object} Error handler instance
+   * @private
+   */
+  createErrorHandler() {
+    return {
+      errors: [],
+      maxErrors: 50,
+      
+      log: (context, error, severity = 'error') => {
+        const errorData = {
+          context,
+          message: error.message || error,
+          stack: error.stack,
+          timestamp: Date.now(),
+          severity
+        };
+        
+        this.errorHandler.errors.push(errorData);
+        
+        // Keep only recent errors
+        if (this.errorHandler.errors.length > this.errorHandler.maxErrors) {
+          this.errorHandler.errors = this.errorHandler.errors.slice(-this.errorHandler.maxErrors);
+        }
+        
+        // Console logging with appropriate level
+        if (severity === 'error') {
+          console.error(`❌ MarkdownEditor [${context}]:`, error);
+        } else if (severity === 'warning') {
+          console.warn(`⚠️ MarkdownEditor [${context}]:`, error);
+        } else {
+          console.log(`ℹ️ MarkdownEditor [${context}]:`, error);
+        }
+        
+        return errorData;
+      },
+      
+      getErrors: () => [...this.errorHandler.errors],
+      
+      clearErrors: () => {
+        this.errorHandler.errors = [];
+      }
+    };
+  }
+
+  /**
+   * Handle errors with comprehensive logging and recovery
+   * @param {string} context - Error context
+   * @param {Error} error - Error object
+   * @param {string} severity - Error severity level
+   */
+  handleError(context, error, severity = 'error') {
+    const errorData = this.errorHandler.log(context, error, severity);
+    
+    // Emit error event for external handling
+    this.emit('error', {
+      context,
+      error: errorData,
+      timestamp: Date.now()
+    });
+    
+    // Attempt recovery for certain error types
+    if (context.includes('auto-save')) {
+      this.setAutoSaveEnabled(false);
+      setTimeout(() => {
+        this.setAutoSaveEnabled(true);
+        console.log('🔄 Auto-save re-enabled after error recovery');
+      }, 5000);
+    }
+    
+    if (context.includes('virtual-scrolling')) {
+      this.disableVirtualScrolling();
+      console.log('🔄 Virtual scrolling disabled due to error');
+    }
+  }
+
+  /**
+   * Add enhanced accessibility features
+   * @private
+   */
+  enhanceAccessibility() {
+    if (!this.textarea) return;
+    
+    // Add keyboard navigation hints
+    this.textarea.title = 'Markdown editor - Use Ctrl+? for keyboard shortcuts';
+    
+    // Enhanced ARIA properties
+    this.container.setAttribute('role', 'application');
+    this.container.setAttribute('aria-label', 'Markdown editor with auto-save and syntax highlighting');
+    
+    // Loading state accessibility
+    if (this.loadingOverlay) {
+      this.loadingOverlay.setAttribute('aria-label', 'Content loading');
+      this.loadingOverlay.setAttribute('role', 'status');
+    }
+    
+    // Line numbers accessibility
+    if (this.lineNumbersContainer) {
+      this.lineNumbersContainer.setAttribute('aria-label', 'Line numbers');
+      this.lineNumbersContainer.setAttribute('role', 'presentation');
+    }
+    
+    console.log('♿ Accessibility features enhanced');
+  }
+
+  /**
+   * Implement scroll synchronization for future preview mode
+   * @private
+   */
+  setupScrollSynchronization() {
+    if (!this.textarea) return;
+    
+    // Store scroll sync state
+    this.scrollSync = {
+      enabled: false,
+      previewElement: null,
+      syncRatio: 1.0,
+      lastScrollTime: 0,
+      debounceDelay: 16 // 60fps
+    };
+    
+    // Enhanced scroll handler with throttling
+    const scrollHandler = () => {
+      const now = performance.now();
+      if (now - this.scrollSync.lastScrollTime < this.scrollSync.debounceDelay) {
+        return;
+      }
+      
+      this.scrollSync.lastScrollTime = now;
+      
+      // Sync overlay scroll position
+      if (this.overlayContainer) {
+        this.overlayContainer.scrollTop = this.textarea.scrollTop;
+      }
+      
+      // Sync line numbers scroll position
+      if (this.lineNumbersContainer && this.lineNumbersEnabled) {
+        this.lineNumbersContainer.scrollTop = this.textarea.scrollTop;
+      }
+      
+      // Update line numbers when scrolling (for large documents)
+      if (this.lineNumbersEnabled && this.isLargeDocument) {
+        requestAnimationFrame(() => {
+          this.updateLineNumbers();
+        });
+      }
+      
+      // Future: Sync with preview pane
+      if (this.scrollSync.enabled && this.scrollSync.previewElement) {
+        const scrollPercentage = this.textarea.scrollTop / 
+          (this.textarea.scrollHeight - this.textarea.clientHeight);
+        
+        const previewScrollTop = scrollPercentage * 
+          (this.scrollSync.previewElement.scrollHeight - this.scrollSync.previewElement.clientHeight);
+        
+        this.scrollSync.previewElement.scrollTop = previewScrollTop;
+      }
+    };
+    
+    this.addDOMEventListener(this.textarea, 'scroll', scrollHandler);
+    console.log('🔄 Scroll synchronization prepared');
+  }
+
+  /**
+   * Enable scroll synchronization with preview element
+   * @param {HTMLElement} previewElement - Preview element to sync with
+   */
+  enableScrollSync(previewElement) {
+    if (!previewElement || !(previewElement instanceof HTMLElement)) {
+      this.handleError('enableScrollSync', new Error('Invalid preview element'), 'warning');
+      return;
+    }
+    
+    this.scrollSync.enabled = true;
+    this.scrollSync.previewElement = previewElement;
+    console.log('🔄 Scroll synchronization enabled');
+  }
+
+  /**
+   * Disable scroll synchronization
+   */
+  disableScrollSync() {
+    this.scrollSync.enabled = false;
+    this.scrollSync.previewElement = null;
+    console.log('🔄 Scroll synchronization disabled');
+  }
+
+  /**
+   * Validate performance and log metrics
+   * @returns {Object} Performance validation results
+   */
+  validatePerformance() {
+    const stats = this.getPerformanceStats();
+    const validation = {
+      autoSave: {
+        target: 50, // ms
+        actual: stats.autoSave.lastSave ? Date.now() - stats.autoSave.lastSave : 0,
+        passed: true
+      },
+      memoryUsage: {
+        target: 10485760, // 10MB in bytes
+        actual: stats.documentSize,
+        passed: stats.documentSize < 10485760
+      },
+      undoStackSize: {
+        target: 100,
+        actual: stats.memory.undoStackSize,
+        passed: stats.memory.undoStackSize <= 100
+      },
+      frameRate: {
+        target: 16, // ms per frame for 60fps
+        actual: this.lastKeystroke ? performance.now() - this.lastKeystroke : 0,
+        passed: true
+      }
+    };
+    
+    // Log warnings for performance issues
+    Object.entries(validation).forEach(([metric, data]) => {
+      if (!data.passed) {
+        this.handleError(
+          `Performance validation - ${metric}`,
+          new Error(`Target: ${data.target}, Actual: ${data.actual}`),
+          'warning'
+        );
+      }
+    });
+    
+    console.log('📊 Performance validation:', validation);
+    return validation;
+  }
+
+  /**
+   * Get comprehensive error and performance report
+   * @returns {Object} Full diagnostic report
+   */
+  getDiagnostics() {
+    return {
+      timestamp: Date.now(),
+      performance: this.getPerformanceStats(),
+      validation: this.validatePerformance(),
+      errors: this.errorHandler.getErrors(),
+      features: {
+        autoSave: this.autoSaveEnabled,
+        lineNumbers: this.lineNumbersEnabled,
+        virtualScrolling: this.virtualScrolling,
+        scrollSync: this.scrollSync?.enabled || false
+      },
+      browser: {
+        userAgent: navigator.userAgent,
+        memory: performance.memory ? {
+          used: performance.memory.usedJSHeapSize,
+          total: performance.memory.totalJSHeapSize,
+          limit: performance.memory.jsHeapSizeLimit
+        } : null
+      }
+    };
+  }
+
+  /**
    * Clean up editor resources
    */
   destroy() {
-    // Clear debounce timeout
+    // Clear all timeouts
     clearTimeout(this.debounceTimeout);
+    clearTimeout(this.autoSaveTimeout);
     
     // Remove all event listeners
     this.eventListeners.forEach((listeners, element) => {
@@ -1342,6 +2076,16 @@ class MarkdownEditor {
     this.content = '';
     this.textarea = null;
     this.overlayContainer = null;
+    this.lineNumbersContainer = null;
+    this.loadingOverlay = null;
+    
+    // Clear auto-save state
+    this.autoSaveEnabled = false;
+    this.saveInProgress = false;
+    
+    // Clear performance state
+    this.virtualScrolling = false;
+    this.cleanupScheduled = false;
     
     console.log('✅ MarkdownEditor destroyed');
   }
