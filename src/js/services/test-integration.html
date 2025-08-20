@@ -121,6 +121,7 @@
                         case 'write_file':
                         case 'auto_save_file':
                             // Simulate save delay
+                            console.log(`Mock ${command} called with:`, args);
                             await new Promise(resolve => setTimeout(resolve, 100));
                             return null;
                         case 'save_vault_preferences':
@@ -257,12 +258,13 @@
             updateStatus('Testing AutoSave...');
             
             try {
-                // Ensure AppState exists
+                // Ensure AppState exists and is properly configured
                 if (!appState) {
                     appState = new AppState();
-                    await appState.setVault('/test/vault');
-                    await appState.setCurrentFile('/test/vault/note.md');
                 }
+                // Always ensure vault and file are set for AutoSave tests
+                await appState.setVault('/test/vault');
+                await appState.setCurrentFile('/test/vault/note.md');
 
                 // Initialize AutoSave
                 autoSave = new AutoSave(appState);
@@ -291,9 +293,18 @@
                 });
 
                 // Test manual save (with mocked file)
-                const saveResult = await autoSave.saveNow();
-                addResult('Manual Save', saveResult, 
-                    saveResult ? 'Manual save successful' : 'Manual save failed');
+                console.log('Testing manual save...');
+                console.log('Current file:', appState.currentFile);
+                console.log('Content getter exists:', !!autoSave.getEditorContent);
+                
+                try {
+                    const saveResult = await autoSave.saveNow();
+                    addResult('Manual Save', saveResult, 
+                        saveResult ? 'Manual save successful' : 'Manual save failed');
+                } catch (saveError) {
+                    console.error('Manual save error:', saveError);
+                    addResult('Manual Save', false, `Manual save failed: ${saveError.message}`);
+                }
 
                 // Test content change (debounced)
                 autoSave.handleContentChange('New content');
