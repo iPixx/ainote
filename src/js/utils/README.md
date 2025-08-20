@@ -89,23 +89,38 @@ Run the comprehensive test suite:
 open src/js/utils/test-parser.html
 ```
 
-The parser includes 30+ test cases covering:
-- All markdown elements
+The parser includes 40+ comprehensive test cases covering:
+- All markdown elements and combinations
 - Edge cases and malformed input
-- Performance benchmarks
-- Security validation
-- Large document handling
+- Performance benchmarks and stress tests
+- Security validation and XSS prevention
+- Large document handling (10,000+ lines)
 - **Real-world Test.md validation** - comprehensive markdown document
+- **Extreme stress testing** - pathological input patterns
+- **Memory efficiency validation** - repetitive content handling
 
-### Test Cases Include:
+### Test Categories:
 
-1. **Basic Elements**: Headers, paragraphs, bold, italic, code
-2. **Advanced Elements**: Lists, blockquotes, links, images
-3. **Complex Nesting**: Bold-italic combinations, formatted blockquotes
-4. **Security Tests**: XSS prevention, HTML escaping
-5. **Performance Tests**: Large documents, repeated content
-6. **Real-World Test**: Complete Test.md file parsing with all elements
-7. **Edge Cases**: Malformed input, special characters
+1. **Basic Elements**: Headers (H1-H6), paragraphs, bold, italic, code
+2. **Advanced Elements**: Lists, blockquotes, links, images, horizontal rules
+3. **Complex Nesting**: Bold-italic combinations, formatted blockquotes, deep lists
+4. **Security Tests**: XSS prevention, HTML escaping, script injection prevention
+5. **Performance Tests**: Large documents (10K+ lines), repeated content patterns
+6. **Real-World Test**: Complete Test.md file with all markdown elements
+7. **Edge Cases**: Malformed input, pathological patterns, unicode handling
+8. **Stress Tests**: Extreme document sizes, complex nesting, memory efficiency
+9. **Reference Links**: Link resolution, missing references, complex combinations
+10. **Code Variations**: Multiple languages, special characters, inline code security
+
+### Interactive Test Runner Features:
+
+- **"Run All Tests"**: Execute complete test suite (40+ tests)
+- **"Load Test.md"**: Load comprehensive real-world test document
+- **"Load Stress Test"**: Generate extreme performance test (500 sections)
+- **"Load Edge Cases"**: Test pathological patterns and unicode
+- **Real-time parsing**: See results instantly as you type
+- **Performance metrics**: Parse time, line count, memory usage
+- **Visual validation**: Side-by-side HTML output and rendered preview
 
 ### Real-World Testing
 

@@ -85,6 +85,8 @@
         
         <button onclick="runTests()">Run All Tests</button>
         <button onclick="loadTestMdFile()" style="margin-left: 10px;">Load Test.md File</button>
+        <button onclick="loadStressTest()" style="margin-left: 10px;">Load Stress Test</button>
+        <button onclick="loadEdgeCaseTest()" style="margin-left: 10px;">Load Edge Cases</button>
         <div id="testOutput" class="test-output"></div>
     </div>
 
@@ -180,13 +182,48 @@ This paragraph demonstrates **bold _italic_** nesting, along with `inline code` 
 
 ## Performance Test
 
+This is a longer paragraph that tests the performance of the syntax highlighter with more content. 
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content. 
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
 This is a longer paragraph that tests the performance of the syntax highlighter with more content.
 
 **Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
 
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
 _Italic text performance test_: Italic content repeated multiple times.
 
 ```
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
 Code block performance test: Line of code that is repeated to test performance.
 Code block performance test: Line of code that is repeated to test performance.
 ```
@@ -251,6 +288,118 @@ That's a comprehensive demonstration of all supported markdown syntax elements! 
                 output.innerHTML = '<span style="color: orange;">ℹ️ Could not load Test.md file, using embedded demo content</span>';
                 console.log('Test.md load info:', error.message);
             }
+        };
+
+        // Load stress test function
+        window.loadStressTest = function() {
+            const input = document.getElementById('markdownInput');
+            const output = document.getElementById('testOutput');
+            
+            // Generate a large stress test document
+            const lines = [];
+            for (let i = 0; i < 500; i++) {
+                lines.push(`# Header Level ${i % 6 + 1}: Performance Section ${i}`);
+                lines.push('');
+                lines.push(`This is paragraph ${i} with **bold text containing _nested italic_** and various other elements including \`inline code\`, [links](https://example${i}.com), and ~~strikethrough~~ content.`);
+                lines.push('');
+                
+                if (i % 25 === 0) {
+                    lines.push('* Complex list item with **bold** text');
+                    lines.push('  * Nested item with _italic_ text and `code`');
+                    lines.push('    * Deep nested item with [link](https://nested.com)');
+                    lines.push('  * Another nested item');
+                    lines.push('* Second top-level item');
+                    lines.push('');
+                    
+                    lines.push('> This is a blockquote with **formatting**');
+                    lines.push('> > Nested quote with _italic_ text');
+                    lines.push('> > > Triple nested quote');
+                    lines.push('');
+                    
+                    lines.push('\`\`\`javascript');
+                    lines.push('// Performance test code block');
+                    lines.push('function performanceTest() {');
+                    lines.push('  return "Testing parser performance";');
+                    lines.push('}');
+                    lines.push('\`\`\`');
+                    lines.push('');
+                }
+            }
+            
+            input.value = lines.join('\n');
+            updatePreview();
+            output.innerHTML = '<span class="success">✅ Stress test loaded (500 sections, complex nesting)!</span>';
+        };
+
+        // Load edge case test function
+        window.loadEdgeCaseTest = function() {
+            const input = document.getElementById('markdownInput');
+            const output = document.getElementById('testOutput');
+            
+            const edgeCaseContent = '# 🧪 Edge Case Testing Suite\\n\\n' +
+'## Deep Nesting Combinations\\n\\n' +
+'**Bold with _italic and `code` inside_ and ~~strikethrough~~**\\n\\n' +
+'***Bold italic*** with regular text and `inline code with **bold** inside`\\n\\n' +
+'## Extreme Link Testing\\n\\n' +
+'Multiple [link1](http://example1.com) and [link2](http://example2.com) in paragraph.\\n\\n' +
+'[Reference link 1][ref1] and [Reference link 2][ref2] with [Missing ref][missing].\\n\\n' +
+'Complex: **[Bold link](http://example.com)** and _[Italic link](http://test.com)_\\n\\n' +
+'Images: ![Image 1](http://example.com/img1.jpg) and ![Image 2](http://example.com/img2.jpg)\\n\\n' +
+'[ref1]: http://reference1.com\\n' +
+'[ref2]: http://reference2.com "With title"\\n\\n' +
+'## Code Block Variations\\n\\n' +
+'```javascript\\n' +
+'// JavaScript with special chars\\n' +
+'function test() { \\n' +
+'  return { "key": 123 & 456 }; \\n' +
+'}\\n' +
+'```\\n\\n' +
+'```python\\n' +
+'# Python with unicode\\n' +
+'def test():\\n' +
+'    return "🚀 → ∞"\\n' +
+'```\\n\\n' +
+'```\\n' +
+'// No language specified\\n' +
+'plain code block with script tag\\n' +
+'```\\n\\n' +
+'## Mixed List Complexity\\n\\n' +
+'1. First ordered item\\n' +
+'   * Nested unordered item\\n' +
+'     1. Deep nested ordered\\n' +
+'       * Even deeper unordered\\n' +
+'2. Back to first level ordered\\n\\n' +
+'* Now an unordered list\\n' +
+'  1. With nested ordered\\n' +
+'* Back to unordered\\n\\n' +
+'## Blockquote Complexity\\n\\n' +
+'> Simple quote\\n\\n' +
+'> Multi-line quote\\n' +
+'> that continues here\\n\\n' +
+'> > Nested quote\\n' +
+'> > > Triple nested\\n\\n' +
+'> **Formatted quote** with _emphasis_ and `code`\\n\\n' +
+'## Pathological Patterns\\n\\n' +
+'**Unclosed bold **bold **bold text\\n\\n' +
+'_Unclosed italic _italic _italic text\\n\\n' +
+'Mixed **bold _italic `code **bold text\\n\\n' +
+'## Unicode and Special Characters\\n\\n' +
+'Text with unicode: 🚀 and special chars\\n\\n' +
+'Special HTML chars: & < > " \\' /\\n\\n' +
+'Mathematical symbols: sum prod delta\\n\\n' +
+'## Performance Stress Patterns\\n\\n' +
+'**Bold text repeated** '.repeat(50) + '\\n\\n' +
+'_Italic text repeated_ '.repeat(50) + '\\n\\n' +
+'[Link repeated](http://example.com) '.repeat(25) + '\\n\\n' +
+'## Memory Efficiency Test\\n\\n' +
+'This is line with **bold** and _italic_ and `code` and [link](http://test.com)\\n'.repeat(100) +
+'\\n---\\n\\n' +
+'## End of Edge Case Testing\\n\\n' +
+'That is comprehensive edge case testing! 🎯';
+
+            input.value = edgeCaseContent;
+            updatePreview();
+            output.innerHTML = '<span class="success">✅ Edge case test loaded (pathological patterns, unicode, nesting)!</span>';
         };
         
         // Interactive demo

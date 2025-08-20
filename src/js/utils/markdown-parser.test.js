@@ -521,6 +521,66 @@ test.test('should meet performance targets for typical documents', () => {
   test.assertEqual(parseTime < 100, true, `Parse time ${parseTime}ms should be < 100ms`);
 });
 
+// Test: Extreme Performance Stress Test
+test.test('should handle extremely large documents efficiently', () => {
+  // Create a very large document (5000+ lines with complex nesting)
+  const lines = [];
+  for (let i = 0; i < 2000; i++) {
+    lines.push(`# Header Level ${i % 6 + 1}: Document Section ${i}`);
+    lines.push('');
+    lines.push(`This is paragraph ${i} with **bold text containing _nested italic_** and various other elements including \`inline code\`, [links](https://example${i}.com), and ~~strikethrough~~ content.`);
+    lines.push('');
+    
+    // Add complex lists every 50 iterations
+    if (i % 50 === 0) {
+      lines.push('* Complex list item with **bold** text');
+      lines.push('  * Nested item with _italic_ text and `code`');
+      lines.push('    * Deep nested item with [link](https://nested.com)');
+      lines.push('  * Another nested item');
+      lines.push('* Second top-level item');
+      lines.push('');
+    }
+    
+    // Add blockquotes every 75 iterations
+    if (i % 75 === 0) {
+      lines.push('> This is a complex blockquote with **formatting**');
+      lines.push('> and `inline code` elements');
+      lines.push('> > Nested quote with _italic_ text');
+      lines.push('> > > Triple nested quote');
+      lines.push('');
+    }
+    
+    // Add code blocks every 100 iterations
+    if (i % 100 === 0) {
+      lines.push('```typescript');
+      lines.push('interface ComplexInterface {');
+      lines.push('  property: string;');
+      lines.push('  method(): Promise<void>;');
+      lines.push('}');
+      lines.push('```');
+      lines.push('');
+    }
+  }
+  
+  const extremeMarkdown = lines.join('\n');
+  const startTime = performance.now();
+  const result = parser.parse(extremeMarkdown);
+  const parseTime = performance.now() - startTime;
+  const stats = parser.getStats();
+  
+  test.assertEqual(result.length > 0, true, 'Should produce output for extreme document');
+  test.assertEqual(parseTime < 500, true, `Parse time ${parseTime.toFixed(2)}ms should be < 500ms for extreme document`);
+  test.assertEqual(stats.totalLines > 10000, true, 'Should handle 10,000+ lines');
+  
+  // Verify complex elements are parsed correctly
+  test.assertContains(result, '<h1>Header Level');
+  test.assertContains(result, '<strong>bold text containing <em>nested italic</em></strong>');
+  test.assertContains(result, '<blockquote>');
+  test.assertContains(result, 'class="language-typescript"');
+  
+  console.log(`✅ Extreme stress test: ${stats.totalLines} lines parsed in ${parseTime.toFixed(2)}ms`);
+});
+
 test.test('should handle large documents efficiently', () => {
   // Create a large document (around 5000 lines)
   const lines = [];
@@ -537,7 +597,7 @@ test.test('should handle large documents efficiently', () => {
   test.assertEqual(parseTime < 200, true, `Parse time ${parseTime}ms should be reasonable for large docs`);
 });
 
-// Test: Edge Cases
+// Test: Advanced Edge Cases and Stress Tests
 test.test('should handle malformed markdown gracefully', () => {
   const malformed = `# Header without closing
 **unclosed bold
@@ -549,12 +609,238 @@ test.test('should handle malformed markdown gracefully', () => {
   test.assertEqual(result.length > 0, true, 'Should produce some output even with malformed input');
 });
 
-test.test('should handle special characters', () => {
-  const result = parser.parse('Text with special chars: & < > " \' /');
+test.test('should handle special characters and unicode', () => {
+  const result = parser.parse('Text with special chars: & < > " \' / and unicode: 🚀 → ∞ ≠ ±');
   test.assertContains(result, '&amp;');
   test.assertContains(result, '&lt;');
   test.assertContains(result, '&gt;');
   test.assertContains(result, '&quot;');
+  test.assertContains(result, '🚀');
+  test.assertContains(result, '→');
+});
+
+test.test('should handle deeply nested formatting combinations', () => {
+  const complexNesting = `**Bold with _italic and \`code\` inside_ and ~~strikethrough~~**
+
+***Bold italic*** with regular text and \`inline code\`
+
+> **Quote with _nested_ formatting and [links](https://example.com)**
+> > **Nested quote with \`code\` and _emphasis_**
+
+* **List item with _italic_ and [link](https://test.com)**
+  * \`Nested item with code\` and **bold**
+    * ~~Deep nested with strikethrough~~ and _italic_`;
+
+  const result = parser.parse(complexNesting);
+  
+  test.assertContains(result, '<strong>Bold with <em>italic and <code>code</code> inside</em>');
+  test.assertContains(result, '<strong><em>Bold italic</em></strong>');
+  test.assertContains(result, '<blockquote>');
+  test.assertContains(result, '<ul>');
+  test.assertContains(result, '<del>Deep nested with strikethrough</del>');
+});
+
+test.test('should handle extreme link and reference combinations', () => {
+  const linkTest = `Multiple [link1](http://example1.com) and [link2](http://example2.com) in paragraph.
+
+[Reference link 1][ref1] and [Reference link 2][ref2] and [Reference link 3][ref3].
+
+[Empty reference][] and [Missing reference][missing].
+
+Images: ![Image 1](http://example.com/img1.jpg) and ![Image 2](http://example.com/img2.jpg)
+
+Complex: **[Bold link](http://example.com)** and _[Italic link](http://test.com)_
+
+[ref1]: http://reference1.com
+[ref2]: http://reference2.com "With title"
+[ref3]: http://reference3.com
+[Empty reference]: http://empty.com`;
+
+  const result = parser.parse(linkTest);
+  
+  test.assertContains(result, '<a href="http://example1.com">link1</a>');
+  test.assertContains(result, '<a href="http://reference1.com">Reference link 1</a>');
+  test.assertContains(result, '<img src="http://example.com/img1.jpg" alt="Image 1">');
+  test.assertContains(result, '<strong><a href="http://example.com">Bold link</a></strong>');
+  test.assertContains(result, '<a href="http://empty.com">Empty reference</a>');
+});
+
+test.test('should handle code block language variations and edge cases', () => {
+  const codeBlockTest = `\`\`\`javascript
+// JavaScript code
+function test() { return true; }
+\`\`\`
+
+\`\`\`python
+# Python code
+def test():
+    return True
+\`\`\`
+
+\`\`\`
+// No language specified
+plain code block
+\`\`\`
+
+\`\`\`typescript
+// TypeScript with special characters
+interface Test<T> { 
+  value: T & { id: number }; 
+}
+\`\`\`
+
+\`\`\`json
+{
+  "test": "value",
+  "nested": { "key": 123 }
+}
+\`\`\`
+
+Inline with special chars: \`const test = { "key": 123 & 456 }\``;
+
+  const result = parser.parse(codeBlockTest);
+  
+  test.assertContains(result, 'class="language-javascript"');
+  test.assertContains(result, 'class="language-python"');
+  test.assertContains(result, 'class="language-typescript"');
+  test.assertContains(result, 'class="language-json"');
+  test.assertContains(result, '<pre><code>\n// No language specified');
+  test.assertContains(result, '<code>const test = { &quot;key&quot;: 123 &amp; 456 }</code>');
+});
+
+test.test('should handle mixed list types and complex nesting', () => {
+  const listTest = `1. First ordered item
+   * Nested unordered item
+   * Another nested unordered
+     1. Deep nested ordered
+     2. Another deep ordered
+       * Even deeper unordered
+2. Back to first level ordered
+   
+* Now an unordered list
+  1. With nested ordered
+     * And nested unordered again
+       1. Very deep ordered
+  2. Second nested ordered
+* Back to unordered
+
+- Different unordered marker
++ Another unordered marker
+* Back to asterisk marker`;
+
+  const result = parser.parse(listTest);
+  
+  test.assertContains(result, '<ol>');
+  test.assertContains(result, '<ul>');
+  test.assertContains(result, '<li>First ordered item</li>');
+  test.assertContains(result, '<li>Nested unordered item</li>');
+  test.assertContains(result, '<li>Deep nested ordered</li>');
+  test.assertContains(result, '<li>Even deeper unordered</li>');
+});
+
+test.test('should handle blockquote edge cases and complex nesting', () => {
+  const quoteTest = `> Simple quote
+
+> Multi-line quote
+> that continues here
+> and here too
+
+> > Nested quote
+> > > Triple nested
+> > > > Quadruple nested
+> > Back to double
+> Back to single
+
+> **Formatted quote** with _emphasis_ and \`code\`
+>
+> With paragraph breaks inside
+
+> # Header in quote
+> ## Subheader in quote
+> 
+> * List in quote
+> * Second item
+>   * Nested in quote
+>
+> \`\`\`javascript
+> // Code in quote
+> console.log("test");
+> \`\`\`
+
+Regular paragraph after quotes.`;
+
+  const result = parser.parse(quoteTest);
+  
+  test.assertContains(result, '<blockquote>');
+  test.assertContains(result, '<p>Simple quote</p>');
+  test.assertContains(result, '<p>Multi-line quote');
+  test.assertContains(result, '<p>Triple nested</p>');
+  test.assertContains(result, '<h1>Header in quote</h1>');
+  test.assertContains(result, '<ul>');
+  test.assertContains(result, 'class="language-javascript"');
+});
+
+test.test('should handle memory efficiency with repetitive content', () => {
+  // Test memory efficiency with highly repetitive content
+  const repetitiveContent = [];
+  for (let i = 0; i < 1000; i++) {
+    repetitiveContent.push(`**Bold text ${i}** with _italic ${i}_ and \`code ${i}\` and [link ${i}](https://example${i}.com)`);
+  }
+  
+  const markdown = repetitiveContent.join('\n\n');
+  const startTime = performance.now();
+  const result = parser.parse(markdown);
+  const parseTime = performance.now() - startTime;
+  
+  test.assertEqual(result.length > 0, true, 'Should handle repetitive content');
+  test.assertEqual(parseTime < 200, true, `Repetitive content parse time ${parseTime.toFixed(2)}ms should be reasonable`);
+  test.assertContains(result, '<strong>Bold text 0</strong>');
+  test.assertContains(result, '<strong>Bold text 999</strong>');
+  test.assertContains(result, '<em>italic 500</em>');
+  test.assertContains(result, '<a href="https://example999.com">link 999</a>');
+  
+  console.log(`✅ Memory efficiency test: 1000 repetitive elements in ${parseTime.toFixed(2)}ms`);
+});
+
+test.test('should handle pathological input patterns', () => {
+  // Test various pathological patterns that could cause performance issues
+  const pathological = [
+    // Extreme nesting
+    '*'.repeat(100) + 'text' + '*'.repeat(100),
+    
+    // Many unclosed elements
+    '**bold **bold **bold **bold text',
+    
+    // Mixed unclosed elements
+    '**bold _italic `code **bold _italic text',
+    
+    // Extreme link patterns
+    '[' + 'a'.repeat(1000) + '](http://example.com)',
+    
+    // Code block stress
+    '```' + 'javascript\n'.repeat(100) + '```',
+    
+    // Quote nesting stress
+    '>' + ' >'.repeat(50) + ' Deep quote',
+    
+    // List marker confusion
+    '* - + * - + list item',
+    
+    // Mixed formatting stress
+    '**_`~~**_`~~' + 'text' + '~~`_**~~`_**'
+  ].join('\n\n');
+  
+  const startTime = performance.now();
+  const result = parser.parse(pathological);
+  const parseTime = performance.now() - startTime;
+  
+  test.assertEqual(result.length > 0, true, 'Should handle pathological input');
+  test.assertEqual(parseTime < 100, true, `Pathological input should parse in reasonable time: ${parseTime.toFixed(2)}ms`);
+  
+  // Verify it doesn't crash and produces some reasonable output
+  test.assertContains(result, '<p>');
+  
+  console.log(`✅ Pathological input test completed in ${parseTime.toFixed(2)}ms`);
 });
 
 // Export test runner for browser usage
