@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Parser Tests</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .test-output {
+            background: #f8f9fa;
+            border-left: 4px solid #007acc;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+        
+        .preview {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+        }
+        
+        .stats {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background: #005999;
+        }
+        
+        .demo-input {
+            width: 100%;
+            height: 200px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .error {
+            color: #dc3545;
+        }
+        
+        .success {
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>aiNote Markdown Parser Tests</h1>
+        <p>Testing the custom markdown parser for Issue #46</p>
+        
+        <button onclick="runTests()">Run All Tests</button>
+        <div id="testOutput" class="test-output"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>Interactive Demo</h2>
+        <p>Type markdown in the textarea below to see real-time parsing:</p>
+        
+        <textarea id="markdownInput" class="demo-input" placeholder="Type markdown here..."># Sample Markdown
+
+This is a **bold** paragraph with *italic* text and `inline code`.
+
+## Lists
+
+* Unordered item 1
+* Unordered item 2
+  * Nested item
+
+1. Ordered item 1
+2. Ordered item 2
+
+## Code Block
+
+```javascript
+console.log("Hello, aiNote!");
+```
+
+## Quote
+
+> This is a blockquote with **bold** text.
+> 
+> Multi-line quote.
+
+## Links and Images
+
+[Link to example](http://example.com)
+
+![Sample Image](data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjUwIiB2aWV3Qm94PSIwIDAgMTAwIDUwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjZjBmMGYwIiBzdHJva2U9IiNjY2MiLz4KPHRleHQgeD0iNTAiIHk9IjMwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjEwIiBmaWxsPSIjNjY2Ij5JbWFnZTwvdGV4dD4KPC9zdmc+)
+
+---
+
+Final paragraph with ~~strikethrough~~ text.</textarea>
+
+        <div class="stats" id="parseStats"></div>
+        
+        <h3>Parsed HTML Output:</h3>
+        <div class="test-output" id="htmlOutput"></div>
+        
+        <h3>Rendered Preview:</h3>
+        <div class="preview" id="htmlPreview"></div>
+    </div>
+
+    <script type="module">
+        import MarkdownParser from './markdown-parser.js';
+        import { markdownParserTests } from './markdown-parser.test.js';
+        
+        const parser = new MarkdownParser();
+        
+        // Make parser available globally for testing
+        window.parser = parser;
+        window.markdownParserTests = markdownParserTests;
+        
+        // Run tests function
+        window.runTests = async function() {
+            const output = document.getElementById('testOutput');
+            output.textContent = 'Running tests...';
+            
+            try {
+                const success = await markdownParserTests.run();
+                if (success) {
+                    output.innerHTML = '<span class="success">✅ All tests passed!</span>';
+                } else {
+                    output.innerHTML = '<span class="error">❌ Some tests failed. Check console for details.</span>';
+                }
+            } catch (error) {
+                output.innerHTML = `<span class="error">❌ Test error: ${error.message}</span>`;
+                console.error('Test error:', error);
+            }
+        };
+        
+        // Interactive demo
+        const input = document.getElementById('markdownInput');
+        const htmlOutput = document.getElementById('htmlOutput');
+        const htmlPreview = document.getElementById('htmlPreview');
+        const parseStats = document.getElementById('parseStats');
+        
+        function updatePreview() {
+            const markdown = input.value;
+            const startTime = performance.now();
+            const html = parser.parse(markdown);
+            const parseTime = performance.now() - startTime;
+            const stats = parser.getStats();
+            
+            htmlOutput.textContent = html;
+            htmlPreview.innerHTML = html;
+            parseStats.innerHTML = `
+                <strong>Parse Stats:</strong>
+                Parse time: ${parseTime.toFixed(2)}ms |
+                Lines: ${stats.totalLines} |
+                HTML lines: ${stats.htmlLines} |
+                Link refs: ${stats.linkReferences}
+            `;
+        }
+        
+        // Update preview on input
+        input.addEventListener('input', updatePreview);
+        
+        // Initial preview
+        updatePreview();
+        
+        console.log('Markdown Parser loaded successfully!');
+        console.log('Run runTests() to execute all tests');
+        console.log('Parser instance available as window.parser');
+    </script>
+</body>
+</html>
