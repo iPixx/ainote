@@ -30,12 +30,33 @@ class PreviewRenderer {
     this.scrollPosition = 0;
     this.lastUpdateTime = 0;
     
+    // Real-time update state
+    this.realTimeEnabled = false;
+    this.updateDebounceTimeout = null;
+    this.updateDebounceDelay = 200; // 200ms as specified
+    this.editorInstance = null;
+    this.lastContentHash = '';
+    this.pendingUpdate = false;
+    
     // Performance tracking
     this.renderStats = {
       totalRenders: 0,
       averageRenderTime: 0,
       maxRenderTime: 0,
-      memoryUsage: 0
+      memoryUsage: 0,
+      realTimeUpdates: 0,
+      incrementalUpdates: 0,
+      memoryGrowthRate: 0
+    };
+    
+    // Scroll synchronization state
+    this.scrollSync = {
+      enabled: false,
+      editorScrollElement: null,
+      editorScrollRatio: 0,
+      previewScrollRatio: 0,
+      syncInProgress: false,
+      tolerance: 5 // 5px tolerance as specified
     };
     
     // DOM elements cache
@@ -48,6 +69,24 @@ class PreviewRenderer {
     this.virtualDom = {
       elements: new Map(),
       lastSnapshot: null
+    };
+    
+    // Incremental parsing state
+    this.incremental = {
+      enabled: false,
+      chunkSize: 1000, // Lines to process per chunk
+      lastProcessedLine: 0,
+      contentLines: [],
+      processedSections: new Map()
+    };
+    
+    // Memory monitoring
+    this.memoryMonitor = {
+      lastCheck: 0,
+      checkInterval: 10000, // 10 seconds
+      baselineMemory: 0,
+      maxMemoryGrowth: 1048576, // 1MB per hour target
+      cleanupThreshold: 5242880 // 5MB cleanup threshold
     };
     
     this.initialize();
@@ -65,6 +104,7 @@ class PreviewRenderer {
     this.setupDOMStructure();
     this.setupEventListeners();
     this.loadTheme();
+    this.initializeMemoryMonitoring();
     
     console.log('✅ PreviewRenderer initialized successfully');
   }
@@ -1100,9 +1140,431 @@ th {
   }
 
   /**
+   * Enable real-time preview updates
+   * @param {MarkdownEditor} editorInstance - Editor instance for content monitoring
+   * @param {HTMLElement} editorScrollElement - Editor scroll container for sync
+   */
+  enableRealTimeUpdates(editorInstance, editorScrollElement = null) {
+    if (!editorInstance) {
+      console.error('❌ Editor instance required for real-time updates');
+      return;
+    }
+    
+    this.realTimeEnabled = true;
+    this.editorInstance = editorInstance;
+    this.scrollSync.editorScrollElement = editorScrollElement;
+    
+    // Listen for content changes from editor
+    this.editorInstance.addEventListener('content_changed', (event) => {
+      this.handleRealTimeContentChange(event.detail.content);
+    });
+    
+    // Setup scroll synchronization if editor scroll element provided
+    if (editorScrollElement) {
+      this.setupScrollSynchronization();
+    }
+    
+    console.log('✅ Real-time preview updates enabled');
+  }
+  
+  /**
+   * Disable real-time preview updates
+   */
+  disableRealTimeUpdates() {
+    this.realTimeEnabled = false;
+    this.editorInstance = null;
+    this.scrollSync.editorScrollElement = null;
+    
+    // Clear any pending updates
+    if (this.updateDebounceTimeout) {
+      clearTimeout(this.updateDebounceTimeout);
+      this.updateDebounceTimeout = null;
+    }
+    
+    console.log('🛑 Real-time preview updates disabled');
+  }
+  
+  /**
+   * Handle real-time content changes from editor with debouncing
+   * Target: <200ms after typing stops
+   * @param {string} content - New markdown content
+   */
+  handleRealTimeContentChange(content) {
+    if (!this.realTimeEnabled || this.pendingUpdate) {
+      return;
+    }
+    
+    // Check if content actually changed using hash comparison
+    const contentHash = this.generateContentHash(content);
+    if (contentHash === this.lastContentHash) {
+      return;
+    }
+    
+    this.lastContentHash = contentHash;
+    
+    // Clear existing debounce timeout
+    if (this.updateDebounceTimeout) {
+      clearTimeout(this.updateDebounceTimeout);
+    }
+    
+    // Debounce the update
+    this.updateDebounceTimeout = setTimeout(() => {
+      this.performRealTimeUpdate(content);
+    }, this.updateDebounceDelay);
+  }
+  
+  /**
+   * Perform real-time preview update
+   * Target: <50ms for incremental updates
+   * @param {string} content - Markdown content to render
+   */
+  async performRealTimeUpdate(content) {
+    if (this.pendingUpdate) {
+      return;
+    }
+    
+    this.pendingUpdate = true;
+    const startTime = performance.now();
+    
+    try {
+      // Use incremental parsing for large documents
+      if (this.shouldUseIncrementalParsing(content)) {
+        await this.performIncrementalUpdate(content);
+      } else {
+        await this.render(content);
+      }
+      
+      const updateTime = performance.now() - startTime;
+      this.renderStats.realTimeUpdates++;
+      
+      // Log performance warning if target exceeded
+      if (updateTime > 50) {
+        console.warn(`⚠️ Real-time update exceeded target: ${updateTime.toFixed(2)}ms (target: <50ms)`);
+      }
+      
+      // Update memory monitoring
+      this.checkMemoryUsage();
+      
+    } catch (error) {
+      console.error('❌ Real-time update failed:', error);
+    } finally {
+      this.pendingUpdate = false;
+      this.updateDebounceTimeout = null;
+    }
+  }
+  
+  /**
+   * Determine if incremental parsing should be used
+   * @param {string} content - Content to check
+   * @returns {boolean} Whether to use incremental parsing
+   */
+  shouldUseIncrementalParsing(content) {
+    const lines = content.split('\n');
+    return lines.length > 1000 || content.length > 50000; // Large document threshold
+  }
+  
+  /**
+   * Perform incremental update for large documents
+   * @param {string} content - Full markdown content
+   */
+  async performIncrementalUpdate(content) {
+    const startTime = performance.now();
+    const lines = content.split('\n');
+    
+    // Detect changed sections
+    const changedSections = this.detectChangedSections(lines);
+    
+    if (changedSections.length === 0) {
+      return; // No changes detected
+    }
+    
+    // Parse and update only changed sections
+    for (const section of changedSections) {
+      await this.updateSection(section, lines);
+    }
+    
+    this.incremental.contentLines = lines;
+    this.renderStats.incrementalUpdates++;
+    
+    const updateTime = performance.now() - startTime;
+    console.log(`🔄 Incremental update completed in ${updateTime.toFixed(2)}ms (${changedSections.length} sections)`);
+  }
+  
+  /**
+   * Detect changed sections in the content
+   * @param {string[]} newLines - New content lines
+   * @returns {Array} Array of changed section objects
+   */
+  detectChangedSections(newLines) {
+    const oldLines = this.incremental.contentLines;
+    const sections = [];
+    
+    if (!oldLines.length) {
+      // First time - consider entire document as changed
+      return [{ start: 0, end: newLines.length - 1, type: 'full' }];
+    }
+    
+    let sectionStart = null;
+    const maxLength = Math.max(oldLines.length, newLines.length);
+    
+    for (let i = 0; i < maxLength; i++) {
+      const oldLine = oldLines[i] || '';
+      const newLine = newLines[i] || '';
+      
+      if (oldLine !== newLine) {
+        if (sectionStart === null) {
+          sectionStart = i;
+        }
+      } else if (sectionStart !== null) {
+        // End of changed section
+        sections.push({ start: sectionStart, end: i - 1, type: 'partial' });
+        sectionStart = null;
+      }
+    }
+    
+    // Handle case where changes go to the end
+    if (sectionStart !== null) {
+      sections.push({ start: sectionStart, end: newLines.length - 1, type: 'partial' });
+    }
+    
+    return sections;
+  }
+  
+  /**
+   * Update a specific section of the content
+   * @param {Object} section - Section to update
+   * @param {string[]} lines - All content lines
+   */
+  async updateSection(section, lines) {
+    const sectionContent = lines.slice(section.start, section.end + 1).join('\n');
+    
+    // Import parser and render section
+    const { default: MarkdownParser } = await import('../utils/markdown-parser.js');
+    const parser = new MarkdownParser();
+    const sectionHtml = parser.parse(sectionContent);
+    
+    // Update specific DOM section if possible, otherwise fall back to full update
+    // For now, use full update - future optimization can target specific DOM elements
+    const fullContent = lines.join('\n');
+    const fullHtml = parser.parse(fullContent);
+    
+    await this.updatePreview(fullHtml, fullContent);
+    
+    // Cache processed section
+    this.incremental.processedSections.set(
+      `${section.start}-${section.end}`, 
+      { html: sectionHtml, content: sectionContent }
+    );
+  }
+  
+  /**
+   * Setup scroll synchronization between editor and preview
+   */
+  setupScrollSynchronization() {
+    if (!this.scrollSync.editorScrollElement || !this.elements.scrollContainer) {
+      return;
+    }
+    
+    this.scrollSync.enabled = true;
+    
+    // Listen to editor scroll events
+    this.scrollSync.editorScrollElement.addEventListener('scroll', 
+      this.debounce(() => this.handleEditorScroll(), 50)
+    );
+    
+    // Listen to preview scroll events
+    this.elements.scrollContainer.addEventListener('scroll', 
+      this.debounce(() => this.handlePreviewScroll(), 50)
+    );
+    
+    console.log('🔗 Scroll synchronization enabled');
+  }
+  
+  /**
+   * Handle editor scroll events for synchronization
+   */
+  handleEditorScroll() {
+    if (!this.scrollSync.enabled || this.scrollSync.syncInProgress) {
+      return;
+    }
+    
+    this.scrollSync.syncInProgress = true;
+    
+    const editorElement = this.scrollSync.editorScrollElement;
+    const previewElement = this.elements.scrollContainer;
+    
+    // Calculate scroll ratio in editor
+    const editorScrollTop = editorElement.scrollTop;
+    const editorScrollHeight = editorElement.scrollHeight - editorElement.clientHeight;
+    const editorScrollRatio = editorScrollHeight > 0 ? editorScrollTop / editorScrollHeight : 0;
+    
+    // Apply to preview with tolerance check
+    const previewScrollHeight = previewElement.scrollHeight - previewElement.clientHeight;
+    const targetScrollTop = editorScrollRatio * previewScrollHeight;
+    
+    if (Math.abs(previewElement.scrollTop - targetScrollTop) > this.scrollSync.tolerance) {
+      previewElement.scrollTop = targetScrollTop;
+    }
+    
+    this.scrollSync.editorScrollRatio = editorScrollRatio;
+    
+    setTimeout(() => {
+      this.scrollSync.syncInProgress = false;
+    }, 100);
+  }
+  
+  /**
+   * Handle preview scroll events for synchronization
+   */
+  handlePreviewScroll() {
+    if (!this.scrollSync.enabled || this.scrollSync.syncInProgress) {
+      return;
+    }
+    
+    this.scrollSync.syncInProgress = true;
+    
+    const editorElement = this.scrollSync.editorScrollElement;
+    const previewElement = this.elements.scrollContainer;
+    
+    // Calculate scroll ratio in preview
+    const previewScrollTop = previewElement.scrollTop;
+    const previewScrollHeight = previewElement.scrollHeight - previewElement.clientHeight;
+    const previewScrollRatio = previewScrollHeight > 0 ? previewScrollTop / previewScrollHeight : 0;
+    
+    // Apply to editor with tolerance check
+    const editorScrollHeight = editorElement.scrollHeight - editorElement.clientHeight;
+    const targetScrollTop = previewScrollRatio * editorScrollHeight;
+    
+    if (Math.abs(editorElement.scrollTop - targetScrollTop) > this.scrollSync.tolerance) {
+      editorElement.scrollTop = targetScrollTop;
+    }
+    
+    this.scrollSync.previewScrollRatio = previewScrollRatio;
+    
+    setTimeout(() => {
+      this.scrollSync.syncInProgress = false;
+    }, 100);
+  }
+  
+  /**
+   * Initialize memory monitoring for performance optimization
+   */
+  initializeMemoryMonitoring() {
+    // Get baseline memory usage
+    if (performance.memory) {
+      this.memoryMonitor.baselineMemory = performance.memory.usedJSHeapSize;
+    }
+    
+    // Start periodic memory monitoring
+    setInterval(() => {
+      this.checkMemoryUsage();
+    }, this.memoryMonitor.checkInterval);
+    
+    console.log('📊 Memory monitoring initialized');
+  }
+  
+  /**
+   * Check current memory usage and perform cleanup if needed
+   * Target: <1MB per hour of continuous editing
+   */
+  checkMemoryUsage() {
+    if (!performance.memory) {
+      return;
+    }
+    
+    const currentMemory = performance.memory.usedJSHeapSize;
+    const memoryGrowth = currentMemory - this.memoryMonitor.baselineMemory;
+    
+    // Update render stats
+    this.renderStats.memoryUsage = currentMemory;
+    this.renderStats.memoryGrowthRate = memoryGrowth;
+    
+    // Check if cleanup is needed
+    if (memoryGrowth > this.memoryMonitor.cleanupThreshold) {
+      this.performMemoryCleanup();
+    }
+    
+    // Log memory usage for monitoring
+    const memoryMB = (currentMemory / 1024 / 1024).toFixed(2);
+    const growthMB = (memoryGrowth / 1024 / 1024).toFixed(2);
+    
+    if (memoryGrowth > this.memoryMonitor.maxMemoryGrowth) {
+      console.warn(`⚠️ Memory growth exceeding target: ${growthMB}MB (target: <1MB/hour)`);
+    }
+    
+    this.memoryMonitor.lastCheck = Date.now();
+  }
+  
+  /**
+   * Perform memory cleanup operations
+   */
+  performMemoryCleanup() {
+    console.log('🧹 Performing memory cleanup...');
+    
+    // Clear processed sections cache
+    this.incremental.processedSections.clear();
+    
+    // Clear virtual DOM cache
+    this.virtualDom.elements.clear();
+    this.virtualDom.lastSnapshot = null;
+    
+    // Force garbage collection if available (development only)
+    if (window.gc && typeof window.gc === 'function') {
+      window.gc();
+    }
+    
+    // Update baseline after cleanup
+    if (performance.memory) {
+      this.memoryMonitor.baselineMemory = performance.memory.usedJSHeapSize;
+    }
+    
+    console.log('✅ Memory cleanup completed');
+  }
+  
+  /**
+   * Generate hash for content change detection
+   * @param {string} content - Content to hash
+   * @returns {string} Simple hash of content
+   */
+  generateContentHash(content) {
+    let hash = 0;
+    if (content.length === 0) return hash.toString();
+    
+    for (let i = 0; i < content.length; i++) {
+      const char = content.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    return hash.toString();
+  }
+  
+  /**
+   * Get performance statistics for monitoring
+   * @returns {Object} Performance statistics
+   */
+  getPerformanceStats() {
+    const stats = { ...this.renderStats };
+    
+    if (performance.memory) {
+      stats.currentMemoryMB = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2);
+      stats.memoryGrowthMB = (stats.memoryGrowthRate / 1024 / 1024).toFixed(2);
+    }
+    
+    stats.realTimeEnabled = this.realTimeEnabled;
+    stats.scrollSyncEnabled = this.scrollSync.enabled;
+    stats.incrementalEnabled = this.incremental.enabled;
+    
+    return stats;
+  }
+
+  /**
    * Cleanup method for removing event listeners and clearing memory
    */
   destroy() {
+    // Disable real-time updates
+    this.disableRealTimeUpdates();
+    
     // Remove event listeners
     if (this.elements.scrollContainer) {
       this.elements.scrollContainer.removeEventListener('scroll', this.handleScroll);
@@ -1129,6 +1591,9 @@ th {
       });
     }
     
+    // Perform final memory cleanup
+    this.performMemoryCleanup();
+    
     // Clear DOM elements
     this.clear();
     
@@ -1136,8 +1601,10 @@ th {
     this.container = null;
     this.elements = {};
     this.virtualDom = { elements: new Map(), lastSnapshot: null };
+    this.editorInstance = null;
+    this.scrollSync = { enabled: false };
     
-    console.log('🧹 PreviewRenderer destroyed');
+    console.log('🗑️ PreviewRenderer destroyed and memory cleared');
   }
 }
 

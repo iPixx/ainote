@@ -6,6 +6,7 @@ import AppState from './js/state.js';
 import { LayoutManager, MobileNavManager } from './js/layout-manager.js';
 import FileTree from './js/components/file-tree.js';
 import MarkdownEditor from './js/components/markdown-editor.js';
+import PreviewRenderer from './js/components/preview-renderer.js';
 
 // Initialize global application state
 const appState = new AppState();
@@ -15,6 +16,7 @@ let layoutManager;
 let mobileNavManager;
 let fileTreeComponent;
 let markdownEditor;
+let previewRenderer;
 
 // Window instance for state management
 let mainWindow;
@@ -381,9 +383,24 @@ async function openFile(filePath) {
       
       console.log('✅ MarkdownEditor initialized for file editing');
     }
+
+    // Initialize preview renderer if not exists (uses same container as editor for toggle mode)
+    if (!previewRenderer) {
+      // Create new preview renderer instance
+      previewRenderer = new PreviewRenderer(editorContent, appState);
+      
+      // Enable real-time updates with the editor
+      const editorScrollElement = editorContent.querySelector('textarea') || editorContent;
+      previewRenderer.enableRealTimeUpdates(markdownEditor, editorScrollElement);
+      
+      console.log('✅ PreviewRenderer initialized with real-time updates');
+    }
     
     // Set the content in the editor
     markdownEditor.setValue(content);
+
+    // Update view mode display based on current state
+    updateViewModeDisplay();
     
     showNotification(`Opened: ${fileName}`, 'success');
   } catch (error) {
@@ -486,12 +503,34 @@ function toggleAiPanel() {
 function toggleViewMode() {
   const newMode = appState.toggleViewMode();
   
-  // Update button appearance
-  const toggleBtn = document.getElementById('toggleModeBtn');
-  toggleBtn.textContent = newMode === 'editor' ? '👁' : '✏️';
-  toggleBtn.title = newMode === 'editor' ? 'Switch to preview' : 'Switch to editor';
+  // Update the display based on new mode
+  updateViewModeDisplay();
   
   showNotification(`Switched to ${newMode} mode`, 'info');
+}
+
+/**
+ * Update the view mode display (editor vs preview)
+ */
+function updateViewModeDisplay() {
+  const currentMode = appState.getState().viewMode;
+  const toggleBtn = document.getElementById('toggleModeBtn');
+  
+  // Update button appearance
+  toggleBtn.textContent = currentMode === 'editor' ? '👁' : '✏️';
+  toggleBtn.title = currentMode === 'editor' ? 'Switch to preview' : 'Switch to editor';
+  
+  if (currentMode === 'preview' && previewRenderer && markdownEditor) {
+    // Switch to preview mode - render current editor content
+    const currentContent = markdownEditor.getValue();
+    previewRenderer.render(currentContent);
+    console.log('📖 Switched to preview mode');
+  } else if (currentMode === 'editor' && markdownEditor) {
+    // Switch to editor mode - clear preview and show editor
+    previewRenderer.clear();
+    markdownEditor.focus();
+    console.log('✏️ Switched to editor mode');
+  }
 }
 
 /**
