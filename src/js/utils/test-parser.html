@@ -174,6 +174,12 @@ You can also use reference-style links like [this one][1].
 >
 > Including **formatted text** and `code`.
 
+## Images
+
+Local assets: ![JavaScript Logo](../../assets/javascript.svg) ![Tauri Logo](../../assets/tauri.svg)
+
+External placeholders: ![Random Photo](https://picsum.photos/300/200) ![Square Photo](https://picsum.photos/150)
+
 ## Mixed Content
 
 This paragraph demonstrates **bold _italic_** nesting, along with `inline code` and [links](https://example.com).
@@ -314,6 +320,18 @@ That's a comprehensive demonstration of all supported markdown syntax elements!<
                     lines.push('* Second top-level item');
                     lines.push('');
                     
+                    // Add image examples every 25 sections (mix local and external)
+                    if (i % 4 === 0) {
+                        lines.push(`![JavaScript Logo](../../assets/javascript.svg "JavaScript")`);
+                    } else if (i % 4 === 1) {
+                        lines.push(`![Tauri Logo](../../assets/tauri.svg "Tauri Framework")`);
+                    } else if (i % 4 === 2) {
+                        lines.push(`![Random Placeholder](https://picsum.photos/250/150 "Random Photo ${i}")`);
+                    } else {
+                        lines.push(`![Square Placeholder](https://picsum.photos/200 "Square Photo ${i}")`);
+                    }
+                    lines.push('');
+                    
                     lines.push('> This is a blockquote with **formatting**');
                     lines.push('> > Nested quote with _italic_ text');
                     lines.push('> > > Triple nested quote');
@@ -331,7 +349,7 @@ That's a comprehensive demonstration of all supported markdown syntax elements!<
             
             input.value = lines.join('\n');
             updatePreview();
-            output.innerHTML = '<span class="success">✅ Stress test loaded (500 sections with H1-H6 hierarchy, complex nesting)!</span>';
+            output.innerHTML = '<span class="success">✅ Stress test loaded (500 sections with H1-H6 hierarchy, local + Picsum images, complex nesting)!</span>';
         };
 
         // Load edge case test function
@@ -339,77 +357,119 @@ That's a comprehensive demonstration of all supported markdown syntax elements!<
             const input = document.getElementById('markdownInput');
             const output = document.getElementById('testOutput');
             
-            const edgeCaseContent = '# Edge Case Testing Suite\\n\\n' +
-'## Header Level Testing\\n\\n' +
-'# H1 Header\\n' +
-'## H2 Header\\n' +
-'### H3 Header\\n' +
-'#### H4 Header\\n' +
-'##### H5 Header\\n' +
-'###### H6 Header\\n\\n' +
-'## Deep Nesting Combinations\\n\\n' +
-'**Bold with _italic and `code` inside_ and ~~strikethrough~~**\\n\\n' +
-'***Bold italic*** with regular text and `inline code with **bold** inside`\\n\\n' +
-'## Extreme Link Testing\\n\\n' +
-'Multiple [link1](http://example1.com) and [link2](http://example2.com) in paragraph.\\n\\n' +
-'[Reference link 1][ref1] and [Reference link 2][ref2] with [Missing ref][missing].\\n\\n' +
-'Complex: **[Bold link](http://example.com)** and _[Italic link](http://test.com)_\\n\\n' +
-'Images: ![Image 1](http://example.com/img1.jpg) and ![Image 2](http://example.com/img2.jpg)\\n\\n' +
-'[ref1]: http://reference1.com\\n' +
-'[ref2]: http://reference2.com "With title"\\n\\n' +
-'## Code Block Variations\\n\\n' +
-'```javascript\\n' +
-'// JavaScript with special chars\\n' +
-'function test() { \\n' +
-'  return { "key": 123 & 456 }; \\n' +
-'}\\n' +
-'```\\n\\n' +
-'```python\\n' +
-'# Python with unicode\\n' +
-'def test():\\n' +
-'    return "🚀 → ∞"\\n' +
-'```\\n\\n' +
-'```\\n' +
-'// No language specified\\n' +
-'plain code block with script tag\\n' +
-'```\\n\\n' +
-'## Mixed List Complexity\\n\\n' +
-'1. First ordered item\\n' +
-'   * Nested unordered item\\n' +
-'     1. Deep nested ordered\\n' +
-'       * Even deeper unordered\\n' +
-'2. Back to first level ordered\\n\\n' +
-'* Now an unordered list\\n' +
-'  1. With nested ordered\\n' +
-'* Back to unordered\\n\\n' +
-'## Blockquote Complexity\\n\\n' +
-'> Simple quote\\n\\n' +
-'> Multi-line quote\\n' +
-'> that continues here\\n\\n' +
-'> > Nested quote\\n' +
-'> > > Triple nested\\n\\n' +
-'> **Formatted quote** with _emphasis_ and `code`\\n\\n' +
-'## Pathological Patterns\\n\\n' +
-'**Unclosed bold **bold **bold text\\n\\n' +
-'_Unclosed italic _italic _italic text\\n\\n' +
-'Mixed **bold _italic `code **bold text\\n\\n' +
-'## Unicode and Special Characters\\n\\n' +
-'Text with unicode chars and emojis\\n\\n' +
-'Special HTML chars: & < > " and quotes\\n\\n' +
-'Mathematical symbols: sum prod delta\\n\\n' +
-'## Performance Stress Patterns\\n\\n' +
-'**Bold text repeated** '.repeat(50) + '\\n\\n' +
-'_Italic text repeated_ '.repeat(50) + '\\n\\n' +
-'[Link repeated](http://example.com) '.repeat(25) + '\\n\\n' +
-'## Memory Efficiency Test\\n\\n' +
-'This is line with **bold** and _italic_ and `code` and [link](http://test.com)\\n'.repeat(100) +
-'\\n---\\n\\n' +
-'## End of Edge Case Testing\\n\\n' +
-'That is comprehensive edge case testing!';
+            const edgeCaseContent = `# Edge Case Testing Suite
+
+## Header Level Testing
+
+# H1 Header
+## H2 Header
+### H3 Header
+#### H4 Header
+##### H5 Header
+###### H6 Header
+
+## Deep Nesting Combinations
+
+**Bold with _italic and \`code\` inside_ and ~~strikethrough~~**
+
+***Bold italic*** with regular text and \`inline code with **bold** inside\`
+
+## Extreme Link Testing
+
+Multiple [link1](http://example1.com) and [link2](http://example2.com) in paragraph.
+
+[Reference link 1][ref1] and [Reference link 2][ref2] with [Missing ref][missing].
+
+Complex: **[Bold link](http://example.com)** and _[Italic link](http://test.com)_
+
+Images: ![JavaScript Logo](../../assets/javascript.svg) and ![Tauri Logo](../../assets/tauri.svg)
+
+External images: ![Random Image 1](https://picsum.photos/200/300) and ![Square Image](https://picsum.photos/200)
+
+[ref1]: http://reference1.com
+[ref2]: http://reference2.com "With title"
+
+## Code Block Variations
+
+\`\`\`javascript
+// JavaScript with special chars
+function test() { 
+  return { "key": 123 & 456 }; 
+}
+\`\`\`
+
+\`\`\`python
+# Python with unicode
+def test():
+    return "Testing unicode"
+\`\`\`
+
+\`\`\`
+// No language specified
+plain code block with script tag
+\`\`\`
+
+## Mixed List Complexity
+
+1. First ordered item
+   * Nested unordered item
+     1. Deep nested ordered
+       * Even deeper unordered
+2. Back to first level ordered
+
+* Now an unordered list
+  1. With nested ordered
+* Back to unordered
+
+## Blockquote Complexity
+
+> Simple quote
+
+> Multi-line quote
+> that continues here
+
+> > Nested quote
+> > > Triple nested
+
+> **Formatted quote** with _emphasis_ and \`code\`
+
+## Pathological Patterns
+
+**Unclosed bold **bold **bold text
+
+_Unclosed italic _italic _italic text
+
+Mixed **bold _italic \`code **bold text
+
+## Unicode and Special Characters
+
+Text with unicode chars and emojis
+
+Special HTML chars: & < > " and quotes
+
+Mathematical symbols: sum prod delta
+
+## Performance Stress Patterns
+
+${'**Bold text repeated** '.repeat(50)}
+
+${'_Italic text repeated_ '.repeat(50)}
+
+${'[Link repeated](http://example.com) '.repeat(25)}
+
+## Memory Efficiency Test
+
+${'This is line with **bold** and _italic_ and `code` and [link](http://test.com)\n'.repeat(100)}
+
+---
+
+## End of Edge Case Testing
+
+That is comprehensive edge case testing!`;
 
             input.value = edgeCaseContent;
             updatePreview();
-            output.innerHTML = '<span class="success">✅ Edge case test loaded (pathological patterns, unicode, nesting)!</span>';
+            output.innerHTML = '<span class="success">✅ Edge case test loaded (local + Picsum images, pathological patterns, unicode, nesting)!</span>';
         };
         
         // Interactive demo
