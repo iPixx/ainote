@@ -22,8 +22,10 @@ class VaultManager {
     this.recentVaults = [];
     this.maxRecentVaults = 5;
     
-    // Load persisted vault preferences
-    this.loadVaultPreferences();
+    // Load persisted vault preferences (async, but don't block constructor)
+    this.loadVaultPreferences().catch(error => {
+      console.error('Failed to load vault preferences during initialization:', error);
+    });
     
     // Restore current vault from app state
     this.currentVaultPath = appState.currentVault;
@@ -143,7 +145,7 @@ class VaultManager {
       await this.appState.setVault(newVaultPath);
 
       // Save to recent vaults
-      this.addToRecentVaults(newVaultPath);
+      await this.addToRecentVaults(newVaultPath);
       
       // Persist vault preference
       this.saveVaultPreference(newVaultPath);
@@ -214,7 +216,7 @@ class VaultManager {
    * Add a vault to the recent vaults list
    * @param {string} vaultPath - Path to add to recent list
    */
-  addToRecentVaults(vaultPath) {
+  async addToRecentVaults(vaultPath) {
     if (!vaultPath || typeof vaultPath !== 'string') {
       return;
     }
@@ -231,74 +233,64 @@ class VaultManager {
     }
     
     // Persist recent vaults
-    this.saveRecentVaults();
+    await this.saveRecentVaults();
   }
 
   /**
-   * Save current vault preference to localStorage
+   * Save current vault preference to app_state.json (current vault is handled by AppState)
+   * This method is kept for API compatibility but delegates to AppState
    * @param {string} vaultPath - Vault path to save
    */
   saveVaultPreference(vaultPath) {
-    try {
-      if (vaultPath && typeof vaultPath === 'string') {
-        localStorage.setItem('ainote_current_vault', vaultPath);
-      }
-    } catch (error) {
-      console.error('Failed to save vault preference:', error);
-    }
+    // Current vault is automatically saved by AppState.setVault()
+    // This method is kept for API compatibility
+    console.log(`Vault preference automatically saved via AppState: ${vaultPath}`);
   }
 
   /**
-   * Load saved vault preference from localStorage
+   * Load saved vault preference from app_state.json via AppState
    * @returns {string|null} Saved vault path or null
    */
   loadVaultPreference() {
-    try {
-      return localStorage.getItem('ainote_current_vault');
-    } catch (error) {
-      console.error('Failed to load vault preference:', error);
-      return null;
-    }
+    // Current vault is loaded by AppState on initialization
+    return this.appState.currentVault;
   }
 
   /**
-   * Clear saved vault preference
+   * Clear saved vault preference (delegates to AppState)
    */
   clearVaultPreference() {
-    try {
-      localStorage.removeItem('ainote_current_vault');
-    } catch (error) {
-      console.error('Failed to clear vault preference:', error);
-    }
+    // This will be handled by AppState.reset() or setVault(null)
+    this.appState.setVault(null);
   }
 
   /**
-   * Load all vault preferences including recent vaults
+   * Load all vault preferences including recent vaults from app_state.json
    */
-  loadVaultPreferences() {
-    // Load recent vaults
+  async loadVaultPreferences() {
     try {
-      const savedRecent = localStorage.getItem('ainote_recent_vaults');
-      if (savedRecent) {
-        const parsed = JSON.parse(savedRecent);
-        if (Array.isArray(parsed)) {
-          this.recentVaults = parsed.slice(0, this.maxRecentVaults);
-        }
+      const recentVaults = await window.__TAURI__.core.invoke('get_vault_preferences');
+      if (Array.isArray(recentVaults)) {
+        this.recentVaults = recentVaults.slice(0, this.maxRecentVaults);
+      } else {
+        this.recentVaults = [];
       }
     } catch (error) {
-      console.error('Failed to load recent vaults:', error);
+      console.error('Failed to load recent vaults from app_state.json:', error);
       this.recentVaults = [];
     }
   }
 
   /**
-   * Save recent vaults to localStorage
+   * Save recent vaults to app_state.json via backend
    */
-  saveRecentVaults() {
+  async saveRecentVaults() {
     try {
-      localStorage.setItem('ainote_recent_vaults', JSON.stringify(this.recentVaults));
+      await window.__TAURI__.core.invoke('save_vault_preferences', {
+        recentVaults: this.recentVaults
+      });
     } catch (error) {
-      console.error('Failed to save recent vaults:', error);
+      console.error('Failed to save recent vaults to app_state.json:', error);
     }
   }
 
@@ -314,9 +306,9 @@ class VaultManager {
       // Clear recent vaults
       this.recentVaults = [];
       
-      // Clear localStorage
+      // Clear app_state.json preferences
       this.clearVaultPreference();
-      localStorage.removeItem('ainote_recent_vaults');
+      await this.saveRecentVaults(); // Save empty recent vaults array
       
       // Reset app state
       await this.appState.setVault(null);

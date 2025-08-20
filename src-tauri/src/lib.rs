@@ -161,6 +161,16 @@ fn save_session_state(
     state_management::save_session_state_internal(current_vault, current_file, view_mode).map_err(|e| e.into())
 }
 
+#[tauri::command]
+fn save_vault_preferences(recent_vaults: Vec<String>) -> Result<(), String> {
+    state_management::save_vault_preferences_internal(recent_vaults).map_err(|e| e.into())
+}
+
+#[tauri::command]
+fn get_vault_preferences() -> Result<Vec<String>, String> {
+    state_management::get_vault_preferences_internal().map_err(|e| e.into())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -252,7 +262,9 @@ pub fn run() {
             save_app_state,
             save_window_state,
             save_layout_state,
-            save_session_state
+            save_session_state,
+            save_vault_preferences,
+            get_vault_preferences
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -772,6 +784,7 @@ mod tests {
                 editor_mode: "split".to_string(),
             },
             session: crate::types::SessionState::default(),
+            vault_preferences: crate::types::VaultPreferences::default(),
         };
         
         let _save_state_result = save_app_state(test_state.clone());

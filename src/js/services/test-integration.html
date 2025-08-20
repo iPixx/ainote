@@ -67,7 +67,7 @@
 <body>
     <div class="test-container">
         <h1>Services Integration Test</h1>
-        <p>Testing VaultManager and AutoSave integration with AppState</p>
+        <p>Testing VaultManager and AutoSave integration with AppState and app_state.json backend</p>
         
         <div class="test-section">
             <h3>Test Controls</h3>
@@ -123,6 +123,13 @@
                             // Simulate save delay
                             await new Promise(resolve => setTimeout(resolve, 100));
                             return null;
+                        case 'save_vault_preferences':
+                            // Mock saving vault preferences
+                            console.log('Mock: Saving vault preferences', args);
+                            return null;
+                        case 'get_vault_preferences':
+                            // Mock getting vault preferences
+                            return ['/mock/vault/path', '/another/mock/vault'];
                         default:
                             throw new Error(`Mock command not implemented: ${command}`);
                     }
