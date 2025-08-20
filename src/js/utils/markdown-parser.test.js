@@ -331,6 +331,171 @@ Final paragraph.`;
   test.assertContains(result, '<hr>');
 });
 
+// Test: Real-world comprehensive markdown (Test.md content)
+test.test('should handle comprehensive real-world Test.md content', () => {
+  const testMd = `# 🚀 Complete Markdown Syntax Demo
+
+## Headings
+
+# Heading 1
+
+## Heading 2
+
+### Heading 3
+
+#### Heading 4
+
+##### Heading 5
+
+###### Heading 6
+
+## Text Formatting
+
+This paragraph has **bold text**, _italic text_, **_bold and italic_**, and ~~strikethrough~~.
+
+You can also use **double underscore bold** and _single underscore italic_.
+
+## Code Examples
+
+Here's some \`inline code\` in a sentence.
+
+\`\`\`javascript
+// Code block with syntax highlighting
+function greetUser(name) {
+    const message = \\\`Hello, \\\${name}!\\\`;
+    console.log(message);
+    return message;
+}
+
+greetUser('World');
+\`\`\`
+
+\`\`\`python
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+print([fibonacci(i) for i in range(10)])
+\`\`\`
+
+## Links and References
+
+Visit [Google](https://google.com) or check out [GitHub](https://github.com).
+
+You can also use reference-style links like [this one][1].
+
+[1]: https://example.com
+
+## Lists
+
+### Unordered Lists
+
+- First item
+- Second item
+  - Nested item
+  - Another nested item
+    - Deep nesting
+- Third item
+
+### Ordered Lists
+
+1. First ordered item
+2. Second ordered item
+   1. Nested ordered item
+   2. Another nested ordered item
+3. Third ordered item
+
+## Blockquotes
+
+> This is a simple blockquote.
+> It can span multiple lines.
+
+> > This is a nested blockquote.
+> > It shows multiple levels of quoting.
+
+> ### Blockquotes can contain other elements
+>
+> Including **formatted text** and \`code\`.
+
+## Mixed Content
+
+This paragraph demonstrates **bold _italic_** nesting, along with \`inline code\` and [links](https://example.com).
+
+> **Quote with formatting**: This shows how _various_ **elements** can be \`combined\` in a [blockquote](https://example.com).
+
+## Performance Test
+
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+
+**Bold text performance test**: Bold content repeated multiple times.
+
+_Italic text performance test_: Italic content repeated multiple times.
+
+\`\`\`
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+\`\`\`
+
+That's a comprehensive demonstration of all supported markdown syntax elements! 🎉`;
+
+  const startTime = performance.now();
+  const result = parser.parse(testMd);
+  const parseTime = performance.now() - startTime;
+  
+  // Verify core parsing worked
+  test.assertEqual(result.length > 0, true, 'Should produce HTML output');
+  
+  // Test headers (all levels)
+  test.assertContains(result, '<h1>🚀 Complete Markdown Syntax Demo</h1>');
+  test.assertContains(result, '<h2>Headings</h2>');
+  test.assertContains(result, '<h3>Heading 3</h3>');
+  test.assertContains(result, '<h4>Heading 4</h4>');
+  test.assertContains(result, '<h5>Heading 5</h5>');
+  test.assertContains(result, '<h6>Heading 6</h6>');
+  
+  // Test text formatting
+  test.assertContains(result, '<strong>bold text</strong>');
+  test.assertContains(result, '<em>italic text</em>');
+  test.assertContains(result, '<del>strikethrough</del>');
+  test.assertContains(result, '<strong><em>bold and italic</em></strong>');
+  
+  // Test inline code
+  test.assertContains(result, '<code>inline code</code>');
+  
+  // Test code blocks with languages
+  test.assertContains(result, 'class="language-javascript"');
+  test.assertContains(result, 'class="language-python"');
+  test.assertContains(result, 'function greetUser(name)');
+  test.assertContains(result, 'def fibonacci(n):');
+  
+  // Test links
+  test.assertContains(result, '<a href="https://google.com">Google</a>');
+  test.assertContains(result, '<a href="https://github.com">GitHub</a>');
+  test.assertContains(result, '<a href="https://example.com">this one</a>'); // reference link
+  
+  // Test lists
+  test.assertContains(result, '<ul>');
+  test.assertContains(result, '<ol>');
+  test.assertContains(result, '<li>First item</li>');
+  test.assertContains(result, '<li>Nested item</li>');
+  test.assertContains(result, '<li>First ordered item</li>');
+  
+  // Test blockquotes
+  test.assertContains(result, '<blockquote>');
+  test.assertContains(result, '<p>This is a simple blockquote.</p>');
+  test.assertContains(result, '<p>This is a nested blockquote.</p>');
+  
+  // Test performance (should parse complex document quickly)
+  test.assertEqual(parseTime < 100, true, `Parse time ${parseTime.toFixed(2)}ms should be < 100ms for complex document`);
+  
+  // Test HTML escaping (emoji should be preserved)
+  test.assertContains(result, '🚀');
+  test.assertContains(result, '🎉');
+  
+  console.log(`✅ Real-world Test.md parsed successfully in ${parseTime.toFixed(2)}ms`);
+});
+
 // Test: Performance
 test.test('should meet performance targets for typical documents', () => {
   // Create a typical document (around 1000 lines)

@@ -84,6 +84,7 @@
         <p>Testing the custom markdown parser for Issue #46</p>
         
         <button onclick="runTests()">Run All Tests</button>
+        <button onclick="loadTestMdFile()" style="margin-left: 10px;">Load Test.md File</button>
         <div id="testOutput" class="test-output"></div>
     </div>
 
@@ -91,40 +92,106 @@
         <h2>Interactive Demo</h2>
         <p>Type markdown in the textarea below to see real-time parsing:</p>
         
-        <textarea id="markdownInput" class="demo-input" placeholder="Type markdown here..."># Sample Markdown
+        <textarea id="markdownInput" class="demo-input" placeholder="Type markdown here..."># 🚀 Complete Markdown Syntax Demo
 
-This is a **bold** paragraph with *italic* text and `inline code`.
+## Headings
+
+# Heading 1
+## Heading 2
+### Heading 3
+#### Heading 4
+##### Heading 5
+###### Heading 6
+
+## Text Formatting
+
+This paragraph has **bold text**, _italic text_, **_bold and italic_**, and ~~strikethrough~~.
+
+You can also use **double underscore bold** and _single underscore italic_.
+
+## Code Examples
+
+Here's some `inline code` in a sentence.
+
+```javascript
+// Code block with syntax highlighting
+function greetUser(name) {
+    const message = `Hello, ${name}!`;
+    console.log(message);
+    return message;
+}
+
+greetUser('World');
+```
+
+```python
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+print([fibonacci(i) for i in range(10)])
+```
+
+## Links and References
+
+Visit [Google](https://google.com) or check out [GitHub](https://github.com).
+
+You can also use reference-style links like [this one][1].
+
+[1]: https://example.com
 
 ## Lists
 
-* Unordered item 1
-* Unordered item 2
-  * Nested item
+### Unordered Lists
 
-1. Ordered item 1
-2. Ordered item 2
+- First item
+- Second item
+  - Nested item
+  - Another nested item
+    - Deep nesting
+- Third item
 
-## Code Block
+### Ordered Lists
 
-```javascript
-console.log("Hello, aiNote!");
+1. First ordered item
+2. Second ordered item
+   1. Nested ordered item
+   2. Another nested ordered item
+3. Third ordered item
+
+## Blockquotes
+
+> This is a simple blockquote.
+> It can span multiple lines.
+
+> > This is a nested blockquote.
+> > It shows multiple levels of quoting.
+
+> ### Blockquotes can contain other elements
+>
+> Including **formatted text** and `code`.
+
+## Mixed Content
+
+This paragraph demonstrates **bold _italic_** nesting, along with `inline code` and [links](https://example.com).
+
+> **Quote with formatting**: This shows how _various_ **elements** can be `combined` in a [blockquote](https://example.com).
+
+## Performance Test
+
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+
+**Bold text performance test**: Bold content repeated multiple times.
+
+_Italic text performance test_: Italic content repeated multiple times.
+
+```
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
 ```
 
-## Quote
-
-> This is a blockquote with **bold** text.
-> 
-> Multi-line quote.
-
-## Links and Images
-
-[Link to example](http://example.com)
-
-![Sample Image](data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjUwIiB2aWV3Qm94PSIwIDAgMTAwIDUwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjZjBmMGYwIiBzdHJva2U9IiNjY2MiLz4KPHRleHQgeD0iNTAiIHk9IjMwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjEwIiBmaWxsPSIjNjY2Ij5JbWFnZTwvdGV4dD4KPC9zdmc+)
-
----
-
-Final paragraph with ~~strikethrough~~ text.</textarea>
+That's a comprehensive demonstration of all supported markdown syntax elements! 🎉</textarea>
 
         <div class="stats" id="parseStats"></div>
         
@@ -160,6 +227,29 @@ Final paragraph with ~~strikethrough~~ text.</textarea>
             } catch (error) {
                 output.innerHTML = `<span class="error">❌ Test error: ${error.message}</span>`;
                 console.error('Test error:', error);
+            }
+        };
+
+        // Load Test.md file function
+        window.loadTestMdFile = async function() {
+            const input = document.getElementById('markdownInput');
+            const output = document.getElementById('testOutput');
+            
+            try {
+                // Try to fetch Test.md from the same directory
+                const response = await fetch('./Test.md');
+                if (response.ok) {
+                    const testMdContent = await response.text();
+                    input.value = testMdContent;
+                    updatePreview();
+                    output.innerHTML = '<span class="success">✅ Test.md loaded successfully!</span>';
+                } else {
+                    // Fallback to the content we have embedded
+                    output.innerHTML = '<span style="color: orange;">ℹ️ Test.md file not found, using embedded demo content</span>';
+                }
+            } catch (error) {
+                output.innerHTML = '<span style="color: orange;">ℹ️ Could not load Test.md file, using embedded demo content</span>';
+                console.log('Test.md load info:', error.message);
             }
         };
         

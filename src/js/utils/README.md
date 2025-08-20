@@ -89,12 +89,34 @@ Run the comprehensive test suite:
 open src/js/utils/test-parser.html
 ```
 
-The parser includes 25+ test cases covering:
+The parser includes 30+ test cases covering:
 - All markdown elements
 - Edge cases and malformed input
 - Performance benchmarks
 - Security validation
 - Large document handling
+- **Real-world Test.md validation** - comprehensive markdown document
+
+### Test Cases Include:
+
+1. **Basic Elements**: Headers, paragraphs, bold, italic, code
+2. **Advanced Elements**: Lists, blockquotes, links, images
+3. **Complex Nesting**: Bold-italic combinations, formatted blockquotes
+4. **Security Tests**: XSS prevention, HTML escaping
+5. **Performance Tests**: Large documents, repeated content
+6. **Real-World Test**: Complete Test.md file parsing with all elements
+7. **Edge Cases**: Malformed input, special characters
+
+### Real-World Testing
+
+The parser is validated against `Test.md` - a comprehensive markdown document that includes:
+- All heading levels (H1-H6)
+- Complex text formatting with nesting
+- Multiple programming languages in code blocks
+- Reference-style links
+- Nested lists and blockquotes
+- Performance stress testing content
+- Unicode characters and emojis
 
 ## Integration with aiNote
 
