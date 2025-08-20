@@ -309,7 +309,7 @@ That's a comprehensive demonstration of all supported markdown syntax elements!<
                 const headerPrefix = '#'.repeat(headerLevel);
                 lines.push(`${headerPrefix} Header Level ${headerLevel}: Performance Section ${i}`);
                 lines.push('');
-                lines.push(`This is paragraph ${i} with **bold text containing _nested italic_** and various other elements including \`inline code\`, [links](https://example${i}.com), and ~~strikethrough~~ content.`);
+                lines.push('This is paragraph ' + i + ' with **bold text containing _nested italic_** and various other elements including `inline code`, [links](https://example' + i + '.com), and ~~strikethrough~~ content.');
                 lines.push('');
                 
                 if (i % 25 === 0) {
