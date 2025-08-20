@@ -101,13 +101,23 @@
                         case 'select_vault':
                             return '/mock/vault/path';
                         case 'validate_vault':
-                            return true;
+                            console.log('Mock: Validating vault', args);
+                            if (args && args.vault_path) {
+                                console.log('Vault path to validate:', args.vault_path);
+                                return true;
+                            }
+                            return false;
                         case 'load_vault':
-                            return [
-                                { name: 'note1.md', is_dir: false, size: 1024 },
-                                { name: 'note2.md', is_dir: false, size: 2048 },
-                                { name: 'folder1', is_dir: true, size: 0 }
-                            ];
+                            console.log('Mock: Loading vault', args);
+                            if (args && args.vault_path) {
+                                console.log('Vault path to load:', args.vault_path);
+                                return [
+                                    { name: 'note1.md', is_dir: false, size: 1024 },
+                                    { name: 'note2.md', is_dir: false, size: 2048 },
+                                    { name: 'folder1', is_dir: true, size: 0 }
+                                ];
+                            }
+                            return [];
                         case 'save_session_state':
                             return null;
                         case 'load_app_state':
@@ -122,11 +132,20 @@
                         case 'auto_save_file':
                             // Simulate save delay
                             console.log(`Mock ${command} called with:`, args);
-                            await new Promise(resolve => setTimeout(resolve, 100));
-                            return null;
+                            if (args && args.file_path && args.content !== undefined) {
+                                console.log(`Saving to: ${args.file_path}, content length: ${args.content.length}`);
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                                return null;
+                            } else {
+                                console.error(`${command} missing required parameters:`, args);
+                                throw new Error(`${command} requires file_path and content parameters`);
+                            }
                         case 'save_vault_preferences':
-                            // Mock saving vault preferences
+                            // Mock saving vault preferences  
                             console.log('Mock: Saving vault preferences', args);
+                            if (args && args.recent_vaults) {
+                                console.log('Recent vaults to save:', args.recent_vaults);
+                            }
                             return null;
                         case 'get_vault_preferences':
                             // Mock getting vault preferences

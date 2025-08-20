@@ -427,9 +427,9 @@ class ContextMenu {
     const fullPath = `${parentPath}/${fileName}`;
 
     try {
-      await window.__TAURI__.core.invoke('create_file', { filePath: fullPath });
+      await window.__TAURI__.core.invoke('create_file', { file_path: fullPath });
       await window.__TAURI__.core.invoke('write_file', { 
-        filePath: fullPath, 
+        file_path: fullPath, 
         content: `# ${fileName.replace('.md', '')}\n\n` 
       });
 
@@ -477,7 +477,7 @@ class ContextMenu {
     const fullPath = `${parentPath}/${folderName}`;
 
     try {
-      await window.__TAURI__.core.invoke('create_folder', { folderPath: fullPath });
+      await window.__TAURI__.core.invoke('create_folder', { folder_path: fullPath });
 
       // Refresh file tree
       await this.refreshVault();
@@ -517,8 +517,8 @@ class ContextMenu {
 
     try {
       await window.__TAURI__.core.invoke('rename_file', { 
-        oldPath: file.path, 
-        newPath: newPath 
+        old_path: file.path, 
+        new_path: newPath 
       });
 
       // Update current file path if it was the renamed file
@@ -557,7 +557,7 @@ class ContextMenu {
     if (!confirmed) return;
 
     try {
-      await window.__TAURI__.core.invoke('delete_file', { filePath: file.path });
+      await window.__TAURI__.core.invoke('delete_file', { file_path: file.path });
 
       // Clear current file if it was the deleted file
       const currentFile = this.appState.getState().currentFile;
@@ -597,7 +597,7 @@ class ContextMenu {
    */
   async handleReveal(file) {
     try {
-      await window.__TAURI__.core.invoke('reveal_in_finder', { filePath: file.path });
+      await window.__TAURI__.core.invoke('reveal_in_finder', { file_path: file.path });
       this.emit(ContextMenu.EVENTS.ACTION_EXECUTED, { action: 'reveal', file: file });
     } catch (error) {
       // Fallback: show the path in a notification

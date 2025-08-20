@@ -70,7 +70,7 @@ class VaultManager {
 
       // Use backend validation command
       const isValid = await window.__TAURI__.core.invoke('validate_vault', {
-        vaultPath: vaultPath
+        vault_path: vaultPath
       });
       
       return isValid === true;
@@ -99,7 +99,7 @@ class VaultManager {
 
       // Load vault files using backend command
       const files = await window.__TAURI__.core.invoke('load_vault', {
-        vaultPath: vaultPath
+        vault_path: vaultPath
       });
 
       if (!Array.isArray(files)) {
@@ -287,7 +287,7 @@ class VaultManager {
   async saveRecentVaults() {
     try {
       await window.__TAURI__.core.invoke('save_vault_preferences', {
-        recentVaults: this.recentVaults
+        recent_vaults: this.recentVaults
       });
     } catch (error) {
       console.error('Failed to save recent vaults to app_state.json:', error);

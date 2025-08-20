@@ -258,7 +258,7 @@ class AutoSave {
       const command = saveType === 'auto' ? 'auto_save_file' : 'write_file';
       
       await window.__TAURI__.core.invoke(command, {
-        filePath: filePath,
+        file_path: filePath,
         content: content
       });
 
