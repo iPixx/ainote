@@ -347,10 +347,15 @@ async function openFile(filePath) {
       markdownEditor.addEventListener('auto_save_requested', async (event) => {
         const { content, fileSize } = event.detail;
         try {
-          const currentFile = appState.getState().currentFile;
-          if (currentFile) {
-            await invoke('write_file', { filePath: currentFile, content });
+          const state = appState.getState();
+          if (state.currentFile) {
+            await invoke('write_file', { filePath: state.currentFile, content });
             console.log(`💾 Auto-saved ${(fileSize / 1024).toFixed(1)}KB`);
+            
+            // Update UI to show saved state
+            const fileName = state.currentFile.split('/').pop();
+            updateCurrentFileName(fileName, false);
+            appState.markDirty(false);
           }
         } catch (error) {
           console.error('❌ Auto-save failed:', error);
