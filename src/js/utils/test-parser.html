@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Parser Tests</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .test-output {
+            background: #f8f9fa;
+            border-left: 4px solid #007acc;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+        
+        .preview {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+        }
+        
+        .stats {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background: #005999;
+        }
+        
+        .demo-input {
+            width: 100%;
+            height: 200px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .error {
+            color: #dc3545;
+        }
+        
+        .success {
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>aiNote Markdown Parser Tests</h1>
+        <p>Testing the custom markdown parser for Issue #46</p>
+        
+        <button onclick="runTests()">Run All Tests</button>
+        <button onclick="loadTestMdFile()" style="margin-left: 10px;">Load Test.md File</button>
+        <button onclick="loadStressTest()" style="margin-left: 10px;">Load Stress Test</button>
+        <button onclick="loadEdgeCaseTest()" style="margin-left: 10px;">Load Edge Cases</button>
+        <div id="testOutput" class="test-output"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>Interactive Demo</h2>
+        <p>Type markdown in the textarea below to see real-time parsing:</p>
+        
+        <textarea id="markdownInput" class="demo-input" placeholder="Type markdown here..."># Complete Markdown Syntax Demo
+
+## Headings
+
+# Heading 1
+## Heading 2
+### Heading 3
+#### Heading 4
+##### Heading 5
+###### Heading 6
+
+## Text Formatting
+
+This paragraph has **bold text**, _italic text_, **_bold and italic_**, and ~~strikethrough~~.
+
+You can also use **double underscore bold** and _single underscore italic_.
+
+## Code Examples
+
+Here's some `inline code` in a sentence.
+
+```javascript
+// Code block with syntax highlighting
+function greetUser(name) {
+    const message = `Hello, ${name}!`;
+    console.log(message);
+    return message;
+}
+
+greetUser('World');
+```
+
+```python
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+print([fibonacci(i) for i in range(10)])
+```
+
+## Links and References
+
+Visit [Google](https://google.com) or check out [GitHub](https://github.com).
+
+You can also use reference-style links like [this one][1].
+
+[1]: https://example.com
+
+## Lists
+
+### Unordered Lists
+
+- First item
+- Second item
+  - Nested item
+  - Another nested item
+    - Deep nesting
+- Third item
+
+### Ordered Lists
+
+1. First ordered item
+2. Second ordered item
+   1. Nested ordered item
+   2. Another nested ordered item
+3. Third ordered item
+
+## Blockquotes
+
+> This is a simple blockquote.
+> It can span multiple lines.
+
+> > This is a nested blockquote.
+> > It shows multiple levels of quoting.
+
+> ### Blockquotes can contain other elements
+>
+> Including **formatted text** and `code`.
+
+## Images
+
+Local assets: ![JavaScript Logo](../../assets/javascript.svg) ![Tauri Logo](../../assets/tauri.svg)
+
+External placeholders: ![Random Photo](https://picsum.photos/300/200) ![Square Photo](https://picsum.photos/150)
+
+## Mixed Content
+
+This paragraph demonstrates **bold _italic_** nesting, along with `inline code` and [links](https://example.com).
+
+> **Quote with formatting**: This shows how _various_ **elements** can be `combined` in a [blockquote](https://example.com).
+
+## Performance Test
+
+This is a longer paragraph that tests the performance of the syntax highlighter with more content. 
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content. 
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+This is a longer paragraph that tests the performance of the syntax highlighter with more content.
+
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+**Bold text performance test**: Bold content repeated multiple times.
+
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+_Italic text performance test_: Italic content repeated multiple times.
+
+```
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+Code block performance test: Line of code that is repeated to test performance.
+```
+
+That's a comprehensive demonstration of all supported markdown syntax elements!</textarea>
+
+        <div class="stats" id="parseStats"></div>
+        
+        <h3>Parsed HTML Output:</h3>
+        <div class="test-output" id="htmlOutput"></div>
+        
+        <h3>Rendered Preview:</h3>
+        <div class="preview" id="htmlPreview"></div>
+    </div>
+
+    <script type="module">
+        import MarkdownParser from './markdown-parser.js';
+        import { markdownParserTests } from './markdown-parser.test.js';
+        
+        const parser = new MarkdownParser();
+        
+        // Make parser available globally for testing
+        window.parser = parser;
+        window.markdownParserTests = markdownParserTests;
+        
+        // Run tests function
+        window.runTests = async function() {
+            const output = document.getElementById('testOutput');
+            output.textContent = 'Running tests...';
+            
+            try {
+                const success = await markdownParserTests.run();
+                if (success) {
+                    output.innerHTML = '<span class="success">✅ All tests passed!</span>';
+                } else {
+                    output.innerHTML = '<span class="error">❌ Some tests failed. Check console for details.</span>';
+                }
+            } catch (error) {
+                output.innerHTML = `<span class="error">❌ Test error: ${error.message}</span>`;
+                console.error('Test error:', error);
+            }
+        };
+
+        // Load Test.md file function
+        window.loadTestMdFile = async function() {
+            const input = document.getElementById('markdownInput');
+            const output = document.getElementById('testOutput');
+            
+            try {
+                // Try to fetch Test.md from the same directory
+                const response = await fetch('./Test.md');
+                if (response.ok) {
+                    const testMdContent = await response.text();
+                    input.value = testMdContent;
+                    updatePreview();
+                    output.innerHTML = '<span class="success">✅ Test.md loaded successfully!</span>';
+                } else {
+                    // Fallback to the content we have embedded
+                    output.innerHTML = '<span style="color: orange;">ℹ️ Test.md file not found, using embedded demo content</span>';
+                }
+            } catch (error) {
+                output.innerHTML = '<span style="color: orange;">ℹ️ Could not load Test.md file, using embedded demo content</span>';
+                console.log('Test.md load info:', error.message);
+            }
+        };
+
+        // Load stress test function
+        window.loadStressTest = function() {
+            const input = document.getElementById('markdownInput');
+            const output = document.getElementById('testOutput');
+            
+            // Generate a large stress test document with proper header hierarchy
+            const lines = [];
+            for (let i = 0; i < 500; i++) {
+                // Cycle through header levels H1-H6 for realistic document structure
+                const headerLevel = (i % 6) + 1;
+                const headerPrefix = '#'.repeat(headerLevel);
+                lines.push(`${headerPrefix} Header Level ${headerLevel}: Performance Section ${i}`);
+                lines.push('');
+                lines.push('This is paragraph ' + i + ' with **bold text containing _nested italic_** and various other elements including `inline code`, [links](https://example' + i + '.com), and ~~strikethrough~~ content.');
+                lines.push('');
+                
+                if (i % 25 === 0) {
+                    lines.push('* Complex list item with **bold** text');
+                    lines.push('  * Nested item with _italic_ text and `code`');
+                    lines.push('    * Deep nested item with [link](https://nested.com)');
+                    lines.push('  * Another nested item');
+                    lines.push('* Second top-level item');
+                    lines.push('');
+                    
+                    // Add image examples every 25 sections (mix local and external)
+                    if (i % 4 === 0) {
+                        lines.push(`![JavaScript Logo](../../assets/javascript.svg "JavaScript")`);
+                    } else if (i % 4 === 1) {
+                        lines.push(`![Tauri Logo](../../assets/tauri.svg "Tauri Framework")`);
+                    } else if (i % 4 === 2) {
+                        lines.push(`![Random Placeholder](https://picsum.photos/250/150 "Random Photo ${i}")`);
+                    } else {
+                        lines.push(`![Square Placeholder](https://picsum.photos/200 "Square Photo ${i}")`);
+                    }
+                    lines.push('');
+                    
+                    lines.push('> This is a blockquote with **formatting**');
+                    lines.push('> > Nested quote with _italic_ text');
+                    lines.push('> > > Triple nested quote');
+                    lines.push('');
+                    
+                    lines.push('\`\`\`javascript');
+                    lines.push('// Performance test code block');
+                    lines.push('function performanceTest() {');
+                    lines.push('  return "Testing parser performance";');
+                    lines.push('}');
+                    lines.push('\`\`\`');
+                    lines.push('');
+                }
+            }
+            
+            input.value = lines.join('\n');
+            updatePreview();
+            output.innerHTML = '<span class="success">✅ Stress test loaded (500 sections with H1-H6 hierarchy, local + Picsum images, complex nesting)!</span>';
+        };
+
+        // Load edge case test function
+        window.loadEdgeCaseTest = function() {
+            const input = document.getElementById('markdownInput');
+            const output = document.getElementById('testOutput');
+            
+            const edgeCaseContent = `# 🧪 Edge Case Testing Suite
+
+## 📋 Header Level Testing
+
+# 🎯 H1 Header
+## 🚀 H2 Header
+### 💡 H3 Header
+#### ⚡ H4 Header
+##### ✨ H5 Header
+###### 🔥 H6 Header
+
+## 🔗 Deep Nesting Combinations
+
+**Bold with _italic and \`code\` inside_ and ~~strikethrough~~**
+
+***Bold italic*** with regular text and \`inline code with **bold** inside\`
+
+## 🌐 Extreme Link Testing
+
+Multiple [link1](http://example1.com) and [link2](http://example2.com) in paragraph.
+
+[Reference link 1][ref1] and [Reference link 2][ref2] with [Missing ref][missing].
+
+Complex: **[Bold link](http://example.com)** and _[Italic link](http://test.com)_
+
+Images: ![JavaScript Logo](../../assets/javascript.svg) and ![Tauri Logo](../../assets/tauri.svg)
+
+External images: ![Random Image 1](https://picsum.photos/200/300) and ![Square Image](https://picsum.photos/200)
+
+[ref1]: http://reference1.com
+[ref2]: http://reference2.com "With title"
+
+## 💻 Code Block Variations
+
+\`\`\`javascript
+// JavaScript with special chars
+function test() { 
+  return { "key": 123 & 456 }; 
+}
+\`\`\`
+
+\`\`\`python
+# Python with unicode
+def test():
+    return "Testing unicode"
+\`\`\`
+
+\`\`\`
+// No language specified
+plain code block with script tag
+\`\`\`
+
+## 📝 Mixed List Complexity
+
+1. First ordered item
+   * Nested unordered item
+     1. Deep nested ordered
+       * Even deeper unordered
+2. Back to first level ordered
+
+* Now an unordered list
+  1. With nested ordered
+* Back to unordered
+
+## 💬 Blockquote Complexity
+
+> Simple quote
+
+> Multi-line quote
+> that continues here
+
+> > Nested quote
+> > > Triple nested
+
+> **Formatted quote** with _emphasis_ and \`code\`
+
+## ⚠️ Pathological Patterns
+
+**Unclosed bold **bold **bold text
+
+_Unclosed italic _italic _italic text
+
+Mixed **bold _italic \`code **bold text
+
+## 🌍 Unicode and Special Characters
+
+Text with unicode chars and emojis: 🚀 💻 📝 🎯 ⚡ 🔥 💡 ✨
+
+Special HTML chars: & < > " and quotes
+
+Mathematical symbols: ∑ ∏ ∆ ∇ ∂ ∫ → ∞ ≠ ± α β γ δ
+
+More emojis: 🎉 🌟 🔧 🛠️ ⭐ 🎨 📊 📈
+
+## 📊 Tables (Future Feature)
+
+| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| Cell 1   | **Bold** | \`Code\`  |
+| Cell 2   | _Italic_ | [Link](http://example.com) |
+
+| Left | Center | Right |
+|:-----|:------:|------:|
+| L1   |   C1   |    R1 |
+| L2   |   C2   |    R2 |
+
+> **Note:** Table parsing will be implemented in sub-issue #48
+
+## 🌟 Performance Stress Patterns
+
+${'**Bold text repeated** '.repeat(50)}
+
+${'_Italic text repeated_ '.repeat(50)}
+
+${'[Link repeated](http://example.com) '.repeat(25)}
+
+## 🧠 Memory Efficiency Test
+
+${'This is line with **bold** and _italic_ and `code` and [link](http://test.com)\n'.repeat(100)}
+
+---
+
+## 🏁 End of Edge Case Testing
+
+That is comprehensive edge case testing! 🎯 ✅ 🚀`;
+
+            input.value = edgeCaseContent;
+            updatePreview();
+            output.innerHTML = '<span class="success">✅ Edge case test loaded (local + Picsum images, pathological patterns, unicode, nesting)!</span>';
+        };
+        
+        // Interactive demo
+        const input = document.getElementById('markdownInput');
+        const htmlOutput = document.getElementById('htmlOutput');
+        const htmlPreview = document.getElementById('htmlPreview');
+        const parseStats = document.getElementById('parseStats');
+        
+        function updatePreview() {
+            const markdown = input.value;
+            const startTime = performance.now();
+            const html = parser.parse(markdown);
+            const parseTime = performance.now() - startTime;
+            const stats = parser.getStats();
+            
+            htmlOutput.textContent = html;
+            htmlPreview.innerHTML = html;
+            parseStats.innerHTML = `
+                <strong>Parse Stats:</strong>
+                Parse time: ${parseTime.toFixed(2)}ms |
+                Lines: ${stats.totalLines} |
+                HTML lines: ${stats.htmlLines} |
+                Link refs: ${stats.linkReferences}
+            `;
+        }
+        
+        // Update preview on input
+        input.addEventListener('input', updatePreview);
+        
+        // Initial preview
+        updatePreview();
+        
+        console.log('Markdown Parser loaded successfully!');
+        console.log('Run runTests() to execute all tests');
+        console.log('Parser instance available as window.parser');
+    </script>
+</body>
+</html>
