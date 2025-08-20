@@ -5,8 +5,7 @@ const { getCurrentWindow } = window.__TAURI__.window;
 import AppState from './js/state.js';
 import { LayoutManager, MobileNavManager } from './js/layout-manager.js';
 import FileTree from './js/components/file-tree.js';
-import MarkdownEditor from './js/components/markdown-editor.js';
-import PreviewRenderer from './js/components/preview-renderer.js';
+import EditorPreviewPanel from './js/components/editor-preview-panel.js';
 
 // Initialize global application state
 const appState = new AppState();
@@ -15,8 +14,7 @@ const appState = new AppState();
 let layoutManager;
 let mobileNavManager;
 let fileTreeComponent;
-let markdownEditor;
-let previewRenderer;
+let editorPreviewPanel;
 
 // Window instance for state management
 let mainWindow;
@@ -327,26 +325,29 @@ async function openFile(filePath) {
     const fileName = filePath.split('/').pop();
     updateCurrentFileName(fileName, false);
     
-    // Initialize or update markdown editor
+    // Initialize or update editor/preview panel
     const editorContent = document.getElementById('editorContent');
     
-    if (!markdownEditor) {
-      // Create new markdown editor instance
-      markdownEditor = new MarkdownEditor(editorContent, appState);
+    if (!editorPreviewPanel) {
+      // Create new editor/preview panel instance
+      editorPreviewPanel = new EditorPreviewPanel(editorContent, appState);
       
-      // Listen for content changes to mark file as dirty
-      markdownEditor.addEventListener(MarkdownEditor.EVENTS.CONTENT_CHANGED, () => {
+      // Listen for content changes from the editor component within the panel
+      editorPreviewPanel.addEventListener('content_changed', () => {
         appState.markDirty(true);
-        updateCurrentFileName(fileName, true);
+        const currentFileName = appState.getState().currentFile?.split('/').pop();
+        if (currentFileName) {
+          updateCurrentFileName(currentFileName, true);
+        }
       });
       
       // Listen for save requests from keyboard shortcuts
-      markdownEditor.addEventListener('save_requested', () => {
+      editorPreviewPanel.addEventListener('save_requested', () => {
         saveFile();
       });
       
-      // Listen for auto-save requests
-      markdownEditor.addEventListener('auto_save_requested', async (event) => {
+      // Listen for auto-save requests from the editor component
+      editorPreviewPanel.addEventListener('auto_save_requested', async (event) => {
         const { content, fileSize } = event.detail;
         try {
           const state = appState.getState();
@@ -366,38 +367,22 @@ async function openFile(filePath) {
       });
       
       // Listen for performance events
-      markdownEditor.addEventListener(MarkdownEditor.EVENTS.LARGE_DOCUMENT_DETECTED, (event) => {
+      editorPreviewPanel.addEventListener('large_document_detected', (event) => {
         const { size } = event.detail;
         showNotification(`Large document detected (${(size / 1024).toFixed(1)}KB) - optimizations enabled`, 'info');
       });
       
-      markdownEditor.addEventListener(MarkdownEditor.EVENTS.AUTO_SAVE_COMPLETED, (event) => {
-        const { duration, fileSize } = event.detail;
-        console.log(`💾 Auto-save: ${duration.toFixed(1)}ms, ${(fileSize / 1024).toFixed(1)}KB`);
+      // Listen for mode changes
+      editorPreviewPanel.addEventListener(EditorPreviewPanel.EVENTS.MODE_CHANGED, (event) => {
+        console.log(`🔄 Panel mode changed to: ${event.detail.mode}`);
+        updateViewModeDisplay();
       });
       
-      markdownEditor.addEventListener(MarkdownEditor.EVENTS.AUTO_SAVE_ERROR, (event) => {
-        console.error('❌ Auto-save error:', event.detail.error);
-        showNotification('Auto-save failed', 'error');
-      });
-      
-      console.log('✅ MarkdownEditor initialized for file editing');
-    }
-
-    // Initialize preview renderer if not exists (uses same container as editor for toggle mode)
-    if (!previewRenderer) {
-      // Create new preview renderer instance
-      previewRenderer = new PreviewRenderer(editorContent, appState);
-      
-      // Enable real-time updates with the editor
-      const editorScrollElement = editorContent.querySelector('textarea') || editorContent;
-      previewRenderer.enableRealTimeUpdates(markdownEditor, editorScrollElement);
-      
-      console.log('✅ PreviewRenderer initialized with real-time updates');
+      console.log('✅ EditorPreviewPanel initialized for file editing');
     }
     
-    // Set the content in the editor
-    markdownEditor.setValue(content);
+    // Set the content in the panel (handles both editor and preview)
+    editorPreviewPanel.setContent(content);
 
     // Update view mode display based on current state
     updateViewModeDisplay();
@@ -454,12 +439,12 @@ async function saveFile() {
     return;
   }
   
-  if (!markdownEditor) {
+  if (!editorPreviewPanel) {
     showNotification('No editor content to save', 'warning');
     return;
   }
   
-  const content = markdownEditor.getValue();
+  const content = editorPreviewPanel.getContent();
   
   try {
     await invoke('write_file', { filePath: currentFile, content });
@@ -501,36 +486,32 @@ function toggleAiPanel() {
  * Toggle view mode between editor and preview
  */
 function toggleViewMode() {
-  const newMode = appState.toggleViewMode();
-  
-  // Update the display based on new mode
-  updateViewModeDisplay();
-  
-  showNotification(`Switched to ${newMode} mode`, 'info');
+  if (editorPreviewPanel) {
+    editorPreviewPanel.toggleMode();
+  } else {
+    // Fallback to AppState toggle if panel not initialized
+    const newMode = appState.toggleViewMode();
+    updateViewModeDisplay();
+    showNotification(`Switched to ${newMode} mode`, 'info');
+  }
 }
 
 /**
  * Update the view mode display (editor vs preview)
  */
 function updateViewModeDisplay() {
+  // The EditorPreviewPanel handles its own display updates
+  // This function is kept for compatibility but may be used for additional UI updates
   const currentMode = appState.getState().viewMode;
   const toggleBtn = document.getElementById('toggleModeBtn');
   
-  // Update button appearance
-  toggleBtn.textContent = currentMode === 'editor' ? '👁' : '✏️';
-  toggleBtn.title = currentMode === 'editor' ? 'Switch to preview' : 'Switch to editor';
-  
-  if (currentMode === 'preview' && previewRenderer && markdownEditor) {
-    // Switch to preview mode - render current editor content
-    const currentContent = markdownEditor.getValue();
-    previewRenderer.render(currentContent);
-    console.log('📖 Switched to preview mode');
-  } else if (currentMode === 'editor' && markdownEditor) {
-    // Switch to editor mode - clear preview and show editor
-    previewRenderer.clear();
-    markdownEditor.focus();
-    console.log('✏️ Switched to editor mode');
+  // Update button appearance (EditorPreviewPanel also updates this, but ensure consistency)
+  if (toggleBtn) {
+    toggleBtn.textContent = currentMode === 'editor' ? '👁' : '✏️';
+    toggleBtn.title = currentMode === 'editor' ? 'Switch to preview (Ctrl+Shift+P)' : 'Switch to editor (Ctrl+Shift+P)';
   }
+  
+  console.log(`📋 View mode display updated: ${currentMode}`);
 }
 
 /**
