@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance & Stress Testing - aiNote</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+            margin: 0;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #007acc;
+            background: #f8f9fa;
+            border-radius: 0 4px 4px 0;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007acc;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-good { background: #28a745; }
+        .status-warn { background: #ffc107; }
+        .status-bad { background: #dc3545; }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007acc, #17a2b8);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .chart-container {
+            margin: 20px 0;
+            height: 300px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            position: relative;
+        }
+        .chart {
+            width: 100%;
+            height: 100%;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover { background: #005999; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 4px;
+            border-left: 4px solid;
+        }
+        .test-pass { background: #d4edda; color: #155724; border-left-color: #28a745; }
+        .test-fail { background: #f8d7da; color: #721c24; border-left-color: #dc3545; }
+        .test-warn { background: #fff3cd; color: #856404; border-left-color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ Performance & Stress Testing</h1>
+        <p>Comprehensive performance validation for large vaults and memory efficiency testing</p>
+        
+        <div class="test-section">
+            <h3>🎮 Test Controls</h3>
+            <button onclick="runPerformanceTests()">🚀 Run Performance Tests</button>
+            <button onclick="runStressTests()">💪 Run Stress Tests</button>
+            <button onclick="runMemoryLeakTests()">💾 Memory Leak Tests</button>
+            <button onclick="runConcurrencyTests()">🔄 Concurrency Tests</button>
+            <button onclick="stopTests()" class="btn-danger">⏹️ Stop Tests</button>
+            <button onclick="clearResults()">🧹 Clear Results</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Real-time Metrics</h3>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value" id="opsPerSec">0</div>
+                    <div class="metric-label">Operations/sec</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="memoryUsed">0MB</div>
+                    <div class="metric-label">Memory Used</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="avgLatency">0ms</div>
+                    <div class="metric-label">Avg Latency</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="errorRate">0%</div>
+                    <div class="metric-label">Error Rate</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📈 Performance Charts</h3>
+            <div class="chart-container">
+                <canvas id="performanceChart" class="chart"></canvas>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🖥️ Test Status</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="testProgress"></div>
+            </div>
+            <div id="status">Ready to run performance tests...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Test Results</h3>
+            <div id="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Test Log</h3>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <!-- Mock Tauri API with performance simulation -->
+    <script>
+        let performanceData = {
+            operations: 0,
+            errors: 0,
+            startTime: 0,
+            latencies: [],
+            memoryUsage: []
+        };
+
+        window.__TAURI__ = {
+            core: {
+                invoke: async (command, args) => {
+                    const start = performance.now();
+                    
+                    // Simulate realistic latencies based on operation type
+                    let simulatedLatency = 0;
+                    switch (command) {
+                        case 'load_vault':
+                            const fileCount = args?.vaultPath?.includes('large') ? 1000 : 10;
+                            simulatedLatency = Math.max(50, fileCount * 0.5 + Math.random() * 100);
+                            break;
+                        case 'scan_vault_files':
+                            simulatedLatency = Math.random() * 200 + 100;
+                            break;
+                        case 'write_file':
+                        case 'auto_save_file':
+                            const contentSize = args?.content?.length || 0;
+                            simulatedLatency = Math.max(20, contentSize / 10000 + Math.random() * 50);
+                            break;
+                        default:
+                            simulatedLatency = Math.random() * 50 + 10;
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, simulatedLatency));
+                    
+                    performanceData.operations++;
+                    const latency = performance.now() - start;
+                    performanceData.latencies.push(latency);
+                    
+                    // Keep only last 100 latency measurements
+                    if (performanceData.latencies.length > 100) {
+                        performanceData.latencies = performanceData.latencies.slice(-100);
+                    }
+                    
+                    // Simulate occasional errors during stress testing
+                    if (window.stressTestActive && Math.random() < 0.02) { // 2% error rate
+                        performanceData.errors++;
+                        throw new Error(`Stress test induced error for ${command}`);
+                    }
+                    
+                    // Mock responses based on command
+                    return mockResponse(command, args);
+                }
+            }
+        };
+
+        function mockResponse(command, args) {
+            switch (command) {
+                case 'load_vault':
+                    const fileCount = args?.vaultPath?.includes('large') ? 1000 : 
+                                     args?.vaultPath?.includes('xlarge') ? 5000 : 10;
+                    const files = [];
+                    for (let i = 0; i < fileCount; i++) {
+                        files.push({
+                            name: `file_${i.toString().padStart(4, '0')}.md`,
+                            is_dir: false,
+                            size: Math.floor(Math.random() * 50000),
+                            path: `${args.vaultPath}/file_${i}.md`
+                        });
+                        // Add directories every 50 files
+                        if (i % 50 === 0) {
+                            files.push({
+                                name: `folder_${i}`,
+                                is_dir: true,
+                                size: 0,
+                                path: `${args.vaultPath}/folder_${i}`
+                            });
+                        }
+                    }
+                    return files;
+                    
+                case 'scan_vault_files':
+                    return mockResponse('load_vault', args);
+                    
+                case 'write_file':
+                case 'auto_save_file':
+                    return null;
+                    
+                case 'validate_vault':
+                    return true;
+                    
+                default:
+                    return null;
+            }
+        }
+    </script>
+
+    <!-- Performance testing implementation -->
+    <script type="module">
+        import AppState from './src/js/state.js';
+        import VaultManager from './src/js/services/vault-manager.js';
+        import AutoSave from './src/js/services/auto-save.js';
+
+        let testResults = [];
+        let testRunning = false;
+        let metricsUpdateInterval;
+        let chartUpdateInterval;
+        let chart;
+        let chartData = {
+            labels: [],
+            latency: [],
+            memory: [],
+            operations: []
+        };
+
+        window.stressTestActive = false;
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(status) {
+            document.getElementById('status').textContent = status;
+            log(`Status: ${status}`);
+        }
+
+        function updateMetrics() {
+            if (!testRunning) return;
+
+            const now = Date.now();
+            const elapsed = (now - performanceData.startTime) / 1000;
+            const opsPerSec = elapsed > 0 ? (performanceData.operations / elapsed).toFixed(1) : 0;
+            
+            const avgLatency = performanceData.latencies.length > 0 ? 
+                (performanceData.latencies.reduce((a, b) => a + b, 0) / performanceData.latencies.length).toFixed(1) : 0;
+            
+            const errorRate = performanceData.operations > 0 ? 
+                ((performanceData.errors / performanceData.operations) * 100).toFixed(1) : 0;
+            
+            const memoryUsed = performance.memory ? 
+                Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) : 0;
+
+            document.getElementById('opsPerSec').textContent = opsPerSec;
+            document.getElementById('avgLatency').textContent = avgLatency + 'ms';
+            document.getElementById('errorRate').textContent = errorRate + '%';
+            document.getElementById('memoryUsed').textContent = memoryUsed + 'MB';
+
+            // Update chart data
+            const timeLabel = new Date().toLocaleTimeString();
+            chartData.labels.push(timeLabel);
+            chartData.latency.push(parseFloat(avgLatency));
+            chartData.memory.push(memoryUsed);
+            chartData.operations.push(parseFloat(opsPerSec));
+
+            // Keep only last 20 data points
+            if (chartData.labels.length > 20) {
+                chartData.labels = chartData.labels.slice(-20);
+                chartData.latency = chartData.latency.slice(-20);
+                chartData.memory = chartData.memory.slice(-20);
+                chartData.operations = chartData.operations.slice(-20);
+            }
+
+            updateChart();
+        }
+
+        function updateChart() {
+            if (!chart) return;
+
+            chart.data.labels = chartData.labels;
+            chart.data.datasets[0].data = chartData.latency;
+            chart.data.datasets[1].data = chartData.memory;
+            chart.data.datasets[2].data = chartData.operations;
+            chart.update('none'); // No animation for real-time updates
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            
+            // Simple chart implementation without Chart.js dependency
+            chart = {
+                data: {
+                    labels: [],
+                    datasets: [
+                        { data: [], label: 'Latency (ms)', color: '#dc3545' },
+                        { data: [], label: 'Memory (MB)', color: '#28a745' },
+                        { data: [], label: 'Ops/sec', color: '#007acc' }
+                    ]
+                },
+                update: function() {
+                    drawChart(ctx, this.data);
+                }
+            };
+        }
+
+        function drawChart(ctx, data) {
+            const canvas = ctx.canvas;
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            if (data.labels.length === 0) return;
+
+            // Draw axes
+            ctx.strokeStyle = '#dee2e6';
+            ctx.lineWidth = 1;
+            
+            // Y-axis
+            ctx.beginPath();
+            ctx.moveTo(50, 20);
+            ctx.lineTo(50, height - 50);
+            ctx.stroke();
+            
+            // X-axis
+            ctx.beginPath();
+            ctx.moveTo(50, height - 50);
+            ctx.lineTo(width - 20, height - 50);
+            ctx.stroke();
+
+            // Draw data lines
+            const colors = ['#dc3545', '#28a745', '#007acc'];
+            const xStep = (width - 70) / (data.labels.length - 1);
+            
+            data.datasets.forEach((dataset, datasetIndex) => {
+                if (dataset.data.length === 0) return;
+                
+                const maxVal = Math.max(...dataset.data, 1);
+                const yScale = (height - 70) / maxVal;
+                
+                ctx.strokeStyle = colors[datasetIndex];
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                dataset.data.forEach((value, index) => {
+                    const x = 50 + index * xStep;
+                    const y = height - 50 - (value * yScale);
+                    
+                    if (index === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                
+                ctx.stroke();
+                
+                // Draw legend
+                ctx.fillStyle = colors[datasetIndex];
+                ctx.fillRect(width - 150, 30 + datasetIndex * 20, 10, 10);
+                ctx.fillStyle = '#000';
+                ctx.font = '12px sans-serif';
+                ctx.fillText(dataset.label, width - 135, 40 + datasetIndex * 20);
+            });
+        }
+
+        function addResult(test, passed, message, duration = null) {
+            testResults.push({ test, passed, message, duration });
+            
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${passed ? 'test-pass' : 'test-fail'}`;
+            resultDiv.innerHTML = `<strong>${test}:</strong> ${message}`;
+            if (duration) {
+                resultDiv.innerHTML += ` <small>(${duration.toFixed(2)}ms)</small>`;
+            }
+            
+            document.getElementById('results').appendChild(resultDiv);
+            document.getElementById('results').scrollTop = document.getElementById('results').scrollHeight;
+        }
+
+        function startMetricsTracking() {
+            performanceData.startTime = Date.now();
+            performanceData.operations = 0;
+            performanceData.errors = 0;
+            performanceData.latencies = [];
+
+            metricsUpdateInterval = setInterval(updateMetrics, 1000);
+            testRunning = true;
+        }
+
+        function stopMetricsTracking() {
+            if (metricsUpdateInterval) {
+                clearInterval(metricsUpdateInterval);
+                metricsUpdateInterval = null;
+            }
+            testRunning = false;
+            window.stressTestActive = false;
+        }
+
+        window.runPerformanceTests = async function() {
+            if (testRunning) return;
+            
+            updateStatus('🚀 Starting performance tests...');
+            startMetricsTracking();
+            
+            try {
+                const appState = new AppState();
+                const vaultManager = new VaultManager(appState);
+                const autoSave = new AutoSave(appState);
+
+                // Test 1: Large vault loading
+                updateStatus('📁 Testing large vault loading (1000 files)...');
+                const start1 = performance.now();
+                try {
+                    const files = await vaultManager.loadVault('/mock/large/vault');
+                    const duration = performance.now() - start1;
+                    const isGood = duration < 1000; // Target: <1s
+                    addResult('Large Vault Loading', isGood, 
+                        `Loaded ${files.length} files in ${duration.toFixed(0)}ms`, duration);
+                } catch (error) {
+                    addResult('Large Vault Loading', false, `Error: ${error.message}`);
+                }
+
+                // Test 2: Extra large vault loading
+                updateStatus('📁 Testing extra large vault loading (5000 files)...');
+                const start2 = performance.now();
+                try {
+                    const files = await vaultManager.loadVault('/mock/xlarge/vault');
+                    const duration = performance.now() - start2;
+                    const isGood = duration < 5000; // Target: <5s
+                    addResult('XLarge Vault Loading', isGood, 
+                        `Loaded ${files.length} files in ${duration.toFixed(0)}ms`, duration);
+                } catch (error) {
+                    addResult('XLarge Vault Loading', false, `Error: ${error.message}`);
+                }
+
+                // Test 3: Rapid file operations
+                updateStatus('⚡ Testing rapid file operations...');
+                await appState.setCurrentFile('/test/rapid.md');
+                
+                const rapidStart = performance.now();
+                const rapidResults = [];
+                
+                for (let i = 0; i < 50; i++) {
+                    autoSave.setContentGetter(() => `Rapid test content ${i} `.repeat(100));
+                    const opStart = performance.now();
+                    try {
+                        await autoSave.saveNow();
+                        rapidResults.push(performance.now() - opStart);
+                    } catch (error) {
+                        log(`Rapid operation ${i} failed: ${error.message}`);
+                    }
+                    
+                    // Small delay to prevent overwhelming
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                
+                const rapidDuration = performance.now() - rapidStart;
+                const avgRapidTime = rapidResults.reduce((a, b) => a + b, 0) / rapidResults.length;
+                const isRapidGood = avgRapidTime < 100; // Target: <100ms per operation
+                
+                addResult('Rapid File Operations', isRapidGood, 
+                    `${rapidResults.length} operations, avg ${avgRapidTime.toFixed(1)}ms each`, rapidDuration);
+
+                // Test 4: Memory pressure test
+                updateStatus('💾 Testing memory usage under pressure...');
+                const memStart = performance.memory ? performance.memory.usedJSHeapSize : 0;
+                
+                // Create many large strings to test memory handling
+                const largeData = [];
+                for (let i = 0; i < 100; i++) {
+                    largeData.push('Large string data '.repeat(10000));
+                    autoSave.handleContentChange(largeData[i]);
+                }
+                
+                const memEnd = performance.memory ? performance.memory.usedJSHeapSize : 0;
+                const memIncrease = (memEnd - memStart) / 1024 / 1024;
+                const isMemGood = memIncrease < 100; // Target: <100MB
+                
+                addResult('Memory Pressure Test', isMemGood, 
+                    `Memory increased by ${memIncrease.toFixed(1)}MB`, 0);
+
+                // Cleanup
+                largeData.length = 0;
+                if (window.gc) window.gc();
+
+                updateStatus('✅ Performance tests completed');
+                
+            } catch (error) {
+                updateStatus(`❌ Performance tests failed: ${error.message}`);
+                log(`Performance test error: ${error.stack}`);
+            } finally {
+                stopMetricsTracking();
+            }
+        };
+
+        window.runStressTests = async function() {
+            if (testRunning) return;
+            
+            updateStatus('💪 Starting stress tests...');
+            startMetricsTracking();
+            window.stressTestActive = true;
+            
+            try {
+                const appState = new AppState();
+                const vaultManager = new VaultManager(appState);
+                const autoSave = new AutoSave(appState);
+
+                // Stress test: Concurrent operations
+                updateStatus('🔄 Running concurrent operations stress test...');
+                const concurrentOps = [];
+                
+                for (let i = 0; i < 20; i++) {
+                    concurrentOps.push(vaultManager.validateVault(`/stress/vault${i}`));
+                    concurrentOps.push(vaultManager.loadVault(`/stress/vault${i}`));
+                }
+                
+                const stressStart = performance.now();
+                try {
+                    const results = await Promise.allSettled(concurrentOps);
+                    const successful = results.filter(r => r.status === 'fulfilled').length;
+                    const failed = results.filter(r => r.status === 'rejected').length;
+                    
+                    addResult('Concurrent Operations Stress', successful > failed, 
+                        `${successful} succeeded, ${failed} failed out of ${results.length}`,
+                        performance.now() - stressStart);
+                } catch (error) {
+                    addResult('Concurrent Operations Stress', false, `Error: ${error.message}`);
+                }
+
+                // Stress test: Sustained load
+                updateStatus('⏰ Running sustained load test (30 seconds)...');
+                await appState.setCurrentFile('/stress/sustained.md');
+                
+                const sustainedStart = Date.now();
+                let sustainedOps = 0;
+                let sustainedErrors = 0;
+                
+                while (Date.now() - sustainedStart < 30000) { // 30 seconds
+                    try {
+                        autoSave.setContentGetter(() => `Sustained load ${Date.now()}`);
+                        await autoSave.saveNow();
+                        sustainedOps++;
+                    } catch (error) {
+                        sustainedErrors++;
+                        log(`Sustained operation failed: ${error.message}`);
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    
+                    // Update progress
+                    const progress = ((Date.now() - sustainedStart) / 30000) * 100;
+                    document.getElementById('testProgress').style.width = progress + '%';
+                }
+                
+                const sustainedRate = sustainedOps / 30; // ops per second
+                const isRateGood = sustainedRate > 10; // Target: >10 ops/sec
+                
+                addResult('Sustained Load Test', isRateGood, 
+                    `${sustainedOps} operations in 30s (${sustainedRate.toFixed(1)} ops/sec), ${sustainedErrors} errors`);
+
+                updateStatus('✅ Stress tests completed');
+                
+            } catch (error) {
+                updateStatus(`❌ Stress tests failed: ${error.message}`);
+                log(`Stress test error: ${error.stack}`);
+            } finally {
+                window.stressTestActive = false;
+                stopMetricsTracking();
+                document.getElementById('testProgress').style.width = '100%';
+            }
+        };
+
+        window.runMemoryLeakTests = async function() {
+            if (testRunning) return;
+            
+            updateStatus('💾 Starting memory leak tests...');
+            startMetricsTracking();
+            
+            try {
+                // Memory leak test: Create and destroy components repeatedly
+                updateStatus('🔍 Testing component lifecycle memory leaks...');
+                
+                const initialMemory = performance.memory ? performance.memory.usedJSHeapSize : 0;
+                const instances = [];
+                
+                // Create many instances
+                for (let cycle = 0; cycle < 5; cycle++) {
+                    log(`Memory test cycle ${cycle + 1}/5`);
+                    
+                    // Create instances
+                    for (let i = 0; i < 20; i++) {
+                        const appState = new AppState();
+                        const vaultManager = new VaultManager(appState);
+                        const autoSave = new AutoSave(appState);
+                        
+                        // Use the instances
+                        await appState.setVault(`/leak/test${i}`);
+                        autoSave.setContentGetter(() => `Leak test ${i}`);
+                        await autoSave.saveNow();
+                        
+                        instances.push({ appState, vaultManager, autoSave });
+                    }
+                    
+                    const cycleMemory = performance.memory ? performance.memory.usedJSHeapSize : 0;
+                    log(`Cycle ${cycle + 1} memory: ${Math.round(cycleMemory / 1024 / 1024)}MB`);
+                    
+                    // Destroy instances
+                    instances.forEach(instance => {
+                        instance.autoSave.destroy();
+                    });
+                    instances.length = 0;
+                    
+                    // Force garbage collection if available
+                    if (window.gc) {
+                        window.gc();
+                        log('Forced garbage collection');
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                
+                const finalMemory = performance.memory ? performance.memory.usedJSHeapSize : 0;
+                const memoryLeak = (finalMemory - initialMemory) / 1024 / 1024;
+                const hasSignificantLeak = memoryLeak > 50; // >50MB retained
+                
+                addResult('Memory Leak Test', !hasSignificantLeak, 
+                    `Memory difference: ${memoryLeak.toFixed(1)}MB (Target: <50MB)`);
+
+                updateStatus('✅ Memory leak tests completed');
+                
+            } catch (error) {
+                updateStatus(`❌ Memory leak tests failed: ${error.message}`);
+                log(`Memory leak test error: ${error.stack}`);
+            } finally {
+                stopMetricsTracking();
+            }
+        };
+
+        window.runConcurrencyTests = async function() {
+            if (testRunning) return;
+            
+            updateStatus('🔄 Starting concurrency tests...');
+            startMetricsTracking();
+            
+            try {
+                // Test concurrent access to same resources
+                updateStatus('🔒 Testing concurrent resource access...');
+                
+                const appState = new AppState();
+                const managers = [];
+                
+                // Create multiple VaultManager instances
+                for (let i = 0; i < 10; i++) {
+                    managers.push(new VaultManager(appState));
+                }
+                
+                // Test concurrent vault operations
+                const concurrentStart = performance.now();
+                const promises = managers.map((manager, index) => 
+                    manager.loadVault(`/concurrent/vault${index}`)
+                );
+                
+                try {
+                    const results = await Promise.allSettled(promises);
+                    const successful = results.filter(r => r.status === 'fulfilled').length;
+                    
+                    addResult('Concurrent Resource Access', successful === managers.length, 
+                        `${successful}/${managers.length} concurrent operations succeeded`,
+                        performance.now() - concurrentStart);
+                } catch (error) {
+                    addResult('Concurrent Resource Access', false, `Error: ${error.message}`);
+                }
+
+                // Test race conditions with auto-save
+                updateStatus('⚡ Testing auto-save race conditions...');
+                
+                await appState.setCurrentFile('/concurrent/race.md');
+                const autoSave = new AutoSave(appState);
+                
+                const raceStart = performance.now();
+                const racePromises = [];
+                
+                for (let i = 0; i < 20; i++) {
+                    autoSave.setContentGetter(() => `Race condition test ${i} at ${Date.now()}`);
+                    racePromises.push(autoSave.saveNow());
+                }
+                
+                try {
+                    const raceResults = await Promise.allSettled(racePromises);
+                    const raceSuccessful = raceResults.filter(r => r.status === 'fulfilled' && r.value === true).length;
+                    
+                    addResult('Auto-Save Race Conditions', raceSuccessful > 0, 
+                        `${raceSuccessful}/${raceResults.length} concurrent saves succeeded`,
+                        performance.now() - raceStart);
+                } catch (error) {
+                    addResult('Auto-Save Race Conditions', false, `Error: ${error.message}`);
+                }
+
+                updateStatus('✅ Concurrency tests completed');
+                
+            } catch (error) {
+                updateStatus(`❌ Concurrency tests failed: ${error.message}`);
+                log(`Concurrency test error: ${error.stack}`);
+            } finally {
+                stopMetricsTracking();
+            }
+        };
+
+        window.stopTests = function() {
+            if (testRunning) {
+                stopMetricsTracking();
+                updateStatus('⏹️ Tests stopped by user');
+                log('Tests stopped by user');
+            }
+        };
+
+        window.clearResults = function() {
+            testResults = [];
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('log').innerHTML = '';
+            document.getElementById('testProgress').style.width = '0%';
+            
+            // Reset metrics
+            document.getElementById('opsPerSec').textContent = '0';
+            document.getElementById('avgLatency').textContent = '0ms';
+            document.getElementById('errorRate').textContent = '0%';
+            document.getElementById('memoryUsed').textContent = '0MB';
+            
+            // Reset chart
+            chartData.labels = [];
+            chartData.latency = [];
+            chartData.memory = [];
+            chartData.operations = [];
+            if (chart) updateChart();
+            
+            updateStatus('Results cleared. Ready for new tests.');
+        };
+
+        // Initialize
+        initChart();
+        updateStatus('⚡ Performance testing suite ready');
+        
+        // Update memory display every few seconds
+        setInterval(() => {
+            if (!testRunning && performance.memory) {
+                const memUsed = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+                document.getElementById('memoryUsed').textContent = memUsed + 'MB';
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
