@@ -14,6 +14,9 @@ pub mod vault_operations;
 pub mod state_management;
 pub mod ollama_client;
 
+#[cfg(test)]
+pub mod ollama_integration_tests;
+
 // Re-exports for commonly used types
 pub use errors::{FileSystemError, FileSystemResult};
 pub use types::{AppState, WindowState, LayoutState, FileInfo};
