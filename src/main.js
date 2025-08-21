@@ -133,19 +133,34 @@ function showNotification(message, type = 'info') {
  * Select vault folder and update UI
  */
 async function selectVault() {
+  console.log('📁 Starting vault selection...');
   try {
-    const result = await invoke('select_vault_folder');
+    const result = await invoke('select_vault');
+    console.log('📁 Vault selection result:', result);
+    
     if (result) {
+      console.log('✅ Vault selected:', result);
       appState.setVault(result);
       updateVaultInfo(result);
+      updateVaultStatusBar(result);
+      
+      // Close vault dialog
+      const vaultDialog = document.getElementById('vaultDialog');
+      if (vaultDialog) {
+        vaultDialog.style.display = 'none';
+        console.log('📁 Vault dialog closed');
+      }
+      
       showNotification(`Vault selected: ${result.split('/').pop()}`, 'success');
       
       // Automatically scan the vault
       await refreshVault();
     } else {
+      console.log('ℹ️ Vault selection cancelled');
       showNotification('No vault selected', 'info');
     }
   } catch (error) {
+    console.error('❌ Error selecting vault:', error);
     showNotification(`Error selecting vault: ${error}`, 'error');
   }
 }
@@ -219,10 +234,10 @@ function createFileTreeHTML(files) {
   return sortedFiles.map(file => {
     const icon = file.is_dir ? '📁' : getFileIcon(file.name);
     const cssClass = file.is_dir ? 'tree-folder' : 'tree-file';
-    const onClick = file.is_dir ? '' : `onclick="openFile('${file.path}')"`;
+    // Remove onclick handler - let FileTree component handle clicks
     
     return `
-      <div class="tree-item ${cssClass}" ${onClick} title="${file.path}">
+      <div class="tree-item ${cssClass}" data-file-path="${file.path}" data-is-dir="${file.is_dir}" title="${file.path}">
         <span class="tree-icon">${icon}</span>
         <span class="tree-name">${file.name}</span>
       </div>
@@ -411,9 +426,10 @@ async function openFile(filePath) {
     console.error('Error opening file:', error);
     showNotification(`Error opening file: ${error}`, 'error');
   } finally {
+    // Reduce the timeout to allow faster subsequent file opening
     setTimeout(() => {
       isFileOpening = false;
-    }, 500);
+    }, 100);
   }
 }
 
@@ -802,6 +818,7 @@ window.forceSaveAllState = forceSaveAllState;
 window.debouncedSaveLayoutState = debouncedSaveLayoutState;
 window.activateFileTreeSearch = activateFileTreeSearch;
 window.saveWindowState = saveWindowState;
+window.showNotification = showNotification;
 
 // Development and testing functions
 window.runLayoutTest = function() {
@@ -847,8 +864,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   
   // Initialize service instances
   try {
-    vaultManager = new VaultManager(appState);
-    autoSave = new AutoSave(appState);
+    // Import services dynamically to ensure modules are loaded
+    const VaultManagerModule = await import('./js/services/vault-manager.js');
+    const AutoSaveModule = await import('./js/services/auto-save.js');
+    
+    vaultManager = new VaultManagerModule.default(appState);
+    autoSave = new AutoSaveModule.default(appState);
     
     // Make services globally accessible
     window.vaultManager = vaultManager;
@@ -858,6 +879,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   } catch (error) {
     console.error('❌ Failed to initialize services:', error);
     showNotification('Failed to initialize application services', 'error');
+    
+    // Fallback: still try to show the proper UI state
+    const initialState = appState.getState();
+    if (initialState.currentVault) {
+      updateVaultInfo(initialState.currentVault);
+      updateVaultStatusBar(initialState.currentVault);
+    }
   }
   
   // Initialize FileTree component
@@ -1115,63 +1143,113 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Initialize UI with current state
-  const initialState = appState.getState();
-  if (initialState.currentVault && vaultManager) {
-    // Verify vault is still valid and load it
-    vaultManager.validateVault(initialState.currentVault).then(isValid => {
-      if (isValid) {
-        updateVaultInfo(initialState.currentVault);
-        updateVaultStatusBar(initialState.currentVault);
-        // Auto-refresh vault on startup
-        refreshVault().then(() => {
-          // Restore last opened file if available
-          if (initialState.currentFile) {
-            console.log('Restoring last opened file:', initialState.currentFile);
+  // Initialize UI state after services are ready
+  const initializeAppState = () => {
+    const initialState = appState.getState();
+    console.log('🔍 Initial state loaded:', initialState);
+    
+    if (initialState.currentVault) {
+      console.log('📁 Found saved vault:', initialState.currentVault);
+      
+      if (vaultManager) {
+        // Verify vault is still valid and load it
+        console.log('🔧 Validating saved vault...');
+        vaultManager.validateVault(initialState.currentVault).then(isValid => {
+          console.log('✅ Vault validation result:', isValid);
+          
+          if (isValid) {
+            updateVaultInfo(initialState.currentVault);
+            updateVaultStatusBar(initialState.currentVault);
+            console.log('✅ Valid vault restored, refreshing files...');
+            
+            // Auto-refresh vault on startup
+            refreshVault().then(() => {
+              // Restore last opened file if available
+              if (initialState.currentFile) {
+                console.log('Restoring last opened file:', initialState.currentFile);
+                // Check if the file still exists before trying to open it
+                invoke('read_file', { filePath: initialState.currentFile })
+                  .then(() => {
+                    setTimeout(() => {
+                      openFile(initialState.currentFile);
+                    }, 500);
+                  })
+                  .catch((error) => {
+                    console.warn('Last opened file no longer exists:', error);
+                    // Clear the invalid file from state
+                    appState.setCurrentFile(null);
+                  });
+              }
+            });
+          } else {
+            // Vault no longer valid, clear it and show selection dialog
+            console.log('❌ Vault no longer valid, clearing and showing dialog');
+            appState.setVault(null);
             setTimeout(() => {
-              openFile(initialState.currentFile);
+              showVaultDialog();
             }, 1000);
           }
+        }).catch(error => {
+          console.error('❌ Failed to validate saved vault:', error);
+          setTimeout(() => {
+            showVaultDialog();
+          }, 1000);
         });
       } else {
-        // Vault no longer valid, clear it and show selection dialog
-        appState.setVault(null);
+        console.warn('⚠️ VaultManager not initialized yet, showing dialog');
         setTimeout(() => {
           showVaultDialog();
         }, 1000);
       }
-    }).catch(error => {
-      console.error('Failed to validate saved vault:', error);
+    } else {
+      // Show vault selection dialog on first launch
+      console.log('🚀 No saved vault found, showing selection dialog');
       setTimeout(() => {
         showVaultDialog();
       }, 1000);
-    });
-  } else {
-    // Show vault selection dialog on first launch
-    setTimeout(() => {
-      showVaultDialog();
-    }, 1000);
-  }
-  
-  // Load persisted state for UI initialization
-  if (initialState.currentVault) {
-    updateVaultInfo(initialState.currentVault);
-  }
-  
-  if (initialState.currentFile) {
-    const fileName = initialState.currentFile.split('/').pop();
-    updateCurrentFileName(fileName, false);
-  }
+    }
+    
+    // Load persisted state for UI initialization
+    if (initialState.currentVault) {
+      updateVaultInfo(initialState.currentVault);
+    }
+    
+    if (initialState.currentFile) {
+      const fileName = initialState.currentFile.split('/').pop();
+      updateCurrentFileName(fileName, false);
+      
+      // If we have a file but no vault manager yet (shouldn't happen but fallback)
+      if (!initialState.currentVault && vaultManager) {
+        console.log('Found saved file without vault, attempting to restore file:', initialState.currentFile);
+        // Try to open the file directly
+        setTimeout(() => {
+          invoke('read_file', { filePath: initialState.currentFile })
+            .then(() => {
+              openFile(initialState.currentFile);
+            })
+            .catch((error) => {
+              console.warn('Cannot restore file without valid vault:', error);
+              appState.setCurrentFile(null);
+              updateCurrentFileName(null);
+            });
+        }, 1000);
+      }
+    }
+  };
+
+  // Call the initialization after services are ready
+  setTimeout(initializeAppState, 100);
   
   // Initialize view mode button
   const toggleBtn = document.getElementById('toggleModeBtn');
+  const currentState = appState.getState();
   if (toggleBtn) {
-    toggleBtn.textContent = initialState.viewMode === 'editor' ? '👁' : '✏️';
-    toggleBtn.title = initialState.viewMode === 'editor' ? 'Switch to preview' : 'Switch to editor';
+    toggleBtn.textContent = currentState.viewMode === 'editor' ? '👁' : '✏️';
+    toggleBtn.title = currentState.viewMode === 'editor' ? 'Switch to preview' : 'Switch to editor';
   }
   
   // Initialize save status
-  updateSaveStatus(initialState.unsavedChanges ? 'unsaved' : 'saved');
+  updateSaveStatus(currentState.unsavedChanges ? 'unsaved' : 'saved');
   
   // Show welcome notification
   setTimeout(() => {
@@ -1412,17 +1490,33 @@ window.hideVaultSwitcher = function() {
 
 // Override selectVault to ensure proper vault dialog closing and status updates
 window.selectVault = async function() {
+  console.log('🔧 Global selectVault called, vaultManager available:', !!window.vaultManager);
+  
   if (!window.vaultManager) {
-    window.showNotification('Vault manager not initialized', 'error');
+    console.error('❌ VaultManager not available, falling back to direct invoke');
+    // Fallback to direct selectVault function if VaultManager is not available
+    await selectVault();
     return;
   }
   
   try {
-    window.showProgressIndicator('Selecting vault...');
-    
+    console.log('📁 Using VaultManager to select vault...');
     const result = await window.vaultManager.selectVault();
+    console.log('📁 VaultManager selection result:', result);
+    
     if (result) {
-      await window.vaultManager.switchVault(result);
+      console.log('✅ Attempting to switch to selected vault:', result);
+      
+      try {
+        await window.vaultManager.switchVault(result);
+        console.log('✅ Successfully switched to vault via VaultManager');
+      } catch (switchError) {
+        console.warn('⚠️ VaultManager switchVault failed, trying direct approach:', switchError);
+        
+        // Fallback: set vault directly and refresh
+        appState.setVault(result);
+        console.log('✅ Vault set directly in AppState');
+      }
       
       // Update both vault displays
       updateVaultInfo(result);
@@ -1432,20 +1526,28 @@ window.selectVault = async function() {
       const vaultDialog = document.getElementById('vaultDialog');
       if (vaultDialog) {
         vaultDialog.style.display = 'none';
+        console.log('📁 Vault dialog closed');
       }
       
-      window.showNotification(`Vault selected: ${result.split('/').pop() || result.split('\\\\').pop()}`, 'success');
+      showNotification(`Vault selected: ${result.split('/').pop() || result.split('\\\\').pop()}`, 'success');
       
       // Refresh vault
-      await window.refreshVault();
+      await refreshVault();
     } else {
-      window.showNotification('No vault selected', 'info');
+      console.log('ℹ️ Vault selection cancelled');
+      showNotification('No vault selected', 'info');
     }
   } catch (error) {
-    window.showNotification(`Error selecting vault: ${error.message}`, 'error');
-    console.error('Vault selection error:', error);
-  } finally {
-    window.hideProgressIndicator();
+    console.error('❌ VaultManager selection error:', error);
+    
+    // Try the direct method as final fallback
+    console.log('🔄 Trying direct vault selection as fallback...');
+    try {
+      await selectVault();
+    } catch (fallbackError) {
+      console.error('❌ Fallback selection also failed:', fallbackError);
+      showNotification(`Error selecting vault: ${error.message}`, 'error');
+    }
   }
 };
 
@@ -1455,27 +1557,41 @@ window.selectNewVault = async function() {
 
 window.switchToRecentVault = async function(vaultPath) {
   if (!window.vaultManager) {
-    window.showNotification('Vault manager not initialized', 'error');
+    showNotification('Vault manager not initialized', 'error');
     return;
   }
   
   try {
-    window.showProgressIndicator('Switching vault...');
-    
     await window.vaultManager.switchVault(vaultPath);
+    updateVaultInfo(vaultPath);
     updateVaultStatusBar(vaultPath);
-    window.showNotification(`Switched to vault: ${vaultPath.split('/').pop() || vaultPath.split('\\\\').pop()}`, 'success');
+    showNotification(`Switched to vault: ${vaultPath.split('/').pop() || vaultPath.split('\\\\').pop()}`, 'success');
     
     // Close dialogs
     window.closeVaultDialog();
     window.hideVaultSwitcher();
     
     // Refresh vault
-    await window.refreshVault();
+    await refreshVault();
   } catch (error) {
-    window.showNotification(`Error switching vault: ${error.message}`, 'error');
+    showNotification(`Error switching vault: ${error.message}`, 'error');
     console.error('Vault switching error:', error);
-  } finally {
-    window.hideProgressIndicator();
+  }
+};
+
+// Add missing global utility functions
+window.showProgressIndicator = function(message) {
+  const indicator = document.getElementById('progressIndicator');
+  const text = document.getElementById('progressText');
+  if (indicator && text) {
+    text.textContent = message || 'Loading...';
+    indicator.style.display = 'flex';
+  }
+};
+
+window.hideProgressIndicator = function() {
+  const indicator = document.getElementById('progressIndicator');
+  if (indicator) {
+    indicator.style.display = 'none';
   }
 };
