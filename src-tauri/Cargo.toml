@@ -35,4 +35,19 @@ once_cell = "1.19"
 
 [dev-dependencies]
 tempfile = "3"
+wiremock = "0.6"
+criterion = { version = "0.5", features = ["html_reports"] }
+tokio-test = "0.4"
+rand = "0.8"
+
+# Benchmark configuration
+[[bench]]
+name = "ollama_benchmarks"
+harness = false
+
+# Test configuration
+[profile.test]
+opt-level = 1
+debug = true
+overflow-checks = true
 

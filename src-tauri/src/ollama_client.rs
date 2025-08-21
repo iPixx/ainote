@@ -104,7 +104,11 @@ impl OllamaClient {
 
     /// Get current connection state
     pub async fn get_connection_state(&self) -> ConnectionState {
-        self.state.read().await.clone()
+        eprintln!("📊 [DEBUG RUST] OllamaClient::get_connection_state() called");
+        let state = self.state.read().await.clone();
+        eprintln!("📊 [DEBUG RUST] Current connection state: status={:?}, retry_count={}, last_check={:?}", 
+                 state.status, state.retry_count, state.last_check);
+        state
     }
 
     /// Update configuration for custom Ollama URL
@@ -124,23 +128,32 @@ impl OllamaClient {
 
     /// Perform service discovery and health check
     pub async fn check_health(&self) -> Result<HealthResponse, OllamaClientError> {
+        eprintln!("🏥 [DEBUG RUST] OllamaClient::check_health() started");
         let start_time = Instant::now();
         
         // Update status to connecting
         {
+            eprintln!("🏥 [DEBUG RUST] Updating status to Connecting");
             let mut state = self.state.write().await;
             state.status = ConnectionStatus::Connecting;
             state.last_check = Some(chrono::Utc::now());
+            eprintln!("🏥 [DEBUG RUST] Status updated to: {:?}, last_check updated", state.status);
         }
 
         let health_url = format!("{}/api/tags", self.config.base_url);
+        eprintln!("🏥 [DEBUG RUST] Making HTTP GET request to: {}", health_url);
+        eprintln!("🏥 [DEBUG RUST] Using timeout: {}ms", self.config.timeout_ms);
         
         match self.client.get(&health_url).send().await {
             Ok(response) => {
                 let elapsed = start_time.elapsed();
+                eprintln!("🏥 [DEBUG RUST] HTTP response received in {:?}", elapsed);
+                eprintln!("🏥 [DEBUG RUST] Response status: {}", response.status());
                 
                 if response.status().is_success() {
+                    eprintln!("🏥 [DEBUG RUST] Response is successful, parsing JSON");
                     let health_response = if let Ok(json) = response.json::<serde_json::Value>().await {
+                        eprintln!("🏥 [DEBUG RUST] Successfully parsed JSON response: {:?}", json);
                         HealthResponse {
                             status: "healthy".to_string(),
                             version: json.get("version").and_then(|v| v.as_str()).map(|s| s.to_string()),
@@ -154,43 +167,55 @@ impl OllamaClient {
                             }),
                         }
                     } else {
+                        eprintln!("🏥 [DEBUG RUST] Failed to parse JSON, using default healthy response");
                         HealthResponse {
                             status: "healthy".to_string(),
                             version: None,
                             models: None,
                         }
                     };
+                    
+                    eprintln!("🏥 [DEBUG RUST] Created health response: {:?}", health_response);
 
                     // Update successful connection state
                     {
+                        eprintln!("🏥 [DEBUG RUST] Updating status to Connected");
                         let mut state = self.state.write().await;
                         state.status = ConnectionStatus::Connected;
                         state.last_successful_connection = Some(chrono::Utc::now());
                         state.retry_count = 0;
                         state.next_retry_at = None;
                         state.health_info = Some(health_response.clone());
+                        eprintln!("🏥 [DEBUG RUST] Connection state updated successfully");
                     }
 
                     // Log performance metrics
                     if elapsed > Duration::from_millis(50) {
                         eprintln!("Warning: Ollama health check took {:?} (target: <100ms)", elapsed);
+                    } else {
+                        eprintln!("🏥 [DEBUG RUST] Health check completed within performance target: {:?}", elapsed);
                     }
 
                     Ok(health_response)
                 } else {
+                    eprintln!("🏥 [DEBUG RUST] HTTP error response: status={}", response.status());
                     let error = OllamaClientError::HttpError {
                         status_code: response.status().as_u16(),
                         message: format!("HTTP {}: {}", response.status(), response.status().canonical_reason().unwrap_or("Unknown")),
                     };
+                    eprintln!("🏥 [DEBUG RUST] Created HTTP error: {:?}", error);
                     self.handle_connection_failure(error.clone()).await;
                     Err(error)
                 }
             },
             Err(e) => {
+                eprintln!("🏥 [DEBUG RUST] Network error occurred: {:?}", e);
+                eprintln!("🏥 [DEBUG RUST] Is timeout: {}", e.is_timeout());
                 let error = OllamaClientError::NetworkError { 
                     message: format!("Connection failed: {}", e),
                     is_timeout: e.is_timeout(),
                 };
+                eprintln!("🏥 [DEBUG RUST] Created network error: {:?}", error);
                 self.handle_connection_failure(error.clone()).await;
                 Err(error)
             }
@@ -239,11 +264,15 @@ impl OllamaClient {
 
     /// Handle connection failure and update state
     async fn handle_connection_failure(&self, error: OllamaClientError) {
+        eprintln!("❌ [DEBUG RUST] handle_connection_failure() called with error: {:?}", error);
         let mut state = self.state.write().await;
+        let previous_status = state.status.clone();
         state.status = ConnectionStatus::Failed {
             error: error.to_string(),
         };
         state.health_info = None;
+        eprintln!("❌ [DEBUG RUST] Status changed from {:?} to {:?}", previous_status, state.status);
+        eprintln!("❌ [DEBUG RUST] Health info cleared");
     }
 
     /// Get configuration

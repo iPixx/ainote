@@ -304,33 +304,58 @@ class AiStatusPanel {
      * Check current Ollama service status
      */
     async checkStatus() {
+        console.log('📊 [DEBUG] checkStatus() started - invoking backend check_ollama_status command');
+        console.log('📊 [DEBUG] Current config:', { base_url: this.currentConfig.base_url });
+        
         try {
+            console.log('📊 [DEBUG] Calling Tauri invoke("check_ollama_status")');
             const connectionState = await invoke('check_ollama_status');
+            
+            console.log('📊 [DEBUG] Backend returned connection state:', connectionState);
+            console.log('📊 [DEBUG] Connection status type:', this.getStatusType(connectionState.status));
+            console.log('📊 [DEBUG] Last check time:', connectionState.last_check);
+            console.log('📊 [DEBUG] Retry count:', connectionState.retry_count);
+            
+            console.log('📊 [DEBUG] Calling updateStatus() with received connection state');
             this.updateStatus(connectionState);
+            
+            console.log('📊 [DEBUG] checkStatus() completed successfully');
         } catch (error) {
-            console.error('❌ Failed to check Ollama status:', error);
+            console.error('❌ [DEBUG] Failed to check Ollama status:', error);
+            console.log('❌ [DEBUG] Error type:', typeof error);
+            console.log('❌ [DEBUG] Error details:', error);
             
             // Handle different types of errors gracefully
             let errorMessage = error.toString();
+            console.log('❌ [DEBUG] Original error message:', errorMessage);
             
             // Check if this is a Tauri command error
             if (errorMessage.includes('command not found') || errorMessage.includes('invoke error')) {
+                console.log('❌ [DEBUG] Detected Tauri command error - backend may be unavailable');
                 errorMessage = 'AI service commands not available. This may be a development build or backend issue.';
             } else if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
+                console.log('❌ [DEBUG] Detected network error');
                 errorMessage = 'Network error: Unable to reach AI service. Check your connection.';
             } else if (errorMessage.includes('permission')) {
+                console.log('❌ [DEBUG] Detected permission error');
                 errorMessage = 'Permission error: Unable to access AI service. Check application permissions.';
             }
             
+            console.log('❌ [DEBUG] Processed error message:', errorMessage);
+            
             // Create a fallback connection state
-            this.updateStatus({
+            const fallbackState = {
                 status: { Failed: { error: errorMessage } },
                 last_check: new Date().toISOString(),
                 last_successful_connection: null,
                 retry_count: 0,
                 next_retry_at: null,
                 health_info: null
-            });
+            };
+            
+            console.log('❌ [DEBUG] Creating fallback connection state:', fallbackState);
+            console.log('❌ [DEBUG] Calling updateStatus() with fallback state');
+            this.updateStatus(fallbackState);
         }
     }
 
@@ -339,37 +364,51 @@ class AiStatusPanel {
      * @param {Object} connectionState - The connection state from backend
      */
     updateStatus(connectionState) {
+        console.log('🎨 [DEBUG] updateStatus() called with connection state:', connectionState);
+        
         this.currentStatus = connectionState;
         
         const statusType = this.getStatusType(connectionState.status);
+        console.log('🎨 [DEBUG] Determined status type:', statusType);
+        
         const config = AiStatusPanel.STATUS_CONFIG[statusType];
         
         if (!config) {
-            console.warn('Unknown status type:', statusType);
+            console.warn('🎨 [DEBUG] Unknown status type:', statusType);
             return;
         }
+        
+        console.log('🎨 [DEBUG] Using status config:', config);
 
         // Update status indicator
+        console.log('🎨 [DEBUG] Updating status indicator');
         this.updateStatusIndicator(statusType, config, connectionState);
         
         // Update connection details
+        console.log('🎨 [DEBUG] Updating connection details');
         this.updateConnectionDetails(connectionState);
         
         // Update action buttons
+        console.log('🎨 [DEBUG] Updating action buttons for status:', statusType);
         this.updateActionButtons(statusType);
         
         // Handle error states
         if (statusType === 'Failed' || statusType === 'Disconnected') {
+            console.log('🎨 [DEBUG] Handling connection error for status:', statusType);
             this.handleConnectionError(connectionState);
         } else {
+            console.log('🎨 [DEBUG] Hiding error message - status is healthy:', statusType);
             this.hideErrorMessage();
         }
         
         // Emit status change event
+        console.log('🎨 [DEBUG] Emitting STATUS_CHANGED event');
         this.emitEvent(AiStatusPanel.EVENTS.STATUS_CHANGED, {
             status: statusType,
             connectionState: connectionState
         });
+        
+        console.log('🎨 [DEBUG] updateStatus() completed');
     }
 
     /**
@@ -465,11 +504,20 @@ class AiStatusPanel {
      * @param {string} statusType - The current status type
      */
     updateActionButtons(statusType) {
+        console.log('🎯 [DEBUG] updateActionButtons() called with status type:', statusType);
+        
         const retryBtn = document.getElementById('aiRetryBtn');
         
         if (retryBtn) {
             const shouldShowRetry = statusType === 'Failed' || statusType === 'Disconnected';
+            console.log('🎯 [DEBUG] Should show retry button:', shouldShowRetry, '(status:', statusType, ')');
+            
+            const previousDisplay = retryBtn.style.display;
             retryBtn.style.display = shouldShowRetry ? 'block' : 'none';
+            
+            console.log('🎯 [DEBUG] Retry button display changed from', previousDisplay, 'to', retryBtn.style.display);
+        } else {
+            console.warn('🎯 [DEBUG] Retry button element not found in DOM');
         }
     }
 
@@ -532,29 +580,57 @@ class AiStatusPanel {
      * Handle status check button click
      */
     async handleStatusCheck() {
+        console.log('🔍 [DEBUG] handleStatusCheck() called');
+        
         const refreshBtn = document.getElementById('aiStatusRefresh');
         if (refreshBtn) {
+            console.log('🔍 [DEBUG] Disabling refresh button and setting loading state');
             refreshBtn.disabled = true;
             refreshBtn.textContent = '⏳';
         }
         
+        console.log('🔍 [DEBUG] Calling checkStatus() method');
         await this.checkStatus();
         
         if (refreshBtn) {
+            console.log('🔍 [DEBUG] Re-enabling refresh button and resetting icon');
             refreshBtn.disabled = false;
             refreshBtn.textContent = '🔄';
         }
+        
+        console.log('🔍 [DEBUG] handleStatusCheck() completed');
     }
 
     /**
      * Handle retry connection button click
      */
     async handleRetryConnection() {
+        console.log('🔄 [DEBUG] Retry Connection button clicked');
+        
+        // Disable retry button temporarily
+        const retryBtn = document.getElementById('aiRetryBtn');
+        if (retryBtn) {
+            console.log('🔄 [DEBUG] Disabling retry button temporarily');
+            retryBtn.disabled = true;
+            retryBtn.textContent = 'Retrying...';
+        }
+        
+        console.log('🔄 [DEBUG] Emitting CONNECTION_REQUESTED event with retry action');
         this.emitEvent(AiStatusPanel.EVENTS.CONNECTION_REQUESTED, {
             action: 'retry'
         });
         
+        console.log('🔄 [DEBUG] Starting status check after retry button click');
         await this.handleStatusCheck();
+        
+        // Re-enable retry button
+        if (retryBtn) {
+            console.log('🔄 [DEBUG] Re-enabling retry button after status check');
+            retryBtn.disabled = false;
+            retryBtn.textContent = 'Retry Connection';
+        }
+        
+        console.log('🔄 [DEBUG] Retry Connection process completed');
     }
 
     /**
