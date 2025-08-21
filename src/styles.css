@@ -454,6 +454,21 @@ input, textarea {
   font-style: italic;
 }
 
+/* AI Panel Status Classes */
+.ai-panel.ai-connected .panel-header {
+  border-bottom-color: var(--color-success);
+}
+
+.ai-panel.ai-disconnected .panel-header,
+.ai-panel.ai-failed .panel-header {
+  border-bottom-color: var(--color-error);
+}
+
+.ai-panel.ai-connecting .panel-header,
+.ai-panel.ai-retrying .panel-header {
+  border-bottom-color: var(--color-warning);
+}
+
 /* ===============================
    Resize Handles
    =============================== */

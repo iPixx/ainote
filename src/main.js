@@ -6,6 +6,7 @@ import AppState from './js/state.js';
 import { LayoutManager, MobileNavManager } from './js/layout-manager.js';
 import FileTree from './js/components/file-tree.js';
 import EditorPreviewPanel from './js/components/editor-preview-panel.js';
+import AiStatusPanel from './js/components/ai-status-panel.js';
 
 // Initialize global application state
 const appState = new AppState();
@@ -15,6 +16,7 @@ let layoutManager;
 let mobileNavManager;
 let fileTreeComponent;
 let editorPreviewPanel;
+let aiStatusPanel;
 
 // Initialize service instances
 let vaultManager;
@@ -517,11 +519,46 @@ function toggleFileTree() {
 }
 
 /**
- * Toggle AI panel (temporary toggle for testing)
+ * Toggle AI panel
  */
 function toggleAiPanel() {
   if (layoutManager) {
     layoutManager.toggleAiPanel();
+  }
+}
+
+/**
+ * Update AI panel header based on connection status
+ * @param {string} status - Current AI connection status
+ */
+function updateAiPanelHeader(status) {
+  const aiPanelHeader = document.querySelector('.ai-panel .panel-header h2');
+  if (aiPanelHeader) {
+    const statusEmojis = {
+      'Connected': '🤖 AI Assistant',
+      'Disconnected': '🔴 AI Assistant',
+      'Connecting': '🟡 AI Assistant',
+      'Retrying': '🟠 AI Assistant',
+      'Failed': '❌ AI Assistant'
+    };
+    
+    aiPanelHeader.textContent = statusEmojis[status] || '🤖 AI Assistant';
+  }
+}
+
+/**
+ * Conditionally show/hide AI panel based on connection status
+ * @param {string} status - Current AI connection status
+ */
+function conditionallyShowAiPanel(status) {
+  // For now, we always keep the panel available for configuration
+  // In future versions, we might hide it completely when disconnected
+  
+  const aiPanel = document.getElementById('aiPanel');
+  if (aiPanel) {
+    // Update panel appearance based on status
+    aiPanel.classList.remove('ai-connected', 'ai-disconnected', 'ai-connecting', 'ai-retrying', 'ai-failed');
+    aiPanel.classList.add(`ai-${status.toLowerCase()}`);
   }
 }
 
@@ -928,6 +965,43 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.log('🌳 FileTree component initialized with advanced features');
   } else {
     console.warn('⚠️ FileTree container not found');
+  }
+  
+  // Initialize AI Status Panel component
+  const aiContent = document.getElementById('aiContent');
+  if (aiContent) {
+    aiStatusPanel = new AiStatusPanel(aiContent);
+    
+    // Listen to AI status panel events
+    aiStatusPanel.addEventListener(AiStatusPanel.EVENTS.STATUS_CHANGED, (event) => {
+      const { status, connectionState } = event.detail;
+      console.log('🤖 AI Status changed:', status, connectionState);
+      
+      // Update AI panel header based on connection status
+      updateAiPanelHeader(status);
+      
+      // Show/hide AI panel conditionally based on status
+      conditionallyShowAiPanel(status);
+    });
+    
+    aiStatusPanel.addEventListener(AiStatusPanel.EVENTS.CONNECTION_REQUESTED, (event) => {
+      const { action } = event.detail;
+      console.log('🔄 AI Connection requested:', action);
+      showNotification(`Retrying AI connection...`, 'info');
+    });
+    
+    aiStatusPanel.addEventListener(AiStatusPanel.EVENTS.SETTINGS_CHANGED, (event) => {
+      const { baseUrl } = event.detail;
+      console.log('⚙️ AI Settings changed:', baseUrl);
+      showNotification(`AI service URL updated: ${baseUrl}`, 'success');
+    });
+    
+    console.log('🤖 AI Status Panel initialized');
+    
+    // Make AI status panel globally accessible for debugging
+    window.aiStatusPanel = aiStatusPanel;
+  } else {
+    console.warn('⚠️ AI content container not found');
   }
   
   // Apply saved layout state if available
