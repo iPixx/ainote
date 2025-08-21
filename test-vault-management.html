@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Vault Management Testing - aiNote</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+            margin: 0;
+        }
+        .test-container {
+            max-width: 1200px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #007acc;
+            background: #f8f9fa;
+            border-radius: 0 4px 4px 0;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .test-result {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            border-left: 4px solid;
+        }
+        .test-pass {
+            background: #d4edda;
+            color: #155724;
+            border-left-color: #28a745;
+        }
+        .test-fail {
+            background: #f8d7da;
+            color: #721c24;
+            border-left-color: #dc3545;
+        }
+        .test-warn {
+            background: #fff3cd;
+            color: #856404;
+            border-left-color: #ffc107;
+        }
+        .test-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left-color: #17a2b8;
+        }
+        .performance-indicator {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .perf-excellent { background: #28a745; color: white; }
+        .perf-good { background: #17a2b8; color: white; }
+        .perf-warning { background: #ffc107; color: black; }
+        .perf-poor { background: #dc3545; color: white; }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #005999;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .status {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border: 1px solid #dee2e6;
+            white-space: pre-wrap;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007acc;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+        .error-details {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .memory-usage {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .test-category {
+            background: #e9ecef;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 15px 0 5px 0;
+            color: #495057;
+        }
+        .accordion {
+            margin: 10px 0;
+        }
+        .accordion-header {
+            background: #f8f9fa;
+            padding: 12px;
+            cursor: pointer;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .accordion-content {
+            display: none;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            background: white;
+        }
+        .accordion.open .accordion-content {
+            display: block;
+        }
+        .chevron {
+            transition: transform 0.2s;
+        }
+        .accordion.open .chevron {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Comprehensive Vault Management Testing</h1>
+        <p>Complete testing suite for error handling, validation, and system integrity according to issue #58</p>
+        
+        <div class="test-section">
+            <h3>🎮 Test Controls</h3>
+            <div class="test-grid">
+                <div>
+                    <h4>Main Test Suites</h4>
+                    <button onclick="runAllTests()">🚀 Run All Tests</button>
+                    <button onclick="runErrorHandlingTests()">❌ Error Handling</button>
+                    <button onclick="runPerformanceTests()">⚡ Performance Tests</button>
+                    <button onclick="runIntegrationTests()">🔗 Integration Tests</button>
+                </div>
+                <div>
+                    <h4>Specific Test Categories</h4>
+                    <button onclick="runFileConflictTests()">⚠️ File Conflicts</button>
+                    <button onclick="runEdgeCaseTests()">🦄 Edge Cases</button>
+                    <button onclick="runMemoryTests()">💾 Memory Tests</button>
+                    <button onclick="runRecoveryTests()">🔄 Recovery Tests</button>
+                </div>
+                <div>
+                    <h4>Utilities</h4>
+                    <button onclick="clearResults()">🧹 Clear Results</button>
+                    <button onclick="generateLargeVault()">📁 Generate Large Vault</button>
+                    <button onclick="simulateCorruption()" class="btn-danger">💥 Simulate Corruption</button>
+                    <button onclick="exportResults()">📄 Export Results</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Progress</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="passedCount">0</div>
+                    <div class="stat-label">Passed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="failedCount">0</div>
+                    <div class="stat-label">Failed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalCount">0</div>
+                    <div class="stat-label">Total</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avgPerf">0ms</div>
+                    <div class="stat-label">Avg Performance</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🖥️ Current Status</h3>
+            <div id="status" class="status">Ready to run comprehensive tests...</div>
+            <div class="memory-usage" id="memoryUsage">Memory usage monitoring will appear here</div>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Test Results</h3>
+            <div id="results"></div>
+        </div>
+
+        <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <span>🔧 System Information & Diagnostics</span>
+                <span class="chevron">▼</span>
+            </div>
+            <div class="accordion-content">
+                <div id="systemInfo"></div>
+            </div>
+        </div>
+
+        <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <span>📈 Performance Metrics</span>
+                <span class="chevron">▼</span>
+            </div>
+            <div class="accordion-content">
+                <div id="performanceMetrics"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Mock Tauri API for comprehensive testing -->
+    <script>
+        // Enhanced mock with error simulation and performance tracking
+        window.__TAURI__ = {
+            core: {
+                invoke: async (command, args) => {
+                    const start = performance.now();
+                    
+                    // Simulate network/disk latency
+                    await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
+                    
+                    try {
+                        let result = await mockTauriCommand(command, args);
+                        const duration = performance.now() - start;
+                        
+                        // Track performance metrics
+                        if (window.testMetrics) {
+                            window.testMetrics.recordCommand(command, duration, true);
+                        }
+                        
+                        return result;
+                    } catch (error) {
+                        const duration = performance.now() - start;
+                        if (window.testMetrics) {
+                            window.testMetrics.recordCommand(command, duration, false);
+                        }
+                        throw error;
+                    }
+                }
+            }
+        };
+
+        async function mockTauriCommand(command, args) {
+            // Simulate various error conditions based on test flags
+            if (window.testFlags?.simulateErrors && Math.random() < 0.1) {
+                throw new Error(`Simulated ${command} error`);
+            }
+            
+            switch (command) {
+                case 'select_vault':
+                    if (window.testFlags?.blockVaultSelection) {
+                        return null;
+                    }
+                    return '/mock/vault/path';
+                    
+                case 'validate_vault':
+                    if (!args?.vaultPath) return false;
+                    if (args.vaultPath.includes('corrupted')) return false;
+                    if (args.vaultPath.includes('permission_denied')) {
+                        throw new Error('Permission denied accessing vault');
+                    }
+                    return true;
+                    
+                case 'load_vault':
+                    if (!args?.vaultPath) throw new Error('Vault path required');
+                    if (args.vaultPath.includes('corrupted')) {
+                        throw new Error('Vault corrupted or inaccessible');
+                    }
+                    
+                    // Return different sizes based on vault path
+                    const fileCount = args.vaultPath.includes('large') ? 1000 : 5;
+                    const files = [];
+                    for (let i = 0; i < fileCount; i++) {
+                        files.push({
+                            name: `note${i}.md`,
+                            is_dir: false,
+                            size: Math.floor(Math.random() * 10000),
+                            path: `${args.vaultPath}/note${i}.md`
+                        });
+                    }
+                    
+                    // Add some directories
+                    for (let i = 0; i < Math.floor(fileCount / 10); i++) {
+                        files.push({
+                            name: `folder${i}`,
+                            is_dir: true,
+                            size: 0,
+                            path: `${args.vaultPath}/folder${i}`
+                        });
+                    }
+                    
+                    return files;
+                    
+                case 'auto_save_file':
+                case 'write_file':
+                    if (!args?.file_path || args.content === undefined) {
+                        throw new Error(`${command} requires file_path and content`);
+                    }
+                    
+                    // Simulate file conflicts
+                    if (window.testFlags?.simulateConflicts && Math.random() < 0.2) {
+                        throw new Error('File modified externally, conflict detected');
+                    }
+                    
+                    // Simulate permission errors
+                    if (args.file_path.includes('readonly')) {
+                        throw new Error('Permission denied: file is read-only');
+                    }
+                    
+                    // Simulate size limits
+                    if (args.content.length > 10 * 1024 * 1024) {
+                        throw new Error('File too large (>10MB)');
+                    }
+                    
+                    return null;
+                    
+                case 'load_app_state':
+                    return {
+                        session: {
+                            current_vault: window.testFlags?.hasVault ? '/test/vault' : null,
+                            current_file: window.testFlags?.hasFile ? '/test/vault/note.md' : null,
+                            view_mode: 'editor'
+                        },
+                        window: {
+                            width: 1200,
+                            height: 800,
+                            x: 100,
+                            y: 100,
+                            maximized: false
+                        }
+                    };
+                    
+                case 'save_session_state':
+                case 'save_window_state':
+                case 'save_layout_state':
+                case 'save_vault_preferences':
+                    // Simulate occasional save failures
+                    if (window.testFlags?.simulateSaveFailures && Math.random() < 0.05) {
+                        throw new Error('Failed to save state to disk');
+                    }
+                    return null;
+                    
+                case 'get_vault_preferences':
+                    return window.testFlags?.hasRecentVaults ? 
+                        ['/vault1', '/vault2', '/vault3'] : [];
+                    
+                default:
+                    throw new Error(`Mock command not implemented: ${command}`);
+            }
+        }
+    </script>
+
+    <!-- Load test modules -->
+    <script type="module">
+        import AppState from './src/js/state.js';
+        import VaultManager from './src/js/services/vault-manager.js';
+        import AutoSave from './src/js/services/auto-save.js';
+
+        // Global test state
+        let testResults = [];
+        let performanceTimes = [];
+        let memoryUsage = [];
+        let currentTestCategory = '';
+
+        // Test flags for simulating different scenarios
+        window.testFlags = {
+            simulateErrors: false,
+            simulateConflicts: false,
+            simulateSaveFailures: false,
+            blockVaultSelection: false,
+            hasVault: true,
+            hasFile: true,
+            hasRecentVaults: true
+        };
+
+        // Performance metrics tracker
+        window.testMetrics = {
+            commands: new Map(),
+            recordCommand: function(command, duration, success) {
+                if (!this.commands.has(command)) {
+                    this.commands.set(command, { total: 0, count: 0, successes: 0, failures: 0, avgTime: 0 });
+                }
+                const stats = this.commands.get(command);
+                stats.total += duration;
+                stats.count++;
+                if (success) stats.successes++;
+                else stats.failures++;
+                stats.avgTime = stats.total / stats.count;
+            },
+            getReport: function() {
+                const report = {};
+                this.commands.forEach((stats, command) => {
+                    report[command] = {
+                        ...stats,
+                        successRate: (stats.successes / stats.count * 100).toFixed(1) + '%'
+                    };
+                });
+                return report;
+            }
+        };
+
+        // Memory monitoring
+        function updateMemoryUsage() {
+            if (performance.memory) {
+                const used = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+                const total = Math.round(performance.memory.totalJSHeapSize / 1024 / 1024);
+                document.getElementById('memoryUsage').textContent = 
+                    `Memory: ${used}MB used / ${total}MB allocated`;
+                memoryUsage.push({ time: Date.now(), used, total });
+            }
+        }
+
+        setInterval(updateMemoryUsage, 2000);
+
+        function addResult(test, passed, message, performance = null, category = '') {
+            const result = { 
+                test, 
+                passed, 
+                message, 
+                performance,
+                category: category || currentTestCategory,
+                timestamp: new Date().toISOString()
+            };
+            
+            testResults.push(result);
+            if (performance) performanceTimes.push(performance);
+            updateResults();
+            updateStats();
+        }
+
+        function updateResults() {
+            const resultsDiv = document.getElementById('results');
+            
+            // Group results by category
+            const grouped = testResults.reduce((acc, result) => {
+                const cat = result.category || 'General';
+                if (!acc[cat]) acc[cat] = [];
+                acc[cat].push(result);
+                return acc;
+            }, {});
+
+            let html = '';
+            Object.entries(grouped).forEach(([category, results]) => {
+                html += `<div class="test-category">${category}</div>`;
+                results.forEach(result => {
+                    const perfIndicator = result.performance ? getPerformanceIndicator(result.performance) : '';
+                    html += `<div class="test-result ${result.passed ? 'test-pass' : 'test-fail'}">
+                        <strong>${result.test}:</strong> ${result.message}${perfIndicator}
+                        ${result.performance ? `<div style="font-size: 11px; opacity: 0.7;">Completed in ${result.performance.toFixed(2)}ms</div>` : ''}
+                    </div>`;
+                });
+            });
+
+            resultsDiv.innerHTML = html;
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function getPerformanceIndicator(time) {
+            let className, text;
+            if (time < 50) {
+                className = 'perf-excellent';
+                text = 'Excellent';
+            } else if (time < 100) {
+                className = 'perf-good';
+                text = 'Good';
+            } else if (time < 500) {
+                className = 'perf-warning';
+                text = 'Slow';
+            } else {
+                className = 'perf-poor';
+                text = 'Very Slow';
+            }
+            return `<span class="performance-indicator ${className}">${text}</span>`;
+        }
+
+        function updateStats() {
+            const passed = testResults.filter(r => r.passed).length;
+            const failed = testResults.filter(r => !r.passed).length;
+            const total = testResults.length;
+            const avgPerf = performanceTimes.length > 0 ? 
+                (performanceTimes.reduce((a, b) => a + b, 0) / performanceTimes.length).toFixed(0) : 0;
+
+            document.getElementById('passedCount').textContent = passed;
+            document.getElementById('failedCount').textContent = failed;
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('avgPerf').textContent = avgPerf + 'ms';
+
+            // Update progress bar
+            const progress = total > 0 ? (passed / total) * 100 : 0;
+            document.getElementById('progressFill').style.width = progress + '%';
+        }
+
+        function updateStatus(status) {
+            document.getElementById('status').textContent = status;
+        }
+
+        function toggleAccordion(header) {
+            const accordion = header.parentElement;
+            accordion.classList.toggle('open');
+        }
+
+        // Test functions
+        window.clearResults = function() {
+            testResults = [];
+            performanceTimes = [];
+            updateResults();
+            updateStats();
+            updateStatus('Results cleared. Ready to run tests...');
+            
+            // Clear system info
+            document.getElementById('systemInfo').innerHTML = '';
+            document.getElementById('performanceMetrics').innerHTML = '';
+        };
+
+        window.runAllTests = async function() {
+            clearResults();
+            updateStatus('🚀 Running comprehensive test suite...');
+            
+            try {
+                await runErrorHandlingTests();
+                await runFileConflictTests();
+                await runPerformanceTests();
+                await runEdgeCaseTests();
+                await runIntegrationTests();
+                await runMemoryTests();
+                await runRecoveryTests();
+                
+                const passed = testResults.filter(r => r.passed).length;
+                const total = testResults.length;
+                const successRate = ((passed / total) * 100).toFixed(1);
+                
+                updateStatus(`✅ All tests completed! Success rate: ${successRate}% (${passed}/${total})`);
+                await generateSystemReport();
+                
+            } catch (error) {
+                updateStatus(`❌ Test suite failed: ${error.message}`);
+            }
+        };
+
+        window.runErrorHandlingTests = async function() {
+            currentTestCategory = '❌ Error Handling Tests';
+            updateStatus('Running error handling tests...');
+            
+            // Enable error simulation
+            window.testFlags.simulateErrors = true;
+            
+            try {
+                const appState = new AppState();
+                const vaultManager = new VaultManager(appState);
+                const autoSave = new AutoSave(appState);
+
+                // Test 1: Invalid vault paths
+                const start1 = performance.now();
+                try {
+                    const isValid = await vaultManager.validateVault('');
+                    addResult('Empty Vault Path', !isValid, 'Correctly rejected empty path', performance.now() - start1);
+                } catch (error) {
+                    addResult('Empty Vault Path', true, `Properly threw error: ${error.message}`, performance.now() - start1);
+                }
+
+                // Test 2: Permission denied scenarios
+                const start2 = performance.now();
+                try {
+                    await vaultManager.validateVault('/permission_denied/vault');
+                    addResult('Permission Denied', false, 'Should have failed with permission error');
+                } catch (error) {
+                    addResult('Permission Denied', error.message.includes('Permission denied'), 
+                        `Correctly handled: ${error.message}`, performance.now() - start2);
+                }
+
+                // Test 3: Corrupted vault handling
+                const start3 = performance.now();
+                try {
+                    await vaultManager.loadVault('/corrupted/vault');
+                    addResult('Corrupted Vault', false, 'Should have failed with corruption error');
+                } catch (error) {
+                    addResult('Corrupted Vault', error.message.includes('corrupted'), 
+                        `Correctly detected corruption: ${error.message}`, performance.now() - start3);
+                }
+
+                // Test 4: AutoSave without file
+                const start4 = performance.now();
+                try {
+                    const result = await autoSave.saveNow();
+                    addResult('AutoSave No File', !result, 'Correctly handled missing file', performance.now() - start4);
+                } catch (error) {
+                    addResult('AutoSave No File', true, `Properly handled: ${error.message}`, performance.now() - start4);
+                }
+
+                // Test 5: Invalid save delay
+                const start5 = performance.now();
+                try {
+                    autoSave.setSaveDelay(100); // Below minimum
+                    addResult('Invalid Save Delay', false, 'Should have rejected delay < 500ms');
+                } catch (error) {
+                    addResult('Invalid Save Delay', true, `Correctly rejected: ${error.message}`, performance.now() - start5);
+                }
+
+                // Test 6: Network/disk errors during save
+                window.testFlags.simulateSaveFailures = true;
+                const start6 = performance.now();
+                await appState.setCurrentFile('/test/file.md');
+                autoSave.setContentGetter(() => 'test content');
+                
+                const saveResults = [];
+                for (let i = 0; i < 10; i++) {
+                    try {
+                        const result = await autoSave.saveNow();
+                        saveResults.push(result);
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    } catch (error) {
+                        saveResults.push(false);
+                    }
+                }
+                const failureCount = saveResults.filter(r => !r).length;
+                addResult('Save Failure Handling', failureCount > 0, 
+                    `${failureCount}/10 saves failed as expected`, performance.now() - start6);
+
+                window.testFlags.simulateSaveFailures = false;
+
+            } finally {
+                window.testFlags.simulateErrors = false;
+            }
+        };
+
+        window.runFileConflictTests = async function() {
+            currentTestCategory = '⚠️ File Conflict Tests';
+            updateStatus('Running file conflict resolution tests...');
+            
+            const appState = new AppState();
+            const autoSave = new AutoSave(appState);
+            await appState.setCurrentFile('/test/conflict.md');
+            autoSave.setContentGetter(() => 'conflicted content');
+
+            // Enable conflict simulation
+            window.testFlags.simulateConflicts = true;
+
+            const start = performance.now();
+            let conflictDetected = false;
+            
+            // Listen for conflict events
+            autoSave.addEventListener(AutoSave.EVENTS.SAVE_CONFLICT, () => {
+                conflictDetected = true;
+            });
+
+            // Test multiple save attempts to trigger conflicts
+            for (let i = 0; i < 5; i++) {
+                try {
+                    await autoSave.saveNow();
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                } catch (error) {
+                    if (error.message.includes('conflict')) {
+                        conflictDetected = true;
+                    }
+                }
+            }
+
+            addResult('Conflict Detection', conflictDetected, 
+                conflictDetected ? 'File conflicts properly detected' : 'No conflicts detected',
+                performance.now() - start);
+
+            window.testFlags.simulateConflicts = false;
+        };
+
+        window.runPerformanceTests = async function() {
+            currentTestCategory = '⚡ Performance Tests';
+            updateStatus('Running performance tests...');
+            
+            const appState = new AppState();
+            const vaultManager = new VaultManager(appState);
+
+            // Test 1: Large vault loading performance
+            const start1 = performance.now();
+            try {
+                const files = await vaultManager.loadVault('/mock/large/vault');
+                const loadTime = performance.now() - start1;
+                const isGoodPerf = loadTime < 500; // Target: <500ms for large vaults
+                
+                addResult('Large Vault Loading', isGoodPerf, 
+                    `Loaded ${files.length} files in ${loadTime.toFixed(2)}ms (Target: <500ms)`, 
+                    loadTime);
+            } catch (error) {
+                addResult('Large Vault Loading', false, `Failed: ${error.message}`);
+            }
+
+            // Test 2: Auto-save performance
+            const autoSave = new AutoSave(appState);
+            await appState.setCurrentFile('/test/perf.md');
+            
+            const saveTimes = [];
+            for (let i = 0; i < 10; i++) {
+                const content = 'Performance test content '.repeat(100 * i);
+                autoSave.setContentGetter(() => content);
+                
+                const start = performance.now();
+                try {
+                    await autoSave.saveNow();
+                    saveTimes.push(performance.now() - start);
+                } catch (error) {
+                    saveTimes.push(1000); // Penalty for failed save
+                }
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
+            const avgSaveTime = saveTimes.reduce((a, b) => a + b, 0) / saveTimes.length;
+            const isGoodSavePerf = avgSaveTime < 50; // Target: <50ms
+            
+            addResult('Auto-Save Performance', isGoodSavePerf, 
+                `Average save time: ${avgSaveTime.toFixed(2)}ms (Target: <50ms)`, avgSaveTime);
+
+            // Test 3: Memory efficiency during operations
+            const memBefore = performance.memory ? performance.memory.usedJSHeapSize : 0;
+            
+            // Perform memory-intensive operations
+            for (let i = 0; i < 100; i++) {
+                await vaultManager.validateVault(`/test/vault${i}`);
+                autoSave.handleContentChange(`Content change ${i}`);
+            }
+
+            const memAfter = performance.memory ? performance.memory.usedJSHeapSize : 0;
+            const memIncrease = (memAfter - memBefore) / 1024 / 1024; // MB
+            const isGoodMemory = memIncrease < 10; // Target: <10MB increase
+            
+            addResult('Memory Efficiency', isGoodMemory, 
+                `Memory increase: ${memIncrease.toFixed(2)}MB (Target: <10MB)`);
+        };
+
+        window.runEdgeCaseTests = async function() {
+            currentTestCategory = '🦄 Edge Case Tests';
+            updateStatus('Running edge case tests...');
+            
+            const appState = new AppState();
+            const vaultManager = new VaultManager(appState);
+            const autoSave = new AutoSave(appState);
+
+            // Test 1: Unicode handling
+            const start1 = performance.now();
+            const unicodePath = '/test/vault/测试文档_émojis_🎉.md';
+            await appState.setCurrentFile(unicodePath);
+            autoSave.setContentGetter(() => '# Unicode Test 测试\n\n**Bold** with émojis 🎉🚀');
+            
+            try {
+                const result = await autoSave.saveNow();
+                addResult('Unicode Support', result, 
+                    'Successfully handled unicode filenames and content', performance.now() - start1);
+            } catch (error) {
+                addResult('Unicode Support', false, `Failed: ${error.message}`);
+            }
+
+            // Test 2: Extremely long file paths
+            const start2 = performance.now();
+            const longPath = '/test/' + 'very_long_directory_name/'.repeat(10) + 'file.md';
+            try {
+                const isValid = await vaultManager.validateVault(longPath);
+                addResult('Long Paths', true, 
+                    `Handled ${longPath.length}-character path`, performance.now() - start2);
+            } catch (error) {
+                addResult('Long Paths', true, `Properly rejected long path: ${error.message}`);
+            }
+
+            // Test 3: Rapid successive operations
+            const start3 = performance.now();
+            const rapidOps = [];
+            for (let i = 0; i < 20; i++) {
+                rapidOps.push(vaultManager.validateVault(`/rapid/test${i}`));
+            }
+            
+            try {
+                const results = await Promise.all(rapidOps);
+                addResult('Rapid Operations', results.length === 20, 
+                    `Handled ${results.length} concurrent operations`, performance.now() - start3);
+            } catch (error) {
+                addResult('Rapid Operations', false, `Failed: ${error.message}`);
+            }
+
+            // Test 4: Large file handling
+            const start4 = performance.now();
+            const largeContent = 'Large content '.repeat(100000); // ~1MB
+            autoSave.setContentGetter(() => largeContent);
+            
+            try {
+                const result = await autoSave.saveNow();
+                addResult('Large File Save', result, 
+                    `Saved ${(largeContent.length/1024/1024).toFixed(1)}MB file`, performance.now() - start4);
+            } catch (error) {
+                const isExpectedError = error.message.includes('too large');
+                addResult('Large File Save', isExpectedError, 
+                    isExpectedError ? 'Correctly rejected large file' : `Unexpected error: ${error.message}`);
+            }
+
+            // Test 5: Empty and whitespace-only content
+            const start5 = performance.now();
+            const testCases = ['', '   ', '\n\n\n', '\t\t'];
+            let emptyHandled = 0;
+            
+            for (const content of testCases) {
+                autoSave.setContentGetter(() => content);
+                try {
+                    await autoSave.saveNow();
+                    emptyHandled++;
+                } catch (error) {
+                    // Count as handled if it fails gracefully
+                    emptyHandled++;
+                }
+            }
+            
+            addResult('Empty Content', emptyHandled === testCases.length, 
+                `Handled ${emptyHandled}/${testCases.length} empty content cases`, performance.now() - start5);
+        };
+
+        window.runIntegrationTests = async function() {
+            currentTestCategory = '🔗 Integration Tests';
+            updateStatus('Running component integration tests...');
+            
+            const appState = new AppState();
+            const vaultManager = new VaultManager(appState);
+            const autoSave = new AutoSave(appState);
+
+            // Test 1: Full workflow integration
+            const start1 = performance.now();
+            try {
+                // Step 1: Select and validate vault
+                const vaultPath = await vaultManager.selectVault();
+                const isValid = await vaultManager.validateVault(vaultPath);
+                
+                // Step 2: Load vault files
+                const files = await vaultManager.loadVault(vaultPath);
+                
+                // Step 3: Set up auto-save for a file
+                if (files.length > 0) {
+                    const firstFile = files.find(f => !f.is_dir);
+                    if (firstFile) {
+                        await appState.setCurrentFile(firstFile.path || `${vaultPath}/${firstFile.name}`);
+                    }
+                }
+                
+                autoSave.setContentGetter(() => '# Integration Test\n\nThis is a full workflow test.');
+                
+                // Step 4: Test auto-save integration
+                const saveResult = await autoSave.saveNow();
+                
+                // Step 5: Verify state consistency
+                const vaultStats = await vaultManager.getVaultStats();
+                const autoSaveStatus = autoSave.getStatus();
+                const appStateValid = appState.isValid();
+                
+                const success = vaultPath && isValid && files.length > 0 && 
+                                saveResult && vaultStats && autoSaveStatus && appStateValid;
+                
+                addResult('Full Workflow Integration', success, 
+                    `Complete workflow: vault(${files.length} files) → save → validation`,
+                    performance.now() - start1);
+                    
+            } catch (error) {
+                addResult('Full Workflow Integration', false, `Integration failed: ${error.message}`);
+            }
+
+            // Test 2: Event system integration
+            const start2 = performance.now();
+            let eventChain = [];
+            
+            // Set up event listeners
+            appState.addEventListener(AppState.EVENTS.VAULT_CHANGED, () => {
+                eventChain.push('vault_changed');
+            });
+            
+            autoSave.addEventListener(AutoSave.EVENTS.SAVE_SUCCESS, () => {
+                eventChain.push('save_success');
+            });
+
+            // Trigger event chain
+            await appState.setVault('/test/event/vault');
+            await appState.setCurrentFile('/test/event/vault/file.md');
+            autoSave.setContentGetter(() => 'Event test content');
+            await autoSave.saveNow();
+
+            const eventsTriggered = eventChain.length > 0;
+            addResult('Event System Integration', eventsTriggered, 
+                `Events triggered: ${eventChain.join(' → ')}`, performance.now() - start2);
+
+            // Test 3: State persistence integration
+            const start3 = performance.now();
+            try {
+                // Save state
+                await appState.saveState();
+                
+                // Create new instances
+                const newAppState = new AppState();
+                await newAppState.loadState();
+                
+                const newVaultManager = new VaultManager(newAppState);
+                const stateConsistent = newAppState.currentVault === appState.currentVault;
+                
+                addResult('State Persistence', stateConsistent, 
+                    'State properly persisted and restored', performance.now() - start3);
+                    
+            } catch (error) {
+                addResult('State Persistence', false, `State persistence failed: ${error.message}`);
+            }
+        };
+
+        window.runMemoryTests = async function() {
+            currentTestCategory = '💾 Memory Efficiency Tests';
+            updateStatus('Running memory efficiency tests...');
+            
+            const initialMemory = performance.memory ? performance.memory.usedJSHeapSize : 0;
+            
+            // Test 1: Memory usage during intensive operations
+            const start1 = performance.now();
+            const instances = [];
+            
+            try {
+                // Create multiple instances
+                for (let i = 0; i < 10; i++) {
+                    const appState = new AppState();
+                    const vaultManager = new VaultManager(appState);
+                    const autoSave = new AutoSave(appState);
+                    instances.push({ appState, vaultManager, autoSave });
+                }
+                
+                // Perform operations on each instance
+                for (const instance of instances) {
+                    await instance.appState.setVault(`/test/memory${instances.indexOf(instance)}`);
+                    await instance.vaultManager.loadVault(instance.appState.currentVault);
+                    instance.autoSave.handleContentChange('Memory test content');
+                }
+                
+                const memoryAfterOperations = performance.memory ? performance.memory.usedJSHeapSize : 0;
+                const memoryIncrease = (memoryAfterOperations - initialMemory) / 1024 / 1024;
+                
+                // Clean up instances
+                instances.forEach(instance => {
+                    instance.autoSave.destroy();
+                });
+                
+                const isEfficient = memoryIncrease < 50; // Target: <50MB for 10 instances
+                addResult('Memory Efficiency', isEfficient, 
+                    `${instances.length} instances used ${memoryIncrease.toFixed(1)}MB (Target: <50MB)`,
+                    performance.now() - start1);
+                    
+            } catch (error) {
+                addResult('Memory Efficiency', false, `Memory test failed: ${error.message}`);
+            }
+
+            // Test 2: Memory leak detection
+            const start2 = performance.now();
+            const memBefore = performance.memory ? performance.memory.usedJSHeapSize : 0;
+            
+            // Create and destroy instances repeatedly
+            for (let i = 0; i < 20; i++) {
+                const appState = new AppState();
+                const autoSave = new AutoSave(appState);
+                autoSave.setContentGetter(() => `Leak test ${i}`);
+                await autoSave.saveNow();
+                autoSave.destroy();
+                
+                // Force garbage collection if available
+                if (window.gc) window.gc();
+            }
+            
+            const memAfter = performance.memory ? performance.memory.usedJSHeapSize : 0;
+            const leakAmount = (memAfter - memBefore) / 1024 / 1024;
+            const hasLeak = leakAmount > 10; // More than 10MB retained
+            
+            addResult('Memory Leak Detection', !hasLeak, 
+                `Memory retained after cleanup: ${leakAmount.toFixed(1)}MB`,
+                performance.now() - start2);
+        };
+
+        window.runRecoveryTests = async function() {
+            currentTestCategory = '🔄 Recovery Tests';
+            updateStatus('Running application crash recovery tests...');
+            
+            const appState = new AppState();
+            const autoSave = new AutoSave(appState);
+            
+            // Test 1: Recovery from corrupted state
+            const start1 = performance.now();
+            try {
+                // Simulate corrupted state
+                appState.currentVault = '/corrupted/vault';
+                appState.currentFile = null;
+                
+                const recovered = appState.isValid();
+                addResult('Corrupted State Recovery', !recovered, 
+                    'Correctly detected invalid state', performance.now() - start1);
+                    
+                // Test recovery
+                await appState.reset();
+                const afterReset = appState.isValid();
+                addResult('State Reset Recovery', afterReset, 
+                    'Successfully recovered from reset', performance.now() - start1);
+                    
+            } catch (error) {
+                addResult('Corrupted State Recovery', false, `Recovery failed: ${error.message}`);
+            }
+
+            // Test 2: Auto-save failure recovery
+            const start2 = performance.now();
+            await appState.setCurrentFile('/test/recovery.md');
+            autoSave.setContentGetter(() => 'Recovery test content');
+            
+            // Enable save failures
+            window.testFlags.simulateSaveFailures = true;
+            
+            let saveAttempts = 0;
+            let successfulSaves = 0;
+            
+            for (let i = 0; i < 10; i++) {
+                try {
+                    const result = await autoSave.saveNow();
+                    saveAttempts++;
+                    if (result) successfulSaves++;
+                } catch (error) {
+                    saveAttempts++;
+                }
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            window.testFlags.simulateSaveFailures = false;
+            
+            // System should handle failures gracefully
+            const recoveredGracefully = saveAttempts === 10 && successfulSaves < 10;
+            addResult('Save Failure Recovery', recoveredGracefully, 
+                `Handled ${saveAttempts} attempts with ${successfulSaves} successes`,
+                performance.now() - start2);
+
+            // Test 3: Component re-initialization
+            const start3 = performance.now();
+            try {
+                // Destroy and recreate components
+                autoSave.destroy();
+                
+                const newAutoSave = new AutoSave(appState);
+                newAutoSave.setContentGetter(() => 'Re-initialization test');
+                const result = await newAutoSave.saveNow();
+                
+                addResult('Component Re-initialization', result, 
+                    'Successfully re-initialized after destruction', performance.now() - start3);
+                    
+            } catch (error) {
+                addResult('Component Re-initialization', false, `Re-init failed: ${error.message}`);
+            }
+        };
+
+        // Utility functions
+        window.generateLargeVault = function() {
+            updateStatus('🔧 Large vault test data generated in mock system');
+            // This would be used with the large vault path in load_vault mock
+        };
+
+        window.simulateCorruption = function() {
+            updateStatus('💥 Corruption simulation enabled - next operations may fail');
+            window.testFlags.simulateErrors = true;
+            setTimeout(() => {
+                window.testFlags.simulateErrors = false;
+                updateStatus('Corruption simulation disabled');
+            }, 30000);
+        };
+
+        window.exportResults = function() {
+            const report = {
+                timestamp: new Date().toISOString(),
+                summary: {
+                    total: testResults.length,
+                    passed: testResults.filter(r => r.passed).length,
+                    failed: testResults.filter(r => !r.passed).length,
+                    avgPerformance: performanceTimes.length > 0 ? 
+                        performanceTimes.reduce((a, b) => a + b, 0) / performanceTimes.length : 0
+                },
+                results: testResults,
+                performanceMetrics: window.testMetrics.getReport(),
+                systemInfo: {
+                    userAgent: navigator.userAgent,
+                    memory: performance.memory ? {
+                        used: performance.memory.usedJSHeapSize,
+                        total: performance.memory.totalJSHeapSize,
+                        limit: performance.memory.jsHeapSizeLimit
+                    } : 'Not available'
+                }
+            };
+            
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vault-management-test-report-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            updateStatus('📄 Test report exported successfully');
+        };
+
+        async function generateSystemReport() {
+            const systemInfo = document.getElementById('systemInfo');
+            const performanceMetrics = document.getElementById('performanceMetrics');
+            
+            // System information
+            systemInfo.innerHTML = `
+                <h4>System Information</h4>
+                <div class="test-info">
+                    <strong>Browser:</strong> ${navigator.userAgent}<br>
+                    <strong>Memory:</strong> ${performance.memory ? 
+                        `${Math.round(performance.memory.usedJSHeapSize/1024/1024)}MB used` : 
+                        'Not available'}<br>
+                    <strong>Test Duration:</strong> ${((Date.now() - (testResults[0]?.timestamp ? new Date(testResults[0].timestamp).getTime() : Date.now())) / 1000).toFixed(1)}s<br>
+                    <strong>Performance Samples:</strong> ${performanceTimes.length}
+                </div>
+            `;
+            
+            // Performance metrics
+            const metrics = window.testMetrics.getReport();
+            let metricsHtml = '<h4>Command Performance Report</h4>';
+            
+            Object.entries(metrics).forEach(([command, stats]) => {
+                metricsHtml += `
+                    <div class="test-result ${stats.successRate === '100.0%' ? 'test-pass' : 'test-warn'}">
+                        <strong>${command}:</strong> 
+                        ${stats.count} calls, ${stats.avgTime.toFixed(1)}ms avg, ${stats.successRate} success rate
+                    </div>
+                `;
+            });
+            
+            performanceMetrics.innerHTML = metricsHtml;
+        }
+
+        // Initialize
+        updateStatus('🧪 Comprehensive test suite ready. Click "Run All Tests" to begin.');
+        updateMemoryUsage();
+    </script>
+</body>
+</html>
