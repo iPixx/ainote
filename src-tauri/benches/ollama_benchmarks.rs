@@ -39,8 +39,8 @@ fn bench_state_access(c: &mut Criterion) {
     group.throughput(Throughput::Elements(1));
 
     group.bench_function("get_connection_state", |b| {
-        b.to_async(&rt).iter(|| async {
-            black_box(client.get_connection_state().await)
+        b.iter(|| {
+            black_box(rt.block_on(client.get_connection_state()))
         })
     });
 
@@ -79,8 +79,8 @@ fn bench_config_operations(c: &mut Criterion) {
     for (name, config) in configs {
         group.bench_with_input(BenchmarkId::new("update_config", name), &config, |b, config| {
             let mut client = OllamaClient::new();
-            b.to_async(&rt).iter(|| async {
-                black_box(client.update_config(config.clone()).await)
+            b.iter(|| {
+                black_box(rt.block_on(client.update_config(config.clone())))
             })
         });
     }
@@ -102,20 +102,22 @@ fn bench_concurrent_operations(c: &mut Criterion) {
             BenchmarkId::new("state_access_concurrent", level),
             &level,
             |b, &level| {
-                b.to_async(&rt).iter(|| async {
-                    let mut handles = Vec::new();
-                    
-                    for _ in 0..level {
-                        let client_clone = std::sync::Arc::clone(&client);
-                        let handle = tokio::spawn(async move {
-                            client_clone.get_connection_state().await
-                        });
-                        handles.push(handle);
-                    }
+                b.iter(|| {
+                    black_box(rt.block_on(async {
+                        let mut handles = Vec::new();
+                        
+                        for _ in 0..level {
+                            let client_clone = std::sync::Arc::clone(&client);
+                            let handle = tokio::spawn(async move {
+                                client_clone.get_connection_state().await
+                            });
+                            handles.push(handle);
+                        }
 
-                    for handle in handles {
-                        black_box(handle.await.unwrap());
-                    }
+                        for handle in handles {
+                            handle.await.unwrap();
+                        }
+                    }))
                 })
             },
         );
@@ -194,8 +196,8 @@ fn bench_memory_operations(c: &mut Criterion) {
 
     group.bench_function("state_clone_operations", |b| {
         let client = OllamaClient::new();
-        b.to_async(&rt).iter(|| async {
-            let state = client.get_connection_state().await;
+        b.iter(|| {
+            let state = rt.block_on(client.get_connection_state());
             let cloned_state = black_box(state.clone());
             drop(cloned_state);
         })
