@@ -12,7 +12,7 @@
     <script type="module" src="/main.js" defer></script>
   </head>
 
-  <body>
+  <body class="with-status-bar">
     <!-- Three-column layout system -->
     <div class="app-container">
       <!-- File Tree Panel -->
@@ -115,6 +115,97 @@
     <button class="mobile-nav-toggle" id="mobileNavToggle" onclick="openMobileNav()" aria-label="Open navigation" style="display: none;">
       ☰
     </button>
+
+    <!-- Vault Selection Dialog -->
+    <div class="vault-dialog" id="vaultDialog" style="display: none;">
+      <div class="vault-dialog-content">
+        <div class="vault-dialog-header">
+          <h3>Select Vault</h3>
+          <button onclick="closeVaultDialog()" class="dialog-close-btn" aria-label="Close dialog">✕</button>
+        </div>
+        <div class="vault-dialog-body">
+          <p>Choose a folder to use as your vault for storing notes.</p>
+          <div class="vault-options">
+            <div class="vault-option">
+              <button onclick="selectNewVault()" class="btn-primary vault-select-btn">
+                <span class="vault-icon">📁</span>
+                <div class="vault-text">
+                  <div class="vault-title">Choose Folder</div>
+                  <div class="vault-description">Select a new folder for your vault</div>
+                </div>
+              </button>
+            </div>
+            <div class="recent-vaults" id="recentVaults" style="display: none;">
+              <h4>Recent Vaults</h4>
+              <div class="recent-vaults-list" id="recentVaultsList">
+                <!-- Recent vaults will be populated here -->
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="vault-dialog-footer">
+          <button onclick="closeVaultDialog()" class="btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress Indicator -->
+    <div class="progress-indicator" id="progressIndicator" style="display: none;">
+      <div class="progress-content">
+        <div class="progress-spinner"></div>
+        <div class="progress-text" id="progressText">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Enhanced Notification System -->
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <!-- Status Bar -->
+    <div class="status-bar" id="statusBar">
+      <div class="status-left">
+        <div class="vault-status" id="vaultStatus">
+          <span class="vault-icon">📁</span>
+          <span class="vault-name" id="vaultName">No vault selected</span>
+          <button class="vault-switch-btn" id="vaultSwitchBtn" onclick="showVaultSwitcher()" aria-label="Switch vault">⇅</button>
+        </div>
+      </div>
+      <div class="status-center">
+        <div class="operation-status" id="operationStatus"></div>
+      </div>
+      <div class="status-right">
+        <div class="save-status" id="saveStatusIndicator">
+          <span class="save-icon" id="saveIcon">💾</span>
+          <span class="save-text" id="saveText">Saved</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vault Switcher Menu -->
+    <div class="vault-switcher" id="vaultSwitcher" style="display: none;">
+      <div class="vault-switcher-content">
+        <div class="vault-switcher-header">
+          <h4>Switch Vault</h4>
+          <button onclick="hideVaultSwitcher()" class="dialog-close-btn" aria-label="Close switcher">✕</button>
+        </div>
+        <div class="vault-switcher-body">
+          <div class="current-vault" id="currentVaultInfo">
+            <div class="vault-info-header">Current Vault</div>
+            <div class="vault-path" id="currentVaultPath">None</div>
+          </div>
+          <div class="vault-actions">
+            <button onclick="selectNewVault()" class="btn-primary vault-action-btn">
+              <span>📁</span> Select New Vault
+            </button>
+          </div>
+          <div class="recent-vaults-switcher" id="recentVaultsSwitcher">
+            <h5>Recent Vaults</h5>
+            <div class="recent-vaults-list" id="recentVaultsListSwitcher">
+              <!-- Recent vaults will be populated here -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Keyboard Shortcuts Help (Hidden by default) -->
     <div class="shortcuts-help" id="shortcutsHelp" style="display: none;">

@@ -203,6 +203,12 @@ class EditorPreviewPanel {
       import('./markdown-editor.js').then(({ default: MarkdownEditor }) => {
         this.markdownEditor = new MarkdownEditor(this.editorContainer, this.appState);
         
+        // Apply stored content if we have any
+        if (this.content) {
+          console.log('🔄 Setting stored content in editor:', this.content.length, 'characters');
+          this.markdownEditor.setValue(this.content);
+        }
+        
         // Listen for content changes
         this.markdownEditor.addEventListener(MarkdownEditor.EVENTS.CONTENT_CHANGED, (event) => {
           this.handleContentChange(event.detail.content);
@@ -233,6 +239,12 @@ class EditorPreviewPanel {
       // Import PreviewRenderer class
       import('./preview-renderer.js').then(({ default: PreviewRenderer }) => {
         this.previewRenderer = new PreviewRenderer(this.previewContainer, this.appState);
+        
+        // Apply stored content if we have any
+        if (this.content) {
+          console.log('🔄 Setting stored content in preview renderer:', this.content.length, 'characters');
+          this.previewRenderer.render(this.content);
+        }
         
         // Listen for scroll events
         this.previewContainer.addEventListener('scroll', () => {

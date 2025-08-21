@@ -38,21 +38,18 @@ class VaultManager {
   async selectVault() {
     try {
       const selectedPath = await window.__TAURI__.core.invoke('select_vault');
+      console.log('🔍 VaultManager: Selected path from dialog:', selectedPath);
       
       if (selectedPath) {
-        // Validate the selected vault before accepting it
-        const isValid = await this.validateVault(selectedPath);
-        
-        if (!isValid) {
-          throw new Error(`Selected folder is not accessible: ${selectedPath}`);
-        }
-        
+        console.log('✅ VaultManager: Path selected, skipping validation during selection');
+        // Skip validation during selection - if user selected it from dialog, it should be valid
+        // We'll validate later during actual usage if needed
         return selectedPath;
       }
       
       return null;
     } catch (error) {
-      console.error('Failed to select vault:', error);
+      console.error('❌ VaultManager: Failed to select vault:', error);
       throw new Error(`Vault selection failed: ${error.message}`);
     }
   }
@@ -65,17 +62,19 @@ class VaultManager {
   async validateVault(vaultPath) {
     try {
       if (!vaultPath || typeof vaultPath !== 'string') {
+        console.log('🔍 VaultManager: Invalid vault path type:', typeof vaultPath, vaultPath);
         return false;
       }
 
-      // Use backend validation command
-      const isValid = await window.__TAURI__.core.invoke('validate_vault', {
-        vault_path: vaultPath
-      });
+      console.log('🔧 VaultManager: Calling backend validate_vault with path:', vaultPath);
       
+      // Use backend validation command
+      const isValid = await window.__TAURI__.core.invoke('validate_vault', { vaultPath });
+      
+      console.log('✅ VaultManager: Backend validation result:', isValid);
       return isValid === true;
     } catch (error) {
-      console.error('Vault validation error:', error);
+      console.error('❌ VaultManager: Vault validation error:', error);
       return false;
     }
   }
@@ -98,9 +97,7 @@ class VaultManager {
       }
 
       // Load vault files using backend command
-      const files = await window.__TAURI__.core.invoke('load_vault', {
-        vault_path: vaultPath
-      });
+      const files = await window.__TAURI__.core.invoke('load_vault', { vaultPath });
 
       if (!Array.isArray(files)) {
         throw new Error('Invalid vault files response format');
@@ -127,16 +124,19 @@ class VaultManager {
         throw new Error('New vault path is required');
       }
 
-      // Validate the new vault
-      const isValid = await this.validateVault(newVaultPath);
-      if (!isValid) {
-        throw new Error(`Invalid vault path: ${newVaultPath}`);
-      }
-
+      console.log('🔄 VaultManager: Switching to vault:', newVaultPath);
       const previousVault = this.currentVaultPath;
 
-      // Load the new vault to ensure it's accessible
-      const files = await this.loadVault(newVaultPath);
+      // Try to load the vault - this will validate accessibility
+      let files = [];
+      try {
+        files = await this.loadVault(newVaultPath);
+        console.log('✅ VaultManager: Successfully loaded vault with', files.length, 'items');
+      } catch (loadError) {
+        console.warn('⚠️ VaultManager: Failed to load vault, but proceeding anyway:', loadError);
+        // If loading fails, still proceed but with empty file list
+        // This allows users to select empty folders or folders with permission issues
+      }
 
       // Update current vault path
       this.currentVaultPath = newVaultPath;
@@ -150,10 +150,10 @@ class VaultManager {
       // Persist vault preference
       this.saveVaultPreference(newVaultPath);
 
-      console.log(`Switched vault from "${previousVault}" to "${newVaultPath}". Loaded ${files.length} items.`);
+      console.log(`✅ VaultManager: Switched vault from "${previousVault}" to "${newVaultPath}". Loaded ${files.length} items.`);
 
     } catch (error) {
-      console.error('Failed to switch vault:', error);
+      console.error('❌ VaultManager: Failed to switch vault:', error);
       throw new Error(`Vault switching failed: ${error.message}`);
     }
   }
@@ -286,9 +286,7 @@ class VaultManager {
    */
   async saveRecentVaults() {
     try {
-      await window.__TAURI__.core.invoke('save_vault_preferences', {
-        recent_vaults: this.recentVaults
-      });
+      await window.__TAURI__.core.invoke('save_vault_preferences', { recentVaults: this.recentVaults });
     } catch (error) {
       console.error('Failed to save recent vaults to app_state.json:', error);
     }

@@ -16,8 +16,18 @@ let mobileNavManager;
 let fileTreeComponent;
 let editorPreviewPanel;
 
+// Initialize service instances
+let vaultManager;
+let autoSave;
+
 // Window instance for state management
 let mainWindow;
+
+// Application start time for suppressing startup notifications
+let appStartTime = Date.now();
+
+// File opening state to prevent double-clicks
+let isFileOpening = false;
 
 /**
  * Update vault information display
@@ -123,19 +133,34 @@ function showNotification(message, type = 'info') {
  * Select vault folder and update UI
  */
 async function selectVault() {
+  console.log('📁 Starting vault selection...');
   try {
-    const result = await invoke('select_vault_folder');
+    const result = await invoke('select_vault');
+    console.log('📁 Vault selection result:', result);
+    
     if (result) {
+      console.log('✅ Vault selected:', result);
       appState.setVault(result);
       updateVaultInfo(result);
+      updateVaultStatusBar(result);
+      
+      // Close vault dialog
+      const vaultDialog = document.getElementById('vaultDialog');
+      if (vaultDialog) {
+        vaultDialog.style.display = 'none';
+        console.log('📁 Vault dialog closed');
+      }
+      
       showNotification(`Vault selected: ${result.split('/').pop()}`, 'success');
       
       // Automatically scan the vault
       await refreshVault();
     } else {
+      console.log('ℹ️ Vault selection cancelled');
       showNotification('No vault selected', 'info');
     }
   } catch (error) {
+    console.error('❌ Error selecting vault:', error);
     showNotification(`Error selecting vault: ${error}`, 'error');
   }
 }
@@ -209,10 +234,10 @@ function createFileTreeHTML(files) {
   return sortedFiles.map(file => {
     const icon = file.is_dir ? '📁' : getFileIcon(file.name);
     const cssClass = file.is_dir ? 'tree-folder' : 'tree-file';
-    const onClick = file.is_dir ? '' : `onclick="openFile('${file.path}')"`;
+    // Remove onclick handler - let FileTree component handle clicks
     
     return `
-      <div class="tree-item ${cssClass}" ${onClick} title="${file.path}">
+      <div class="tree-item ${cssClass}" data-file-path="${file.path}" data-is-dir="${file.is_dir}" title="${file.path}">
         <span class="tree-icon">${icon}</span>
         <span class="tree-name">${file.name}</span>
       </div>
@@ -315,7 +340,14 @@ function getFullPath(fileName) {
  * @param {string} filePath - Path to the file to open
  */
 async function openFile(filePath) {
+  if (isFileOpening) {
+    console.log('File opening already in progress, skipping');
+    return;
+  }
+  
+  isFileOpening = true;
   try {
+    console.log('Opening file:', filePath);
     const content = await invoke('read_file', { filePath });
     
     // Update state
@@ -332,12 +364,22 @@ async function openFile(filePath) {
       // Create new editor/preview panel instance
       editorPreviewPanel = new EditorPreviewPanel(editorContent, appState);
       
+      // Initialize the panel
+      editorPreviewPanel.init();
+      
       // Listen for content changes from the editor component within the panel
       editorPreviewPanel.addEventListener('content_changed', () => {
         appState.markDirty(true);
+        updateSaveStatus('unsaved');
+        
         const currentFileName = appState.getState().currentFile?.split('/').pop();
         if (currentFileName) {
           updateCurrentFileName(currentFileName, true);
+        }
+        
+        // Trigger auto-save if initialized
+        if (autoSave) {
+          autoSave.handleContentChange();
         }
       });
       
@@ -348,21 +390,11 @@ async function openFile(filePath) {
       
       // Listen for auto-save requests from the editor component
       editorPreviewPanel.addEventListener('auto_save_requested', async (event) => {
-        const { content, fileSize } = event.detail;
-        try {
-          const state = appState.getState();
-          if (state.currentFile) {
-            await invoke('write_file', { filePath: state.currentFile, content });
-            console.log(`💾 Auto-saved ${(fileSize / 1024).toFixed(1)}KB`);
-            
-            // Update UI to show saved state
-            const fileName = state.currentFile.split('/').pop();
-            updateCurrentFileName(fileName, false);
-            appState.markDirty(false);
-          }
-        } catch (error) {
-          console.error('❌ Auto-save failed:', error);
-          showNotification('Auto-save failed', 'error');
+        // Auto-save is now handled by the AutoSave service
+        // This event is kept for compatibility but delegates to AutoSave
+        if (autoSave) {
+          const content = event.detail?.content || editorPreviewPanel.getContent();
+          autoSave.handleContentChange(content);
         }
       });
       
@@ -387,9 +419,20 @@ async function openFile(filePath) {
     // Update view mode display based on current state
     updateViewModeDisplay();
     
-    showNotification(`Opened: ${fileName}`, 'success');
+    // Show success notification only if not restoring from startup
+    if (Date.now() - appStartTime > 3000) {
+      showNotification(`Opened: ${fileName}`, 'success');
+    }
+    
+    console.log('✅ File opened successfully:', fileName);
   } catch (error) {
+    console.error('Error opening file:', error);
     showNotification(`Error opening file: ${error}`, 'error');
+  } finally {
+    // Reduce the timeout to allow faster subsequent file opening
+    setTimeout(() => {
+      isFileOpening = false;
+    }, 100);
   }
 }
 
@@ -757,6 +800,9 @@ appState.addEventListener(AppState.EVENTS.DIRTY_STATE_CHANGED, (data) => {
     const fileName = data.file.split('/').pop();
     updateCurrentFileName(fileName, data.isDirty);
   }
+  
+  // Update save status indicator
+  updateSaveStatus(data.isDirty ? 'unsaved' : 'saved');
 });
 
 // Make functions globally accessible for HTML onclick handlers
@@ -775,6 +821,7 @@ window.forceSaveAllState = forceSaveAllState;
 window.debouncedSaveLayoutState = debouncedSaveLayoutState;
 window.activateFileTreeSearch = activateFileTreeSearch;
 window.saveWindowState = saveWindowState;
+window.showNotification = showNotification;
 
 // Development and testing functions
 window.runLayoutTest = function() {
@@ -817,6 +864,36 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Initialize layout managers after DOM is ready
   layoutManager = new LayoutManager();
   mobileNavManager = new MobileNavManager();
+  
+  // Initialize service instances
+  try {
+    // Import services dynamically to ensure modules are loaded
+    const VaultManagerModule = await import('./js/services/vault-manager.js');
+    const AutoSaveModule = await import('./js/services/auto-save.js');
+    
+    // Store class references for static access
+    const AutoSave = AutoSaveModule.default;
+    
+    vaultManager = new VaultManagerModule.default(appState);
+    autoSave = new AutoSave(appState);
+    
+    // Make services and class globally accessible
+    window.vaultManager = vaultManager;
+    window.autoSave = autoSave;
+    window.AutoSave = AutoSave; // Make AutoSave class globally accessible
+    
+    console.log('✅ VaultManager and AutoSave services initialized');
+  } catch (error) {
+    console.error('❌ Failed to initialize services:', error);
+    showNotification('Failed to initialize application services', 'error');
+    
+    // Fallback: still try to show the proper UI state
+    const initialState = appState.getState();
+    if (initialState.currentVault) {
+      updateVaultInfo(initialState.currentVault);
+      updateVaultStatusBar(initialState.currentVault);
+    }
+  }
   
   // Initialize FileTree component
   const fileTreeContent = document.getElementById('fileTreeContent');
@@ -862,26 +939,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   
   // FileTree component styling is now loaded via CSS file
   
-  // Load persisted state on startup
-  const currentState = appState.getState();
-  
-  if (currentState.currentVault) {
-    updateVaultInfo(currentState.currentVault);
-    // Auto-refresh vault if one is persisted
-    refreshVault();
-  }
-  
-  if (currentState.currentFile) {
-    const fileName = currentState.currentFile.split('/').pop();
-    updateCurrentFileName(fileName, false);
-  }
-  
-  // Initialize view mode button
-  const toggleBtn = document.getElementById('toggleModeBtn');
-  if (toggleBtn) {
-    toggleBtn.textContent = currentState.viewMode === 'editor' ? '👁' : '✏️';
-    toggleBtn.title = currentState.viewMode === 'editor' ? 'Switch to preview' : 'Switch to editor';
-  }
+  // Load persisted state on startup will be handled after vault manager initialization
+  // This section moved below to avoid variable conflicts
   
   // Handle keyboard shortcuts help overlay click-outside
   const shortcutsHelp = document.getElementById('shortcutsHelp');
@@ -946,8 +1005,69 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.error('❌ Main window instance not available');
   }
   
+  // Setup auto-save integration with editor (delayed until editor is ready)
+  const setupAutoSaveIntegration = () => {
+    if (autoSave && editorPreviewPanel) {
+      // Set up content getter for auto-save
+      autoSave.setContentGetter(() => {
+        return editorPreviewPanel ? editorPreviewPanel.getContent() : null;
+      });
+      
+      // Listen for auto-save events
+      autoSave.addEventListener(AutoSave.EVENTS.SAVE_SUCCESS, (event) => {
+        const { saveType, saveTime } = event;
+        updateSaveStatus('saved');
+        updateOperationStatus('');
+        if (saveType === 'manual') {
+          showNotification(`File saved (${saveTime.toFixed(0)}ms)`, 'success', 2000);
+        }
+      });
+      
+      autoSave.addEventListener(AutoSave.EVENTS.SAVE_ERROR, (event) => {
+        const { error, saveType } = event;
+        updateSaveStatus('error');
+        updateOperationStatus('');
+        showNotification(`Save failed: ${error}`, 'error');
+      });
+      
+      autoSave.addEventListener(AutoSave.EVENTS.SAVE_STARTED, (event) => {
+        const { saveType } = event;
+        updateSaveStatus('saving');
+        if (saveType === 'manual') {
+          updateOperationStatus('Saving file...');
+        }
+      });
+      
+      console.log('✅ Auto-save integration configured');
+      return true;
+    }
+    return false;
+  };
+  
+  // Try to setup auto-save integration now, or retry later
+  if (!setupAutoSaveIntegration()) {
+    // Retry when editor becomes available
+    const retryIntegration = setInterval(() => {
+      if (setupAutoSaveIntegration()) {
+        clearInterval(retryIntegration);
+      }
+    }, 500);
+    
+    // Give up after 10 seconds
+    setTimeout(() => {
+      clearInterval(retryIntegration);
+    }, 10000);
+  }
+  
   // Add keyboard shortcut handling for macOS
   document.addEventListener('keydown', async (event) => {
+    // Handle Ctrl/Cmd+O for vault selection
+    if ((event.metaKey || event.ctrlKey) && event.key === 'o') {
+      event.preventDefault();
+      showVaultDialog();
+      return;
+    }
+    
     // Handle file tree search activation (Ctrl/Cmd + F when file tree is focused)
     if ((event.metaKey || event.ctrlKey) && event.key === 'f') {
       const activeElement = document.activeElement;
@@ -959,6 +1079,28 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (isFileTreeFocused) {
         event.preventDefault();
         activateFileTreeSearch();
+        return;
+      }
+    }
+    
+    // Handle Escape key to close dialogs
+    if (event.key === 'Escape') {
+      const vaultDialog = document.getElementById('vaultDialog');
+      const vaultSwitcher = document.getElementById('vaultSwitcher');
+      const shortcutsHelp = document.getElementById('shortcutsHelp');
+      
+      if (vaultDialog && vaultDialog.style.display === 'flex') {
+        closeVaultDialog();
+        return;
+      }
+      
+      if (vaultSwitcher && vaultSwitcher.style.display !== 'none') {
+        hideVaultSwitcher();
+        return;
+      }
+      
+      if (shortcutsHelp && shortcutsHelp.style.display === 'flex') {
+        toggleShortcutsHelp();
         return;
       }
     }
@@ -1008,8 +1150,473 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Initialize UI state after services are ready
+  const initializeAppState = () => {
+    const initialState = appState.getState();
+    console.log('🔍 Initial state loaded:', initialState);
+    
+    if (initialState.currentVault) {
+      console.log('📁 Found saved vault:', initialState.currentVault);
+      
+      if (vaultManager) {
+        // Verify vault is still valid and load it
+        console.log('🔧 Validating saved vault...');
+        vaultManager.validateVault(initialState.currentVault).then(isValid => {
+          console.log('✅ Vault validation result:', isValid);
+          
+          if (isValid) {
+            updateVaultInfo(initialState.currentVault);
+            updateVaultStatusBar(initialState.currentVault);
+            console.log('✅ Valid vault restored, refreshing files...');
+            
+            // Auto-refresh vault on startup
+            refreshVault().then(() => {
+              // Restore last opened file if available
+              if (initialState.currentFile) {
+                console.log('Restoring last opened file:', initialState.currentFile);
+                // Check if the file still exists before trying to open it
+                invoke('read_file', { filePath: initialState.currentFile })
+                  .then(() => {
+                    // Wait for all components to be fully initialized before restoring file
+                    const restoreFile = () => {
+                      if (document.getElementById('editorContent')) {
+                        console.log('✅ Editor container ready, restoring file...');
+                        openFile(initialState.currentFile);
+                      } else {
+                        console.log('⏳ Editor container not ready, retrying...');
+                        setTimeout(restoreFile, 200);
+                      }
+                    };
+                    
+                    // Start restoration attempt after a short delay
+                    setTimeout(restoreFile, 800);
+                  })
+                  .catch((error) => {
+                    console.warn('Last opened file no longer exists:', error);
+                    // Clear the invalid file from state
+                    appState.setCurrentFile(null);
+                  });
+              }
+            });
+          } else {
+            // Vault no longer valid, clear it and show selection dialog
+            console.log('❌ Vault no longer valid, clearing and showing dialog');
+            appState.setVault(null);
+            setTimeout(() => {
+              showVaultDialog();
+            }, 1000);
+          }
+        }).catch(error => {
+          console.error('❌ Failed to validate saved vault:', error);
+          setTimeout(() => {
+            showVaultDialog();
+          }, 1000);
+        });
+      } else {
+        console.warn('⚠️ VaultManager not initialized yet, showing dialog');
+        setTimeout(() => {
+          showVaultDialog();
+        }, 1000);
+      }
+    } else {
+      // Show vault selection dialog on first launch
+      console.log('🚀 No saved vault found, showing selection dialog');
+      setTimeout(() => {
+        showVaultDialog();
+      }, 1000);
+    }
+    
+    // Load persisted state for UI initialization
+    if (initialState.currentVault) {
+      updateVaultInfo(initialState.currentVault);
+    }
+    
+    if (initialState.currentFile) {
+      const fileName = initialState.currentFile.split('/').pop();
+      updateCurrentFileName(fileName, false);
+      
+      // If we have a file but no vault manager yet (shouldn't happen but fallback)
+      if (!initialState.currentVault && vaultManager) {
+        console.log('Found saved file without vault, attempting to restore file:', initialState.currentFile);
+        // Try to open the file directly with proper timing
+        const restoreFileWithoutVault = () => {
+          if (document.getElementById('editorContent')) {
+            console.log('✅ Editor ready for fallback file restoration');
+            invoke('read_file', { filePath: initialState.currentFile })
+              .then(() => {
+                openFile(initialState.currentFile);
+              })
+              .catch((error) => {
+                console.warn('Cannot restore file without valid vault:', error);
+                appState.setCurrentFile(null);
+                updateCurrentFileName(null);
+              });
+          } else {
+            console.log('⏳ Editor not ready for fallback, retrying...');
+            setTimeout(restoreFileWithoutVault, 200);
+          }
+        };
+        
+        setTimeout(restoreFileWithoutVault, 1000);
+      }
+    }
+  };
+
+  // Call the initialization after services are ready
+  setTimeout(initializeAppState, 100);
+  
+  // Initialize view mode button
+  const toggleBtn = document.getElementById('toggleModeBtn');
+  const currentState = appState.getState();
+  if (toggleBtn) {
+    toggleBtn.textContent = currentState.viewMode === 'editor' ? '👁' : '✏️';
+    toggleBtn.title = currentState.viewMode === 'editor' ? 'Switch to preview' : 'Switch to editor';
+  }
+  
+  // Initialize save status
+  updateSaveStatus(currentState.unsavedChanges ? 'unsaved' : 'saved');
+  
   // Show welcome notification
   setTimeout(() => {
-    showNotification('Welcome to aiNote! Select a vault to get started.', 'info');
-  }, 1000);
+    const welcomeState = appState.getState();
+    if (welcomeState.currentVault) {
+      showNotification('Welcome back to aiNote!', 'info', 3000);
+    } else {
+      showNotification('Welcome to aiNote! Please select a vault to get started.', 'info', 0, true); // Persistent until vault selected
+    }
+  }, 1500);
 });
+
+// UI Helper Functions
+
+/**
+ * Update vault information in the status bar
+ * @param {string} vaultPath - Path to the current vault
+ */
+function updateVaultStatusBar(vaultPath) {
+  const vaultName = document.getElementById('vaultName');
+  const vaultStatus = document.getElementById('vaultStatus');
+  
+  if (vaultName && vaultPath) {
+    const folderName = vaultPath.split('/').pop() || vaultPath.split('\\').pop() || 'Unknown';
+    vaultName.textContent = folderName;
+    vaultName.title = vaultPath; // Full path on hover
+  } else if (vaultName) {
+    vaultName.textContent = 'No vault selected';
+    vaultName.title = '';
+  }
+}
+
+/**
+ * Update save status indicator
+ * @param {string} status - Save status (saved, unsaved, saving, error)
+ */
+function updateSaveStatus(status) {
+  const indicator = document.getElementById('saveStatusIndicator');
+  const icon = document.getElementById('saveIcon');
+  const text = document.getElementById('saveText');
+  
+  if (!indicator || !icon || !text) return;
+  
+  // Remove all status classes
+  indicator.classList.remove('saved', 'unsaved', 'saving', 'error');
+  
+  // Add current status class and update content
+  indicator.classList.add(status);
+  
+  switch (status) {
+    case 'saved':
+      icon.textContent = '💾';
+      text.textContent = 'Saved';
+      break;
+    case 'unsaved':
+      icon.textContent = '●';
+      text.textContent = 'Unsaved';
+      break;
+    case 'saving':
+      icon.textContent = '⏳';
+      text.textContent = 'Saving...';
+      break;
+    case 'error':
+      icon.textContent = '❌';
+      text.textContent = 'Save Error';
+      break;
+    default:
+      icon.textContent = '💾';
+      text.textContent = 'Ready';
+  }
+}
+
+/**
+ * Update operation status in the center of status bar
+ * @param {string} status - Current operation status
+ */
+function updateOperationStatus(status) {
+  const operationStatus = document.getElementById('operationStatus');
+  if (operationStatus) {
+    operationStatus.textContent = status;
+  }
+}
+
+/**
+ * Show vault switcher menu
+ */
+function showVaultSwitcher() {
+  const switcher = document.getElementById('vaultSwitcher');
+  const currentVaultPath = document.getElementById('currentVaultPath');
+  
+  if (switcher) {
+    // Update current vault display
+    if (currentVaultPath && vaultManager) {
+      const currentVault = vaultManager.getCurrentVault();
+      currentVaultPath.textContent = currentVault || 'None';
+      currentVaultPath.title = currentVault || '';
+    }
+    
+    // Populate recent vaults
+    populateRecentVaultsSwitcher();
+    
+    switcher.style.display = 'block';
+  }
+}
+
+/**
+ * Hide vault switcher menu
+ */
+function hideVaultSwitcher() {
+  const switcher = document.getElementById('vaultSwitcher');
+  if (switcher) {
+    switcher.style.display = 'none';
+  }
+}
+
+/**
+ * Populate recent vaults in the vault dialog
+ */
+async function populateRecentVaults() {
+  if (!vaultManager) return;
+  
+  const recentVaults = vaultManager.getRecentVaults();
+  const container = document.getElementById('recentVaults');
+  const list = document.getElementById('recentVaultsList');
+  
+  if (!container || !list) return;
+  
+  if (recentVaults.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  
+  container.style.display = 'block';
+  list.innerHTML = '';
+  
+  for (const vaultPath of recentVaults) {
+    const item = document.createElement('div');
+    item.className = 'recent-vault-item';
+    item.onclick = () => switchToRecentVault(vaultPath);
+    
+    const folderName = vaultPath.split('/').pop() || vaultPath.split('\\').pop();
+    
+    item.innerHTML = `
+      <span class="vault-icon">📁</span>
+      <div class="recent-vault-info">
+        <div class="recent-vault-name">${folderName}</div>
+        <div class="recent-vault-path">${vaultPath}</div>
+      </div>
+    `;
+    
+    list.appendChild(item);
+  }
+}
+
+/**
+ * Populate recent vaults in the vault switcher
+ */
+async function populateRecentVaultsSwitcher() {
+  if (!vaultManager) return;
+  
+  const recentVaults = vaultManager.getRecentVaults();
+  const list = document.getElementById('recentVaultsListSwitcher');
+  
+  if (!list) return;
+  
+  list.innerHTML = '';
+  
+  if (recentVaults.length === 0) {
+    list.innerHTML = '<p style="color: var(--color-text-tertiary); text-align: center; padding: var(--space-4);">No recent vaults</p>';
+    return;
+  }
+  
+  for (const vaultPath of recentVaults) {
+    const item = document.createElement('div');
+    item.className = 'recent-vault-item';
+    item.onclick = () => switchToRecentVault(vaultPath);
+    
+    const folderName = vaultPath.split('/').pop() || vaultPath.split('\\').pop();
+    
+    item.innerHTML = `
+      <span class="vault-icon">📁</span>
+      <div class="recent-vault-info">
+        <div class="recent-vault-name">${folderName}</div>
+        <div class="recent-vault-path">${vaultPath}</div>
+      </div>
+    `;
+    
+    list.appendChild(item);
+  }
+}
+
+// Global functions for HTML onclick handlers
+window.showVaultDialog = function() {
+  const dialog = document.getElementById('vaultDialog');
+  if (dialog) {
+    // Populate recent vaults if available
+    populateRecentVaults();
+    dialog.style.display = 'flex';
+    
+    // Focus on the dialog for accessibility
+    dialog.setAttribute('tabindex', '-1');
+    dialog.focus();
+  }
+};
+
+window.closeVaultDialog = function() {
+  const dialog = document.getElementById('vaultDialog');
+  if (dialog) {
+    dialog.style.display = 'none';
+  }
+};
+
+window.showVaultSwitcher = function() {
+  const switcher = document.getElementById('vaultSwitcher');
+  const currentVaultPath = document.getElementById('currentVaultPath');
+  
+  if (switcher) {
+    // Update current vault display
+    if (currentVaultPath && window.vaultManager) {
+      const currentVault = window.vaultManager.getCurrentVault();
+      currentVaultPath.textContent = currentVault || 'None';
+      currentVaultPath.title = currentVault || '';
+    }
+    
+    // Populate recent vaults
+    populateRecentVaultsSwitcher();
+    
+    switcher.style.display = 'block';
+  }
+};
+
+window.hideVaultSwitcher = function() {
+  const switcher = document.getElementById('vaultSwitcher');
+  if (switcher) {
+    switcher.style.display = 'none';
+  }
+};
+
+// Override selectVault to ensure proper vault dialog closing and status updates
+window.selectVault = async function() {
+  console.log('🔧 Global selectVault called, vaultManager available:', !!window.vaultManager);
+  
+  if (!window.vaultManager) {
+    console.error('❌ VaultManager not available, falling back to direct invoke');
+    // Fallback to direct selectVault function if VaultManager is not available
+    await selectVault();
+    return;
+  }
+  
+  try {
+    console.log('📁 Using VaultManager to select vault...');
+    const result = await window.vaultManager.selectVault();
+    console.log('📁 VaultManager selection result:', result);
+    
+    if (result) {
+      console.log('✅ Attempting to switch to selected vault:', result);
+      
+      try {
+        await window.vaultManager.switchVault(result);
+        console.log('✅ Successfully switched to vault via VaultManager');
+      } catch (switchError) {
+        console.warn('⚠️ VaultManager switchVault failed, trying direct approach:', switchError);
+        
+        // Fallback: set vault directly and refresh
+        appState.setVault(result);
+        console.log('✅ Vault set directly in AppState');
+      }
+      
+      // Update both vault displays
+      updateVaultInfo(result);
+      updateVaultStatusBar(result);
+      
+      // Close vault dialog
+      const vaultDialog = document.getElementById('vaultDialog');
+      if (vaultDialog) {
+        vaultDialog.style.display = 'none';
+        console.log('📁 Vault dialog closed');
+      }
+      
+      showNotification(`Vault selected: ${result.split('/').pop() || result.split('\\\\').pop()}`, 'success');
+      
+      // Refresh vault
+      await refreshVault();
+    } else {
+      console.log('ℹ️ Vault selection cancelled');
+      showNotification('No vault selected', 'info');
+    }
+  } catch (error) {
+    console.error('❌ VaultManager selection error:', error);
+    
+    // Try the direct method as final fallback
+    console.log('🔄 Trying direct vault selection as fallback...');
+    try {
+      await selectVault();
+    } catch (fallbackError) {
+      console.error('❌ Fallback selection also failed:', fallbackError);
+      showNotification(`Error selecting vault: ${error.message}`, 'error');
+    }
+  }
+};
+
+window.selectNewVault = async function() {
+  await window.selectVault();
+};
+
+window.switchToRecentVault = async function(vaultPath) {
+  if (!window.vaultManager) {
+    showNotification('Vault manager not initialized', 'error');
+    return;
+  }
+  
+  try {
+    await window.vaultManager.switchVault(vaultPath);
+    updateVaultInfo(vaultPath);
+    updateVaultStatusBar(vaultPath);
+    showNotification(`Switched to vault: ${vaultPath.split('/').pop() || vaultPath.split('\\\\').pop()}`, 'success');
+    
+    // Close dialogs
+    window.closeVaultDialog();
+    window.hideVaultSwitcher();
+    
+    // Refresh vault
+    await refreshVault();
+  } catch (error) {
+    showNotification(`Error switching vault: ${error.message}`, 'error');
+    console.error('Vault switching error:', error);
+  }
+};
+
+// Add missing global utility functions
+window.showProgressIndicator = function(message) {
+  const indicator = document.getElementById('progressIndicator');
+  const text = document.getElementById('progressText');
+  if (indicator && text) {
+    text.textContent = message || 'Loading...';
+    indicator.style.display = 'flex';
+  }
+};
+
+window.hideProgressIndicator = function() {
+  const indicator = document.getElementById('progressIndicator');
+  if (indicator) {
+    indicator.style.display = 'none';
+  }
+};
