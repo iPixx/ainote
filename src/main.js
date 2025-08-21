@@ -364,6 +364,9 @@ async function openFile(filePath) {
       // Create new editor/preview panel instance
       editorPreviewPanel = new EditorPreviewPanel(editorContent, appState);
       
+      // Initialize the panel
+      editorPreviewPanel.init();
+      
       // Listen for content changes from the editor component within the panel
       editorPreviewPanel.addEventListener('content_changed', () => {
         appState.markDirty(true);
@@ -868,12 +871,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     const VaultManagerModule = await import('./js/services/vault-manager.js');
     const AutoSaveModule = await import('./js/services/auto-save.js');
     
-    vaultManager = new VaultManagerModule.default(appState);
-    autoSave = new AutoSaveModule.default(appState);
+    // Store class references for static access
+    const AutoSave = AutoSaveModule.default;
     
-    // Make services globally accessible
+    vaultManager = new VaultManagerModule.default(appState);
+    autoSave = new AutoSave(appState);
+    
+    // Make services and class globally accessible
     window.vaultManager = vaultManager;
     window.autoSave = autoSave;
+    window.AutoSave = AutoSave; // Make AutoSave class globally accessible
     
     console.log('✅ VaultManager and AutoSave services initialized');
   } catch (error) {
@@ -1170,9 +1177,19 @@ window.addEventListener('DOMContentLoaded', async () => {
                 // Check if the file still exists before trying to open it
                 invoke('read_file', { filePath: initialState.currentFile })
                   .then(() => {
-                    setTimeout(() => {
-                      openFile(initialState.currentFile);
-                    }, 500);
+                    // Wait for all components to be fully initialized before restoring file
+                    const restoreFile = () => {
+                      if (document.getElementById('editorContent')) {
+                        console.log('✅ Editor container ready, restoring file...');
+                        openFile(initialState.currentFile);
+                      } else {
+                        console.log('⏳ Editor container not ready, retrying...');
+                        setTimeout(restoreFile, 200);
+                      }
+                    };
+                    
+                    // Start restoration attempt after a short delay
+                    setTimeout(restoreFile, 800);
                   })
                   .catch((error) => {
                     console.warn('Last opened file no longer exists:', error);
@@ -1221,18 +1238,26 @@ window.addEventListener('DOMContentLoaded', async () => {
       // If we have a file but no vault manager yet (shouldn't happen but fallback)
       if (!initialState.currentVault && vaultManager) {
         console.log('Found saved file without vault, attempting to restore file:', initialState.currentFile);
-        // Try to open the file directly
-        setTimeout(() => {
-          invoke('read_file', { filePath: initialState.currentFile })
-            .then(() => {
-              openFile(initialState.currentFile);
-            })
-            .catch((error) => {
-              console.warn('Cannot restore file without valid vault:', error);
-              appState.setCurrentFile(null);
-              updateCurrentFileName(null);
-            });
-        }, 1000);
+        // Try to open the file directly with proper timing
+        const restoreFileWithoutVault = () => {
+          if (document.getElementById('editorContent')) {
+            console.log('✅ Editor ready for fallback file restoration');
+            invoke('read_file', { filePath: initialState.currentFile })
+              .then(() => {
+                openFile(initialState.currentFile);
+              })
+              .catch((error) => {
+                console.warn('Cannot restore file without valid vault:', error);
+                appState.setCurrentFile(null);
+                updateCurrentFileName(null);
+              });
+          } else {
+            console.log('⏳ Editor not ready for fallback, retrying...');
+            setTimeout(restoreFileWithoutVault, 200);
+          }
+        };
+        
+        setTimeout(restoreFileWithoutVault, 1000);
       }
     }
   };
