@@ -1,0 +1,562 @@
+/**
+ * AI Status Panel Styles
+ * 
+ * Comprehensive styling for the AI service status indicators, connection UI,
+ * and settings configuration panel. Follows the existing design system
+ * and provides accessible, responsive interface elements.
+ */
+
+/* ===============================
+   AI Status Container
+   =============================== */
+
+.ai-status-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--space-4);
+  overflow-y: auto;
+  gap: var(--space-4);
+}
+
+/* ===============================
+   Status Display Section
+   =============================== */
+
+.ai-status-display {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.status-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.status-refresh-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  border: 1px solid var(--color-border-secondary);
+  border-radius: 0.375rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.status-refresh-btn:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-focus);
+}
+
+.status-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===============================
+   Status Indicator
+   =============================== */
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 0.5rem;
+  transition: all var(--transition-fast);
+}
+
+.status-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.status-label {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+  transition: color var(--transition-fast);
+}
+
+.status-description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-normal);
+}
+
+/* ===============================
+   Connection Details
+   =============================== */
+
+.connection-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background-color: var(--color-bg-tertiary);
+  border-radius: 0.375rem;
+  font-size: var(--font-size-sm);
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.detail-label {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.detail-value {
+  color: var(--color-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  text-align: right;
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ===============================
+   Action Buttons
+   =============================== */
+
+.status-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ai-action-btn {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-sm);
+  border-radius: 0.5rem;
+  transition: all var(--transition-fast);
+}
+
+.ai-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ===============================
+   Settings Panel
+   =============================== */
+
+.ai-settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  height: 100%;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.settings-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.settings-close-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  border-radius: 0.375rem;
+  font-size: var(--font-size-base);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.settings-close-btn:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+/* ===============================
+   Settings Form
+   =============================== */
+
+.ai-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.form-label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.form-input {
+  width: 100%;
+  padding: var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border-secondary);
+  border-radius: 0.375rem;
+  transition: all var(--transition-fast);
+  font-family: var(--font-family-mono);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-input:invalid {
+  border-color: var(--color-error);
+}
+
+.form-help {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  line-height: var(--line-height-normal);
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.form-actions .btn-primary,
+.form-actions .btn-secondary {
+  flex: 1;
+  padding: var(--space-3);
+  font-size: var(--font-size-sm);
+  border-radius: 0.5rem;
+}
+
+/* ===============================
+   Settings Help Section
+   =============================== */
+
+.settings-help {
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 0.5rem;
+}
+
+.settings-help h4 {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.settings-help ul {
+  margin: 0;
+  padding-left: var(--space-4);
+  list-style-type: disc;
+}
+
+.settings-help li {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-normal);
+  margin-bottom: var(--space-2);
+}
+
+.settings-help code {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  padding: var(--space-1) var(--space-2);
+  border-radius: 0.25rem;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+}
+
+/* ===============================
+   Error Messages
+   =============================== */
+
+.ai-error-message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 0.5rem;
+  margin-bottom: var(--space-4);
+}
+
+.error-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  color: var(--color-error);
+}
+
+.error-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.error-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-error);
+  margin-bottom: var(--space-1);
+}
+
+.error-description {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-normal);
+}
+
+.error-close {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  color: var(--color-error);
+  border-radius: 0.25rem;
+  font-size: var(--font-size-xs);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.error-close:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* ===============================
+   Status-Specific Styles
+   =============================== */
+
+/* Connected State */
+.status-indicator[data-status="connected"] {
+  border-color: var(--color-success);
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+.status-indicator[data-status="connected"] .status-icon {
+  animation: pulse-success 2s infinite;
+}
+
+/* Disconnected State */
+.status-indicator[data-status="disconnected"] {
+  border-color: var(--color-error);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+/* Connecting/Retrying State */
+.status-indicator[data-status="connecting"],
+.status-indicator[data-status="retrying"] {
+  border-color: var(--color-warning);
+  background-color: rgba(245, 158, 11, 0.05);
+}
+
+.status-indicator[data-status="connecting"] .status-icon,
+.status-indicator[data-status="retrying"] .status-icon {
+  animation: pulse-warning 1.5s infinite;
+}
+
+/* Failed State */
+.status-indicator[data-status="failed"] {
+  border-color: var(--color-error);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.status-indicator[data-status="failed"] .status-icon {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* ===============================
+   Animations
+   =============================== */
+
+@keyframes pulse-success {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.7; 
+    transform: scale(1.05);
+  }
+}
+
+@keyframes pulse-warning {
+  0%, 100% { 
+    opacity: 1;
+  }
+  50% { 
+    opacity: 0.5;
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+/* ===============================
+   Responsive Design
+   =============================== */
+
+@media (max-width: 767px) {
+  .ai-status-container {
+    padding: var(--space-3);
+  }
+  
+  .status-indicator {
+    flex-direction: column;
+    text-align: center;
+    gap: var(--space-2);
+  }
+  
+  .status-icon {
+    align-self: center;
+  }
+  
+  .connection-details {
+    font-size: var(--font-size-xs);
+  }
+  
+  .detail-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+  
+  .detail-value {
+    text-align: left;
+    width: 100%;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .settings-help {
+    margin-top: var(--space-4);
+    padding: var(--space-3);
+  }
+}
+
+/* ===============================
+   Accessibility Enhancements
+   =============================== */
+
+/* Focus visible for keyboard navigation */
+.status-refresh-btn:focus-visible,
+.settings-close-btn:focus-visible,
+.ai-action-btn:focus-visible,
+.form-input:focus-visible,
+.error-close:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .status-indicator {
+    border-width: 2px;
+  }
+  
+  .ai-error-message {
+    border-width: 2px;
+  }
+  
+  .form-input {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .status-icon {
+    animation: none !important;
+  }
+  
+  .status-indicator,
+  .form-input,
+  .ai-action-btn,
+  .status-refresh-btn,
+  .settings-close-btn,
+  .error-close {
+    transition: none !important;
+  }
+}
+
+/* ===============================
+   Print Styles
+   =============================== */
+
+@media print {
+  .ai-status-container {
+    overflow: visible;
+  }
+  
+  .ai-settings-panel,
+  .ai-error-message,
+  .status-actions {
+    display: none !important;
+  }
+  
+  .status-indicator {
+    break-inside: avoid;
+  }
+}

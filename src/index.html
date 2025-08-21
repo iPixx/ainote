@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="js/components/context-menu.css" />
     <link rel="stylesheet" href="js/components/markdown-editor.css" />
     <link rel="stylesheet" href="js/components/editor-preview-panel.css" />
+    <link rel="stylesheet" href="js/components/ai-status-panel.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>aiNote</title>
     <script type="module" src="/main.js" defer></script>
@@ -82,7 +83,7 @@
         <div class="resize-handle resize-handle-right" data-direction="horizontal" data-panel="editor"></div>
       </main>
 
-      <!-- AI Panel (Hidden in Phase 1) -->
+      <!-- AI Panel -->
       <aside class="ai-panel" id="aiPanel" style="display: none;">
         <header class="panel-header">
           <h2>AI Assistant</h2>
@@ -93,9 +94,7 @@
           </div>
         </header>
         <div class="ai-content" id="aiContent">
-          <div class="ai-placeholder">
-            <p>AI features coming in Phase 2</p>
-          </div>
+          <!-- AI Status Panel will be rendered here -->
         </div>
       </aside>
     </div>
