@@ -10,10 +10,12 @@ pub mod validation;
 pub mod file_operations;
 pub mod vault_operations;
 pub mod state_management;
+pub mod ollama_client;
 
 // Re-exports for commonly used types
 pub use errors::{FileSystemError, FileSystemResult};
 pub use types::{AppState, WindowState, LayoutState, FileInfo};
+pub use ollama_client::{OllamaClient, OllamaConfig, ConnectionStatus, ConnectionState, HealthResponse, OllamaClientError};
 
 // Tauri command implementations
 #[tauri::command]
