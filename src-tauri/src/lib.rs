@@ -185,18 +185,33 @@ fn get_vault_preferences() -> Result<Vec<String>, String> {
 // Ollama service commands
 #[tauri::command]
 async fn check_ollama_status() -> Result<ConnectionState, String> {
-    let client_lock = OLLAMA_CLIENT.read().await;
-    if let Some(client) = client_lock.as_ref() {
-        Ok(client.get_connection_state().await)
-    } else {
-        // Initialize client if not exists
-        drop(client_lock);
-        let mut client_lock = OLLAMA_CLIENT.write().await;
-        let client = OllamaClient::new();
-        let state = client.get_connection_state().await;
-        *client_lock = Some(client);
-        Ok(state)
-    }
+    eprintln!("🔍 [DEBUG RUST] check_ollama_status command called");
+    
+    let client = {
+        let client_lock = OLLAMA_CLIENT.read().await;
+        if let Some(client) = client_lock.as_ref() {
+            eprintln!("🔍 [DEBUG RUST] Using existing Ollama client instance");
+            client.clone()
+        } else {
+            eprintln!("🔍 [DEBUG RUST] No existing client found, creating new OllamaClient");
+            // Initialize client if not exists
+            drop(client_lock);
+            let mut client_lock = OLLAMA_CLIENT.write().await;
+            let new_client = OllamaClient::new();
+            eprintln!("🔍 [DEBUG RUST] Created new client with config: {:?}", new_client.get_config());
+            *client_lock = Some(new_client.clone());
+            new_client
+        }
+    };
+    
+    // Perform actual health check to get current status
+    eprintln!("🔍 [DEBUG RUST] Performing fresh health check");
+    let _health_result = client.check_health().await; // This updates the internal state
+    
+    // Now get the updated connection state
+    let state = client.get_connection_state().await;
+    eprintln!("🔍 [DEBUG RUST] Fresh connection state after health check: {:?}", state);
+    Ok(state)
 }
 
 #[tauri::command]
