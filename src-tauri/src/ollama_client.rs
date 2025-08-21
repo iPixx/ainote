@@ -69,7 +69,7 @@ impl Default for ConnectionState {
 }
 
 /// Main Ollama client for service detection and health monitoring
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OllamaClient {
     config: OllamaConfig,
     client: Client,
