@@ -23,6 +23,12 @@ let autoSave;
 // Window instance for state management
 let mainWindow;
 
+// Application start time for suppressing startup notifications
+let appStartTime = Date.now();
+
+// File opening state to prevent double-clicks
+let isFileOpening = false;
+
 /**
  * Update vault information display
  * @param {string|null} vaultPath - Path to the vault directory
@@ -319,7 +325,14 @@ function getFullPath(fileName) {
  * @param {string} filePath - Path to the file to open
  */
 async function openFile(filePath) {
+  if (isFileOpening) {
+    console.log('File opening already in progress, skipping');
+    return;
+  }
+  
+  isFileOpening = true;
   try {
+    console.log('Opening file:', filePath);
     const content = await invoke('read_file', { filePath });
     
     // Update state
@@ -388,9 +401,19 @@ async function openFile(filePath) {
     // Update view mode display based on current state
     updateViewModeDisplay();
     
-    showNotification(`Opened: ${fileName}`, 'success');
+    // Show success notification only if not restoring from startup
+    if (Date.now() - appStartTime > 3000) {
+      showNotification(`Opened: ${fileName}`, 'success');
+    }
+    
+    console.log('✅ File opened successfully:', fileName);
   } catch (error) {
+    console.error('Error opening file:', error);
     showNotification(`Error opening file: ${error}`, 'error');
+  } finally {
+    setTimeout(() => {
+      isFileOpening = false;
+    }, 500);
   }
 }
 
@@ -1098,9 +1121,18 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Verify vault is still valid and load it
     vaultManager.validateVault(initialState.currentVault).then(isValid => {
       if (isValid) {
+        updateVaultInfo(initialState.currentVault);
         updateVaultStatusBar(initialState.currentVault);
         // Auto-refresh vault on startup
-        refreshVault();
+        refreshVault().then(() => {
+          // Restore last opened file if available
+          if (initialState.currentFile) {
+            console.log('Restoring last opened file:', initialState.currentFile);
+            setTimeout(() => {
+              openFile(initialState.currentFile);
+            }, 1000);
+          }
+        });
       } else {
         // Vault no longer valid, clear it and show selection dialog
         appState.setVault(null);
@@ -1329,7 +1361,9 @@ async function populateRecentVaultsSwitcher() {
     
     list.appendChild(item);
   }
-}// Global functions for HTML onclick handlers
+}
+
+// Global functions for HTML onclick handlers
 window.showVaultDialog = function() {
   const dialog = document.getElementById('vaultDialog');
   if (dialog) {
@@ -1373,6 +1407,45 @@ window.hideVaultSwitcher = function() {
   const switcher = document.getElementById('vaultSwitcher');
   if (switcher) {
     switcher.style.display = 'none';
+  }
+};
+
+// Override selectVault to ensure proper vault dialog closing and status updates
+window.selectVault = async function() {
+  if (!window.vaultManager) {
+    window.showNotification('Vault manager not initialized', 'error');
+    return;
+  }
+  
+  try {
+    window.showProgressIndicator('Selecting vault...');
+    
+    const result = await window.vaultManager.selectVault();
+    if (result) {
+      await window.vaultManager.switchVault(result);
+      
+      // Update both vault displays
+      updateVaultInfo(result);
+      updateVaultStatusBar(result);
+      
+      // Close vault dialog
+      const vaultDialog = document.getElementById('vaultDialog');
+      if (vaultDialog) {
+        vaultDialog.style.display = 'none';
+      }
+      
+      window.showNotification(`Vault selected: ${result.split('/').pop() || result.split('\\\\').pop()}`, 'success');
+      
+      // Refresh vault
+      await window.refreshVault();
+    } else {
+      window.showNotification('No vault selected', 'info');
+    }
+  } catch (error) {
+    window.showNotification(`Error selecting vault: ${error.message}`, 'error');
+    console.error('Vault selection error:', error);
+  } finally {
+    window.hideProgressIndicator();
   }
 };
 
