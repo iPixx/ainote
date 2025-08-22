@@ -20,7 +20,10 @@ pub mod ollama_integration_tests;
 // Re-exports for commonly used types
 pub use errors::{FileSystemError, FileSystemResult};
 pub use types::{AppState, WindowState, LayoutState, FileInfo};
-pub use ollama_client::{OllamaClient, OllamaConfig, ConnectionStatus, ConnectionState, HealthResponse, OllamaClientError};
+pub use ollama_client::{
+    OllamaClient, OllamaConfig, ConnectionStatus, ConnectionState, HealthResponse, OllamaClientError,
+    ModelInfo, ModelCompatibility, ModelVerificationResult
+};
 
 // Global Ollama client instance
 static OLLAMA_CLIENT: once_cell::sync::Lazy<Arc<RwLock<Option<OllamaClient>>>> = 
@@ -301,6 +304,84 @@ async fn start_ollama_monitoring() -> Result<(), String> {
     Ok(())
 }
 
+// === MODEL MANAGEMENT TAURI COMMANDS ===
+
+#[tauri::command]
+async fn get_available_models() -> Result<Vec<ModelInfo>, String> {
+    let client_lock = OLLAMA_CLIENT.read().await;
+    
+    if let Some(client) = client_lock.as_ref() {
+        client.get_available_models().await
+            .map_err(|e| e.to_string())
+    } else {
+        drop(client_lock);
+        // Initialize client if not exists
+        let mut client_lock = OLLAMA_CLIENT.write().await;
+        let client = OllamaClient::new();
+        let result = client.get_available_models().await
+            .map_err(|e| e.to_string());
+        *client_lock = Some(client);
+        result
+    }
+}
+
+#[tauri::command]
+async fn verify_model(model_name: String) -> Result<ModelVerificationResult, String> {
+    let client_lock = OLLAMA_CLIENT.read().await;
+    
+    if let Some(client) = client_lock.as_ref() {
+        client.verify_model(&model_name).await
+            .map_err(|e| e.to_string())
+    } else {
+        drop(client_lock);
+        // Initialize client if not exists
+        let mut client_lock = OLLAMA_CLIENT.write().await;
+        let client = OllamaClient::new();
+        let result = client.verify_model(&model_name).await
+            .map_err(|e| e.to_string());
+        *client_lock = Some(client);
+        result
+    }
+}
+
+#[tauri::command]
+async fn is_nomic_embed_available() -> Result<bool, String> {
+    let client_lock = OLLAMA_CLIENT.read().await;
+    
+    if let Some(client) = client_lock.as_ref() {
+        client.is_nomic_embed_available().await
+            .map_err(|e| e.to_string())
+    } else {
+        drop(client_lock);
+        // Initialize client if not exists
+        let mut client_lock = OLLAMA_CLIENT.write().await;
+        let client = OllamaClient::new();
+        let result = client.is_nomic_embed_available().await
+            .map_err(|e| e.to_string());
+        *client_lock = Some(client);
+        result
+    }
+}
+
+#[tauri::command]
+async fn get_model_info(model_name: String) -> Result<Option<ModelInfo>, String> {
+    let client_lock = OLLAMA_CLIENT.read().await;
+    
+    if let Some(client) = client_lock.as_ref() {
+        client.get_model_info(&model_name).await
+            .map_err(|e| e.to_string())
+    } else {
+        drop(client_lock);
+        // Initialize client if not exists
+        let mut client_lock = OLLAMA_CLIENT.write().await;
+        let client = OllamaClient::new();
+        let result = client.get_model_info(&model_name).await
+            .map_err(|e| e.to_string());
+        *client_lock = Some(client);
+        result
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -398,7 +479,11 @@ pub fn run() {
             check_ollama_status,
             get_ollama_health,
             configure_ollama_url,
-            start_ollama_monitoring
+            start_ollama_monitoring,
+            get_available_models,
+            verify_model,
+            is_nomic_embed_available,
+            get_model_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1354,5 +1439,207 @@ mod tests {
 
         // Memory usage should be stable (can't directly measure, but operations should complete)
         // This test mainly ensures no memory leaks cause panics or failures
+    }
+
+    // === MODEL MANAGEMENT TAURI COMMAND TESTS ===
+
+    #[tokio::test]
+    async fn test_get_available_models_command() {
+        // Test get_available_models Tauri command (may fail without actual Ollama service)
+        let result = get_available_models().await;
+        
+        // Should either return models or a network error - both are valid responses
+        match result {
+            Ok(models) => {
+                println!("Found {} models", models.len());
+                // Verify structure of returned models
+                for model in models {
+                    assert!(!model.name.is_empty(), "Model name should not be empty");
+                }
+            }
+            Err(e) => {
+                println!("Expected network error (Ollama not available): {}", e);
+                // Network errors are expected in test environment without Ollama
+                assert!(e.contains("Connection") || e.contains("Network") || e.contains("timeout"));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_verify_model_command() {
+        // Test verify_model Tauri command
+        let model_name = "nomic-embed-text".to_string();
+        let result = verify_model(model_name.clone()).await;
+        
+        match result {
+            Ok(verification) => {
+                // Verify structure of verification result
+                assert_eq!(verification.model_name, model_name);
+                assert!(verification.verification_time_ms > 0);
+                println!("Model verification completed in {}ms", verification.verification_time_ms);
+            }
+            Err(e) => {
+                println!("Expected network error (Ollama not available): {}", e);
+                // Network errors are expected in test environment without Ollama
+                assert!(e.contains("Connection") || e.contains("Network") || e.contains("timeout"));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_is_nomic_embed_available_command() {
+        // Test is_nomic_embed_available Tauri command
+        let result = is_nomic_embed_available().await;
+        
+        match result {
+            Ok(is_available) => {
+                println!("Nomic embed availability: {}", is_available);
+                // Boolean result is always valid
+            }
+            Err(e) => {
+                println!("Expected network error (Ollama not available): {}", e);
+                // Network errors are expected in test environment without Ollama
+                assert!(e.contains("Connection") || e.contains("Network") || e.contains("timeout"));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_model_info_command() {
+        // Test get_model_info Tauri command
+        let model_name = "nomic-embed-text".to_string();
+        let result = get_model_info(model_name.clone()).await;
+        
+        match result {
+            Ok(model_info) => {
+                match model_info {
+                    Some(info) => {
+                        assert_eq!(info.name, model_name);
+                        println!("Found model info for: {}", info.name);
+                    }
+                    None => {
+                        println!("Model {} not found (expected in test environment)", model_name);
+                    }
+                }
+            }
+            Err(e) => {
+                println!("Expected network error (Ollama not available): {}", e);
+                // Network errors are expected in test environment without Ollama
+                assert!(e.contains("Connection") || e.contains("Network") || e.contains("timeout"));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_model_management_command_performance() {
+        use std::time::Instant;
+        
+        // Test that model management commands complete within reasonable time
+        let start = Instant::now();
+        let _result = get_available_models().await;
+        let get_models_duration = start.elapsed();
+        
+        let start = Instant::now();
+        let _result = verify_model("test-model".to_string()).await;
+        let verify_model_duration = start.elapsed();
+        
+        let start = Instant::now();
+        let _result = is_nomic_embed_available().await;
+        let check_nomic_duration = start.elapsed();
+        
+        let start = Instant::now();
+        let _result = get_model_info("test-model".to_string()).await;
+        let get_info_duration = start.elapsed();
+        
+        println!("Model management command performance:");
+        println!("  get_available_models: {:?}", get_models_duration);
+        println!("  verify_model: {:?}", verify_model_duration);
+        println!("  is_nomic_embed_available: {:?}", check_nomic_duration);
+        println!("  get_model_info: {:?}", get_info_duration);
+        
+        // All commands should complete within reasonable time (allowing for network timeouts)
+        assert!(get_models_duration < tokio::time::Duration::from_millis(500));
+        assert!(verify_model_duration < tokio::time::Duration::from_millis(500));
+        assert!(check_nomic_duration < tokio::time::Duration::from_millis(500));
+        assert!(get_info_duration < tokio::time::Duration::from_millis(500));
+    }
+
+    #[tokio::test]
+    async fn test_model_management_concurrent_access() {
+        use tokio::task;
+        
+        // Test concurrent access to model management commands
+        let mut handles = Vec::new();
+        
+        for i in 0..5 {
+            let handle = task::spawn(async move {
+                let model_name = format!("test-model-{}", i);
+                
+                // Test various commands concurrently
+                let _models = get_available_models().await;
+                let _verification = verify_model(model_name.clone()).await;
+                let _available = is_nomic_embed_available().await;
+                let _info = get_model_info(model_name).await;
+                
+                i // Return task identifier
+            });
+            handles.push(handle);
+        }
+        
+        // All concurrent tasks should complete without panics
+        for handle in handles {
+            let task_id = handle.await.expect("Concurrent task should complete");
+            assert!(task_id < 5);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_model_management_client_state_consistency() {
+        // Test that the global OLLAMA_CLIENT state remains consistent across model management operations
+        
+        // First operation should initialize client
+        let _result1 = get_available_models().await;
+        
+        // Subsequent operations should reuse existing client
+        let _result2 = verify_model("test".to_string()).await;
+        let _result3 = is_nomic_embed_available().await;
+        let _result4 = get_model_info("test".to_string()).await;
+        
+        // Change configuration and verify it affects model management
+        let custom_url = "http://custom-ollama:11434".to_string();
+        let config_result = configure_ollama_url(custom_url.clone()).await;
+        assert!(config_result.is_ok());
+        
+        // Model management should now use the new configuration
+        let _result5 = get_available_models().await;
+        // Can't directly verify the URL was used, but operation should complete without panics
+    }
+
+    #[tokio::test]
+    async fn test_model_verification_result_completeness() {
+        // Test that ModelVerificationResult contains all required information
+        let test_model = "nomic-embed-text".to_string();
+        let result = verify_model(test_model.clone()).await;
+        
+        match result {
+            Ok(verification) => {
+                // Verify all fields are populated correctly
+                assert_eq!(verification.model_name, test_model);
+                assert!(verification.verification_time_ms > 0);
+                
+                // Verify logical consistency
+                if verification.is_available {
+                    assert!(verification.info.is_some());
+                } else {
+                    assert!(matches!(verification.is_compatible, ModelCompatibility::Unknown));
+                }
+                
+                println!("Verification result: {:?}", verification);
+            }
+            Err(e) => {
+                // Network error is expected in test environment
+                assert!(e.contains("Connection") || e.contains("Network") || e.contains("timeout"));
+            }
+        }
     }
 }
