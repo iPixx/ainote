@@ -44,6 +44,36 @@ pub struct HealthResponse {
     pub models: Option<Vec<String>>,
 }
 
+/// Model information from Ollama API
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ModelInfo {
+    pub name: String,
+    pub size: Option<u64>,
+    pub digest: Option<String>,
+    pub modified_at: Option<String>,
+    pub template: Option<String>,
+    pub parameter_size: Option<String>,
+    pub quantization_level: Option<String>,
+}
+
+/// Model compatibility status for embedding models
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ModelCompatibility {
+    Compatible,
+    Incompatible { reason: String },
+    Unknown,
+}
+
+/// Model verification result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelVerificationResult {
+    pub model_name: String,
+    pub is_available: bool,
+    pub is_compatible: ModelCompatibility,
+    pub info: Option<ModelInfo>,
+    pub verification_time_ms: u64,
+}
+
 /// Connection state information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionState {
@@ -278,6 +308,159 @@ impl OllamaClient {
     /// Get configuration
     pub fn get_config(&self) -> &OllamaConfig {
         &self.config
+    }
+
+    // === MODEL MANAGEMENT METHODS ===
+
+    /// Get list of available models from Ollama
+    pub async fn get_available_models(&self) -> Result<Vec<ModelInfo>, OllamaClientError> {
+        let start_time = Instant::now();
+        let models_url = format!("{}/api/tags", self.config.base_url);
+        
+        match self.client.get(&models_url).send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    let json: serde_json::Value = response.json().await
+                        .map_err(|e| OllamaClientError::ConfigError { 
+                            message: format!("Failed to parse models response: {}", e) 
+                        })?;
+                    
+                    let models = json.get("models")
+                        .and_then(|m| m.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|model| {
+                                    let name = model.get("name").and_then(|n| n.as_str())?;
+                                    Some(ModelInfo {
+                                        name: name.to_string(),
+                                        size: model.get("size").and_then(|s| s.as_u64()),
+                                        digest: model.get("digest").and_then(|d| d.as_str()).map(|s| s.to_string()),
+                                        modified_at: model.get("modified_at").and_then(|m| m.as_str()).map(|s| s.to_string()),
+                                        template: model.get("template").and_then(|t| t.as_str()).map(|s| s.to_string()),
+                                        parameter_size: model.get("details").and_then(|d| d.get("parameter_size")).and_then(|p| p.as_str()).map(|s| s.to_string()),
+                                        quantization_level: model.get("details").and_then(|d| d.get("quantization_level")).and_then(|q| q.as_str()).map(|s| s.to_string()),
+                                    })
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+
+                    let elapsed = start_time.elapsed();
+                    if elapsed > Duration::from_millis(5000) {
+                        eprintln!("Warning: Model list retrieval took {:?} (target: <5s)", elapsed);
+                    }
+
+                    Ok(models)
+                } else {
+                    Err(OllamaClientError::HttpError {
+                        status_code: response.status().as_u16(),
+                        message: format!("Failed to get models: HTTP {}", response.status()),
+                    })
+                }
+            },
+            Err(e) => Err(OllamaClientError::NetworkError {
+                message: format!("Failed to connect to Ollama for model list: {}", e),
+                is_timeout: e.is_timeout(),
+            })
+        }
+    }
+
+    /// Verify if a specific model is available and compatible
+    pub async fn verify_model(&self, model_name: &str) -> Result<ModelVerificationResult, OllamaClientError> {
+        let start_time = Instant::now();
+        
+        // Get all available models
+        let available_models = self.get_available_models().await?;
+        
+        // Find the requested model
+        let model_info = available_models.iter()
+            .find(|model| model.name == model_name)
+            .cloned();
+        
+        let is_available = model_info.is_some();
+        
+        // Check compatibility for embedding models
+        let is_compatible = if is_available {
+            self.check_model_compatibility(model_name)
+        } else {
+            ModelCompatibility::Unknown
+        };
+        
+        let elapsed = start_time.elapsed();
+        
+        Ok(ModelVerificationResult {
+            model_name: model_name.to_string(),
+            is_available,
+            is_compatible,
+            info: model_info,
+            verification_time_ms: elapsed.as_millis() as u64,
+        })
+    }
+
+    /// Check if a model is compatible for embedding use
+    fn check_model_compatibility(&self, model_name: &str) -> ModelCompatibility {
+        // Known compatible embedding models
+        let compatible_models = vec![
+            "nomic-embed-text",
+            "nomic-embed-text:latest",
+            "mxbai-embed-large",
+            "mxbai-embed-large:latest",
+            "all-minilm",
+            "all-minilm:latest",
+        ];
+        
+        let embedding_patterns = vec![
+            "embed",
+            "embedding",
+            "sentence",
+            "nomic",
+            "mxbai",
+            "minilm",
+        ];
+        
+        let model_lower = model_name.to_lowercase();
+        
+        // Check exact matches first
+        if compatible_models.iter().any(|&compatible| model_lower == compatible.to_lowercase()) {
+            return ModelCompatibility::Compatible;
+        }
+        
+        // Check if model name contains embedding-related patterns
+        if embedding_patterns.iter().any(|&pattern| model_lower.contains(pattern)) {
+            return ModelCompatibility::Compatible;
+        }
+        
+        // Check if it's a chat/completion model (incompatible for embeddings)
+        let incompatible_patterns = vec![
+            "llama",
+            "mistral", 
+            "codellama",
+            "chat",
+            "instruct",
+            "vicuna",
+            "alpaca",
+        ];
+        
+        if incompatible_patterns.iter().any(|&pattern| model_lower.contains(pattern)) {
+            return ModelCompatibility::Incompatible { 
+                reason: format!("Model '{}' appears to be a chat/completion model, not an embedding model", model_name) 
+            };
+        }
+        
+        // Unknown model type
+        ModelCompatibility::Unknown
+    }
+
+    /// Check if the specific nomic-embed-text model is available
+    pub async fn is_nomic_embed_available(&self) -> Result<bool, OllamaClientError> {
+        let verification = self.verify_model("nomic-embed-text").await?;
+        Ok(verification.is_available && matches!(verification.is_compatible, ModelCompatibility::Compatible))
+    }
+
+    /// Get model information for a specific model
+    pub async fn get_model_info(&self, model_name: &str) -> Result<Option<ModelInfo>, OllamaClientError> {
+        let models = self.get_available_models().await?;
+        Ok(models.into_iter().find(|model| model.name == model_name))
     }
 }
 
@@ -579,5 +762,273 @@ mod tests {
         // Multiple reads should return consistent data
         assert_eq!(state1.status, state2.status);
         assert_eq!(state1.retry_count, state2.retry_count);
+    }
+
+    // === MODEL MANAGEMENT TESTS ===
+
+    #[tokio::test]
+    async fn test_model_info_serialization() {
+        let model_info = ModelInfo {
+            name: "nomic-embed-text".to_string(),
+            size: Some(274_000_000),
+            digest: Some("sha256:123abc".to_string()),
+            modified_at: Some("2024-01-01T00:00:00Z".to_string()),
+            template: Some("embed".to_string()),
+            parameter_size: Some("137M".to_string()),
+            quantization_level: Some("f16".to_string()),
+        };
+
+        let serialized = serde_json::to_string(&model_info).unwrap();
+        let deserialized: ModelInfo = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.name, "nomic-embed-text");
+        assert_eq!(deserialized.size, Some(274_000_000));
+        assert_eq!(deserialized.digest, Some("sha256:123abc".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_model_compatibility_serialization() {
+        let compatibilities = vec![
+            ModelCompatibility::Compatible,
+            ModelCompatibility::Unknown,
+            ModelCompatibility::Incompatible { 
+                reason: "Not an embedding model".to_string() 
+            },
+        ];
+
+        for compatibility in compatibilities {
+            let serialized = serde_json::to_string(&compatibility).unwrap();
+            let deserialized: ModelCompatibility = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized, compatibility);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_model_verification_result_serialization() {
+        let result = ModelVerificationResult {
+            model_name: "nomic-embed-text".to_string(),
+            is_available: true,
+            is_compatible: ModelCompatibility::Compatible,
+            info: Some(ModelInfo {
+                name: "nomic-embed-text".to_string(),
+                size: Some(274_000_000),
+                digest: None,
+                modified_at: None,
+                template: None,
+                parameter_size: None,
+                quantization_level: None,
+            }),
+            verification_time_ms: 150,
+        };
+
+        let serialized = serde_json::to_string(&result).unwrap();
+        let deserialized: ModelVerificationResult = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.model_name, "nomic-embed-text");
+        assert_eq!(deserialized.is_available, true);
+        assert_eq!(deserialized.is_compatible, ModelCompatibility::Compatible);
+        assert_eq!(deserialized.verification_time_ms, 150);
+    }
+
+    #[tokio::test]
+    async fn test_model_compatibility_logic() {
+        let client = OllamaClient::new();
+
+        // Test compatible models
+        let compatible_tests = vec![
+            "nomic-embed-text",
+            "nomic-embed-text:latest",
+            "mxbai-embed-large",
+            "all-minilm",
+            "custom-embed-model",
+            "sentence-transformer",
+        ];
+
+        for model in compatible_tests {
+            let compatibility = client.check_model_compatibility(model);
+            assert_eq!(compatibility, ModelCompatibility::Compatible, 
+                      "Model '{}' should be compatible", model);
+        }
+
+        // Test incompatible models
+        let incompatible_tests = vec![
+            "llama2",
+            "llama3:instruct",
+            "mistral",
+            "codellama",
+            "vicuna-chat",
+            "alpaca-7b",
+        ];
+
+        for model in incompatible_tests {
+            let compatibility = client.check_model_compatibility(model);
+            assert!(matches!(compatibility, ModelCompatibility::Incompatible { .. }), 
+                   "Model '{}' should be incompatible", model);
+        }
+
+        // Test unknown models
+        let unknown_tests = vec![
+            "random-model",
+            "custom-unknown",
+            "test-model-123",
+        ];
+
+        for model in unknown_tests {
+            let compatibility = client.check_model_compatibility(model);
+            assert_eq!(compatibility, ModelCompatibility::Unknown, 
+                      "Model '{}' should be unknown", model);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_model_compatibility_case_insensitive() {
+        let client = OllamaClient::new();
+
+        let test_cases = vec![
+            ("NOMIC-EMBED-TEXT", ModelCompatibility::Compatible),
+            ("NoMiC-EmBeD-tExT:LaTeSt", ModelCompatibility::Compatible),
+            ("LLAMA2", ModelCompatibility::Incompatible { reason: String::new() }),
+            ("MiStRaL", ModelCompatibility::Incompatible { reason: String::new() }),
+        ];
+
+        for (model, expected) in test_cases {
+            let compatibility = client.check_model_compatibility(model);
+            match (compatibility, expected) {
+                (ModelCompatibility::Compatible, ModelCompatibility::Compatible) => {},
+                (ModelCompatibility::Incompatible { .. }, ModelCompatibility::Incompatible { .. }) => {},
+                (actual, expected) => panic!("Model '{}': expected {:?}, got {:?}", model, expected, actual),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_model_verification_performance() {
+        use std::time::Instant;
+        
+        let client = OllamaClient::new();
+        
+        // Test performance of compatibility checking (should be fast)
+        let start = Instant::now();
+        for _ in 0..1000 {
+            let _compatibility = client.check_model_compatibility("nomic-embed-text");
+        }
+        let elapsed = start.elapsed();
+        
+        // 1000 compatibility checks should complete in <10ms
+        assert!(elapsed < Duration::from_millis(10), 
+               "Compatibility checking too slow: {:?}", elapsed);
+        
+        println!("Compatibility check performance: {:?} for 1000 operations", elapsed);
+    }
+
+    #[tokio::test]
+    async fn test_model_info_memory_usage() {
+        // Test that ModelInfo structures use reasonable memory
+        let model_info = ModelInfo {
+            name: "nomic-embed-text".to_string(),
+            size: Some(274_000_000),
+            digest: Some("sha256:abcd1234".to_string()),
+            modified_at: Some("2024-01-01T00:00:00Z".to_string()),
+            template: Some("embed template".to_string()),
+            parameter_size: Some("137M".to_string()),
+            quantization_level: Some("f16".to_string()),
+        };
+
+        let model_size = std::mem::size_of_val(&model_info);
+        
+        // ModelInfo should be reasonably sized (<1KB)
+        assert!(model_size < 1024, "ModelInfo too large: {} bytes", model_size);
+        
+        println!("ModelInfo memory usage: {} bytes", model_size);
+    }
+
+    #[tokio::test]
+    async fn test_model_verification_result_construction() {
+        let _client = OllamaClient::new();
+        
+        // Test verification result for available compatible model
+        let model_info = ModelInfo {
+            name: "nomic-embed-text".to_string(),
+            size: Some(274_000_000),
+            digest: None,
+            modified_at: None,
+            template: None,
+            parameter_size: None,
+            quantization_level: None,
+        };
+        
+        let result = ModelVerificationResult {
+            model_name: "nomic-embed-text".to_string(),
+            is_available: true,
+            is_compatible: ModelCompatibility::Compatible,
+            info: Some(model_info),
+            verification_time_ms: 100,
+        };
+        
+        assert_eq!(result.model_name, "nomic-embed-text");
+        assert!(result.is_available);
+        assert_eq!(result.is_compatible, ModelCompatibility::Compatible);
+        assert!(result.info.is_some());
+        assert_eq!(result.verification_time_ms, 100);
+        
+        // Test verification result for unavailable model
+        let unavailable_result = ModelVerificationResult {
+            model_name: "missing-model".to_string(),
+            is_available: false,
+            is_compatible: ModelCompatibility::Unknown,
+            info: None,
+            verification_time_ms: 50,
+        };
+        
+        assert!(!unavailable_result.is_available);
+        assert!(unavailable_result.info.is_none());
+        assert_eq!(unavailable_result.is_compatible, ModelCompatibility::Unknown);
+    }
+
+    #[tokio::test]
+    async fn test_embedding_model_patterns() {
+        let client = OllamaClient::new();
+        
+        // Test various embedding model patterns
+        let embedding_patterns = vec![
+            "sentence-transformers/all-MiniLM-L6-v2",
+            "instructor-embed",
+            "bge-large-en",
+            "e5-large-v2",
+            "gte-large", 
+            "text-embedding-ada-002",
+            "multilingual-embed",
+        ];
+        
+        for pattern in embedding_patterns {
+            let compatibility = client.check_model_compatibility(pattern);
+            assert_eq!(compatibility, ModelCompatibility::Compatible,
+                      "Pattern '{}' should be recognized as embedding model", pattern);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_model_name_edge_cases() {
+        let client = OllamaClient::new();
+        
+        // Test edge cases in model names
+        let edge_cases = vec![
+            ("", ModelCompatibility::Unknown),
+            ("embed", ModelCompatibility::Compatible),
+            ("llama", ModelCompatibility::Incompatible { reason: String::new() }),
+            ("nomic", ModelCompatibility::Compatible),
+            ("embed-llama", ModelCompatibility::Compatible), // embed takes precedence
+            ("llama-embed", ModelCompatibility::Compatible), // embed takes precedence
+        ];
+        
+        for (model_name, expected) in edge_cases {
+            let compatibility = client.check_model_compatibility(model_name);
+            match (compatibility, expected) {
+                (ModelCompatibility::Compatible, ModelCompatibility::Compatible) => {},
+                (ModelCompatibility::Incompatible { .. }, ModelCompatibility::Incompatible { .. }) => {},
+                (ModelCompatibility::Unknown, ModelCompatibility::Unknown) => {},
+                (actual, expected) => panic!("Model '{}': expected {:?}, got {:?}", model_name, expected, actual),
+            }
+        }
     }
 }
