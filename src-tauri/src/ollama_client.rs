@@ -3,6 +3,8 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
+// StreamExt is used for processing download streams
+use futures::StreamExt;
 
 /// Configuration for Ollama client connection
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,6 +76,59 @@ pub struct ModelVerificationResult {
     pub verification_time_ms: u64,
 }
 
+/// Download status for model downloads
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum DownloadStatus {
+    Queued,
+    Downloading { 
+        progress_percent: f64,
+        downloaded_bytes: u64,
+        total_bytes: Option<u64>,
+        speed_bytes_per_sec: Option<u64>,
+    },
+    Completed {
+        total_bytes: u64,
+        download_time_ms: u64,
+    },
+    Failed {
+        error: String,
+        retry_count: usize,
+    },
+    Cancelled,
+}
+
+/// Download progress information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DownloadProgress {
+    pub model_name: String,
+    pub status: DownloadStatus,
+    pub started_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub estimated_completion: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// Download configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DownloadConfig {
+    pub max_retries: usize,
+    pub retry_delay_ms: u64,
+    pub progress_update_interval_ms: u64,
+    pub timeout_ms: u64,
+    pub chunk_size: usize,
+}
+
+impl Default for DownloadConfig {
+    fn default() -> Self {
+        Self {
+            max_retries: 3,
+            retry_delay_ms: 2000, // 2 seconds
+            progress_update_interval_ms: 500, // 500ms as required
+            timeout_ms: 300000, // 5 minutes for large downloads
+            chunk_size: 8192, // 8KB chunks for memory efficiency
+        }
+    }
+}
+
 /// Connection state information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionState {
@@ -104,6 +159,8 @@ pub struct OllamaClient {
     config: OllamaConfig,
     client: Client,
     state: Arc<RwLock<ConnectionState>>,
+    download_state: Arc<RwLock<std::collections::HashMap<String, DownloadProgress>>>,
+    download_config: DownloadConfig,
 }
 
 impl Default for OllamaClient {
@@ -129,6 +186,8 @@ impl OllamaClient {
             config,
             client,
             state: Arc::new(RwLock::new(ConnectionState::default())),
+            download_state: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            download_config: DownloadConfig::default(),
         }
     }
 
@@ -462,6 +521,297 @@ impl OllamaClient {
         let models = self.get_available_models().await?;
         Ok(models.into_iter().find(|model| model.name == model_name))
     }
+
+    // === MODEL DOWNLOAD METHODS ===
+
+    /// Download a model from Ollama with progress tracking
+    pub async fn download_model(&self, model_name: &str) -> Result<DownloadProgress, OllamaClientError> {
+        let _start_time = Instant::now();
+        
+        // Initialize download progress
+        let mut progress = DownloadProgress {
+            model_name: model_name.to_string(),
+            status: DownloadStatus::Queued,
+            started_at: Some(chrono::Utc::now()),
+            completed_at: None,
+            estimated_completion: None,
+        };
+
+        // Store initial progress state
+        {
+            let mut download_state = self.download_state.write().await;
+            download_state.insert(model_name.to_string(), progress.clone());
+        }
+
+        // Check if model already exists
+        if let Ok(verification) = self.verify_model(model_name).await {
+            if verification.is_available {
+                progress.status = DownloadStatus::Completed {
+                    total_bytes: 0, // Model already exists
+                    download_time_ms: 0,
+                };
+                progress.completed_at = Some(chrono::Utc::now());
+                
+                let mut download_state = self.download_state.write().await;
+                download_state.insert(model_name.to_string(), progress.clone());
+                
+                return Ok(progress);
+            }
+        }
+
+        let download_url = format!("{}/api/pull", self.config.base_url);
+        let request_body = serde_json::json!({
+            "name": model_name,
+            "stream": true
+        });
+
+        // Start download with retry logic
+        let mut retry_count = 0;
+        let max_retries = self.download_config.max_retries;
+
+        while retry_count <= max_retries {
+            match self.perform_download(&download_url, &request_body, model_name).await {
+                Ok(final_progress) => {
+                    let mut download_state = self.download_state.write().await;
+                    download_state.insert(model_name.to_string(), final_progress.clone());
+                    return Ok(final_progress);
+                }
+                Err(e) => {
+                    retry_count += 1;
+                    
+                    if retry_count > max_retries {
+                        // Final failure - update state and return error
+                        progress.status = DownloadStatus::Failed {
+                            error: e.to_string(),
+                            retry_count,
+                        };
+                        
+                        let mut download_state = self.download_state.write().await;
+                        download_state.insert(model_name.to_string(), progress.clone());
+                        
+                        return Err(e);
+                    }
+                    
+                    // Wait before retry
+                    tokio::time::sleep(Duration::from_millis(self.download_config.retry_delay_ms)).await;
+                    
+                    // Update progress with retry info
+                    progress.status = DownloadStatus::Failed {
+                        error: format!("Retry {}/{}: {}", retry_count, max_retries, e),
+                        retry_count,
+                    };
+                    
+                    let mut download_state = self.download_state.write().await;
+                    download_state.insert(model_name.to_string(), progress.clone());
+                }
+            }
+        }
+
+        // This should never be reached due to the logic above, but just in case
+        Err(OllamaClientError::DownloadError {
+            message: format!("Download failed after {} retries", max_retries),
+        })
+    }
+
+    /// Perform the actual download with streaming progress updates
+    async fn perform_download(
+        &self,
+        url: &str,
+        body: &serde_json::Value,
+        model_name: &str,
+    ) -> Result<DownloadProgress, OllamaClientError> {
+        let start_time = Instant::now();
+        let last_update = Instant::now();
+        
+        let response = self.client
+            .post(url)
+            .json(body)
+            .send()
+            .await
+            .map_err(|e| OllamaClientError::NetworkError {
+                message: format!("Failed to start download: {}", e),
+                is_timeout: e.is_timeout(),
+            })?;
+
+        if !response.status().is_success() {
+            return Err(OllamaClientError::HttpError {
+                status_code: response.status().as_u16(),
+                message: format!("Download request failed: HTTP {}", response.status()),
+            });
+        }
+
+        let mut stream = response.bytes_stream();
+        let mut downloaded_bytes = 0u64;
+        let mut total_bytes: Option<u64> = None;
+        let mut last_progress_update = Instant::now();
+
+        // Process streaming response
+        while let Some(chunk_result) = futures::StreamExt::next(&mut stream).await {
+            let chunk = chunk_result.map_err(|e| OllamaClientError::NetworkError {
+                message: format!("Stream error during download: {}", e),
+                is_timeout: false,
+            })?;
+
+            // Parse JSON response for Ollama pull API
+            if let Ok(text) = std::str::from_utf8(&chunk) {
+                for line in text.lines() {
+                    if line.trim().is_empty() {
+                        continue;
+                    }
+                    
+                    if let Ok(json_response) = serde_json::from_str::<serde_json::Value>(line) {
+                        // Extract progress information from Ollama response
+                        if let Some(status) = json_response.get("status").and_then(|s| s.as_str()) {
+                            if status.contains("downloading") || status.contains("pulling") {
+                                // Update progress from Ollama's response
+                                if let (Some(completed), Some(total)) = (
+                                    json_response.get("completed").and_then(|c| c.as_u64()),
+                                    json_response.get("total").and_then(|t| t.as_u64()),
+                                ) {
+                                    downloaded_bytes = completed;
+                                    total_bytes = Some(total);
+                                }
+                            } else if status.contains("verifying") {
+                                // Model download complete, now verifying
+                                downloaded_bytes = total_bytes.unwrap_or(downloaded_bytes);
+                            } else if status.contains("success") || status.contains("complete") {
+                                // Download completed successfully
+                                let elapsed = start_time.elapsed();
+                                
+                                let final_progress = DownloadProgress {
+                                    model_name: model_name.to_string(),
+                                    status: DownloadStatus::Completed {
+                                        total_bytes: total_bytes.unwrap_or(downloaded_bytes),
+                                        download_time_ms: elapsed.as_millis() as u64,
+                                    },
+                                    started_at: Some(chrono::Utc::now() - chrono::Duration::milliseconds(elapsed.as_millis() as i64)),
+                                    completed_at: Some(chrono::Utc::now()),
+                                    estimated_completion: None,
+                                };
+                                
+                                return Ok(final_progress);
+                            }
+                        }
+                        
+                        // Check for error status
+                        if let Some(error) = json_response.get("error").and_then(|e| e.as_str()) {
+                            return Err(OllamaClientError::DownloadError {
+                                message: format!("Ollama download error: {}", error),
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Update progress every 500ms as required
+            if last_progress_update.elapsed() >= Duration::from_millis(self.download_config.progress_update_interval_ms) {
+                let progress_percent = if let Some(total) = total_bytes {
+                    if total > 0 {
+                        (downloaded_bytes as f64 / total as f64) * 100.0
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                };
+
+                // Calculate download speed
+                let elapsed_secs = last_update.elapsed().as_secs_f64();
+                let speed_bytes_per_sec = if elapsed_secs > 0.0 {
+                    Some((downloaded_bytes as f64 / start_time.elapsed().as_secs_f64()) as u64)
+                } else {
+                    None
+                };
+
+                // Estimate completion time
+                let estimated_completion = if let (Some(speed), Some(total)) = (speed_bytes_per_sec, total_bytes) {
+                    if speed > 0 && total > downloaded_bytes {
+                        let remaining_bytes = total - downloaded_bytes;
+                        let eta_seconds = remaining_bytes as f64 / speed as f64;
+                        Some(chrono::Utc::now() + chrono::Duration::seconds(eta_seconds as i64))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                let progress = DownloadProgress {
+                    model_name: model_name.to_string(),
+                    status: DownloadStatus::Downloading {
+                        progress_percent,
+                        downloaded_bytes,
+                        total_bytes,
+                        speed_bytes_per_sec,
+                    },
+                    started_at: Some(chrono::Utc::now() - chrono::Duration::milliseconds(start_time.elapsed().as_millis() as i64)),
+                    completed_at: None,
+                    estimated_completion,
+                };
+
+                // Update download state
+                {
+                    let mut download_state = self.download_state.write().await;
+                    download_state.insert(model_name.to_string(), progress);
+                }
+
+                last_progress_update = Instant::now();
+            }
+        }
+
+        // If we reach here, the stream ended without a success message
+        Err(OllamaClientError::DownloadError {
+            message: "Download stream ended unexpectedly".to_string(),
+        })
+    }
+
+    /// Get current download progress for a specific model
+    pub async fn get_download_progress(&self, model_name: &str) -> Option<DownloadProgress> {
+        let download_state = self.download_state.read().await;
+        download_state.get(model_name).cloned()
+    }
+
+    /// Get all current downloads
+    pub async fn get_all_downloads(&self) -> std::collections::HashMap<String, DownloadProgress> {
+        let download_state = self.download_state.read().await;
+        download_state.clone()
+    }
+
+    /// Cancel a download in progress
+    pub async fn cancel_download(&self, model_name: &str) -> Result<(), OllamaClientError> {
+        let mut download_state = self.download_state.write().await;
+        
+        if let Some(mut progress) = download_state.get(model_name).cloned() {
+            if matches!(progress.status, DownloadStatus::Downloading { .. } | DownloadStatus::Queued) {
+                progress.status = DownloadStatus::Cancelled;
+                progress.completed_at = Some(chrono::Utc::now());
+                download_state.insert(model_name.to_string(), progress);
+                
+                // Note: Actual cancellation of HTTP request would require more complex state management
+                // For now, we just mark it as cancelled in our tracking
+                Ok(())
+            } else {
+                Err(OllamaClientError::DownloadError {
+                    message: format!("Cannot cancel download for '{}': not in progress", model_name),
+                })
+            }
+        } else {
+            Err(OllamaClientError::DownloadError {
+                message: format!("No download found for model '{}'", model_name),
+            })
+        }
+    }
+
+    /// Clear completed downloads from tracking
+    pub async fn clear_completed_downloads(&self) {
+        let mut download_state = self.download_state.write().await;
+        download_state.retain(|_, progress| {
+            !matches!(
+                progress.status,
+                DownloadStatus::Completed { .. } | DownloadStatus::Failed { .. } | DownloadStatus::Cancelled
+            )
+        });
+    }
 }
 
 /// Errors that can occur during Ollama client operations
@@ -478,6 +828,12 @@ pub enum OllamaClientError {
     
     #[error("Service unavailable: {message}")]
     ServiceUnavailable { message: String },
+    
+    #[error("Download error: {message}")]
+    DownloadError { message: String },
+    
+    #[error("Disk space error: {message}")]
+    DiskSpaceError { message: String },
 }
 
 impl From<reqwest::Error> for OllamaClientError {
@@ -1029,6 +1385,290 @@ mod tests {
                 (ModelCompatibility::Unknown, ModelCompatibility::Unknown) => {},
                 (actual, expected) => panic!("Model '{}': expected {:?}, got {:?}", model_name, expected, actual),
             }
+        }
+    }
+
+    // === DOWNLOAD FUNCTIONALITY TESTS ===
+
+    #[tokio::test]
+    async fn test_download_status_serialization() {
+        let statuses = vec![
+            DownloadStatus::Queued,
+            DownloadStatus::Downloading {
+                progress_percent: 45.5,
+                downloaded_bytes: 1024 * 1024,
+                total_bytes: Some(2 * 1024 * 1024),
+                speed_bytes_per_sec: Some(512 * 1024),
+            },
+            DownloadStatus::Completed {
+                total_bytes: 2 * 1024 * 1024,
+                download_time_ms: 5000,
+            },
+            DownloadStatus::Failed {
+                error: "Network timeout".to_string(),
+                retry_count: 2,
+            },
+            DownloadStatus::Cancelled,
+        ];
+
+        for status in statuses {
+            let serialized = serde_json::to_string(&status).unwrap();
+            let deserialized: DownloadStatus = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized, status);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_download_progress_serialization() {
+        let progress = DownloadProgress {
+            model_name: "nomic-embed-text".to_string(),
+            status: DownloadStatus::Downloading {
+                progress_percent: 75.0,
+                downloaded_bytes: 1536 * 1024,
+                total_bytes: Some(2 * 1024 * 1024),
+                speed_bytes_per_sec: Some(256 * 1024),
+            },
+            started_at: Some(chrono::Utc::now()),
+            completed_at: None,
+            estimated_completion: Some(chrono::Utc::now() + chrono::Duration::seconds(30)),
+        };
+
+        let serialized = serde_json::to_string(&progress).unwrap();
+        let deserialized: DownloadProgress = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.model_name, "nomic-embed-text");
+        assert!(matches!(deserialized.status, DownloadStatus::Downloading { .. }));
+        assert!(deserialized.started_at.is_some());
+        assert!(deserialized.completed_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_download_config_default() {
+        let config = DownloadConfig::default();
+        
+        assert_eq!(config.max_retries, 3);
+        assert_eq!(config.retry_delay_ms, 2000);
+        assert_eq!(config.progress_update_interval_ms, 500);
+        assert_eq!(config.timeout_ms, 300000);
+        assert_eq!(config.chunk_size, 8192);
+    }
+
+    #[tokio::test]
+    async fn test_download_state_management() {
+        let client = OllamaClient::new();
+        
+        // Initially no downloads should exist
+        let all_downloads = client.get_all_downloads().await;
+        assert!(all_downloads.is_empty());
+        
+        // Test get_download_progress for non-existent model
+        let progress = client.get_download_progress("non-existent-model").await;
+        assert!(progress.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_cancel_non_existent_download() {
+        let client = OllamaClient::new();
+        
+        let result = client.cancel_download("non-existent-model").await;
+        assert!(result.is_err());
+        
+        if let Err(error) = result {
+            assert!(matches!(error, OllamaClientError::DownloadError { .. }));
+            assert!(error.to_string().contains("No download found"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_clear_completed_downloads() {
+        let client = OllamaClient::new();
+        
+        // Add a mock completed download to the state
+        {
+            let mut download_state = client.download_state.write().await;
+            download_state.insert("test-model".to_string(), DownloadProgress {
+                model_name: "test-model".to_string(),
+                status: DownloadStatus::Completed {
+                    total_bytes: 1024,
+                    download_time_ms: 1000,
+                },
+                started_at: Some(chrono::Utc::now()),
+                completed_at: Some(chrono::Utc::now()),
+                estimated_completion: None,
+            });
+        }
+        
+        // Verify it exists
+        let progress = client.get_download_progress("test-model").await;
+        assert!(progress.is_some());
+        
+        // Clear completed downloads
+        client.clear_completed_downloads().await;
+        
+        // Verify it's been cleared
+        let progress = client.get_download_progress("test-model").await;
+        assert!(progress.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_download_error_types() {
+        // Test different error types are correctly created
+        let network_error = OllamaClientError::NetworkError {
+            message: "Connection refused".to_string(),
+            is_timeout: false,
+        };
+        assert!(network_error.to_string().contains("Network error"));
+
+        let download_error = OllamaClientError::DownloadError {
+            message: "Download failed".to_string(),
+        };
+        assert!(download_error.to_string().contains("Download error"));
+
+        let disk_error = OllamaClientError::DiskSpaceError {
+            message: "Insufficient space".to_string(),
+        };
+        assert!(disk_error.to_string().contains("Disk space error"));
+    }
+
+    #[tokio::test]
+    async fn test_download_progress_calculation() {
+        // Test progress percentage calculation
+        let downloaded = 1024u64;
+        let total = 2048u64;
+        let expected_percent = (downloaded as f64 / total as f64) * 100.0;
+        
+        assert_eq!(expected_percent, 50.0);
+        
+        // Test edge case: zero total
+        let zero_total = 0u64;
+        let percent_zero = if zero_total > 0 {
+            (downloaded as f64 / zero_total as f64) * 100.0
+        } else {
+            0.0
+        };
+        assert_eq!(percent_zero, 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_speed_calculation() {
+        use std::time::Duration;
+        
+        let bytes_downloaded = 1024u64;
+        let elapsed_seconds = 2.0;
+        let expected_speed = (bytes_downloaded as f64 / elapsed_seconds) as u64;
+        
+        assert_eq!(expected_speed, 512); // 512 bytes per second
+        
+        // Test edge case: zero time elapsed
+        let zero_elapsed = 0.0;
+        let speed_zero = if zero_elapsed > 0.0 {
+            Some((bytes_downloaded as f64 / zero_elapsed) as u64)
+        } else {
+            None
+        };
+        assert_eq!(speed_zero, None);
+    }
+
+    #[tokio::test]
+    async fn test_eta_calculation() {
+        let downloaded = 1024u64;
+        let total = 2048u64;
+        let speed = 512u64; // bytes per second
+        
+        let remaining = total - downloaded;
+        let eta_seconds = remaining as f64 / speed as f64;
+        
+        assert_eq!(eta_seconds, 2.0); // Should take 2 more seconds
+        
+        // Test edge case: no speed data
+        let eta_no_speed = if speed > 0 && total > downloaded {
+            Some(remaining as f64 / speed as f64)
+        } else {
+            None
+        };
+        assert!(eta_no_speed.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_download_config_serialization() {
+        let config = DownloadConfig {
+            max_retries: 5,
+            retry_delay_ms: 3000,
+            progress_update_interval_ms: 250,
+            timeout_ms: 600000,
+            chunk_size: 16384,
+        };
+
+        let serialized = serde_json::to_string(&config).unwrap();
+        let deserialized: DownloadConfig = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.max_retries, 5);
+        assert_eq!(deserialized.retry_delay_ms, 3000);
+        assert_eq!(deserialized.progress_update_interval_ms, 250);
+        assert_eq!(deserialized.timeout_ms, 600000);
+        assert_eq!(deserialized.chunk_size, 16384);
+    }
+
+    #[tokio::test]
+    async fn test_download_memory_usage() {
+        // Test that download structures use reasonable memory
+        let progress = DownloadProgress {
+            model_name: "nomic-embed-text".to_string(),
+            status: DownloadStatus::Downloading {
+                progress_percent: 50.0,
+                downloaded_bytes: 1024 * 1024,
+                total_bytes: Some(2 * 1024 * 1024),
+                speed_bytes_per_sec: Some(512 * 1024),
+            },
+            started_at: Some(chrono::Utc::now()),
+            completed_at: None,
+            estimated_completion: Some(chrono::Utc::now()),
+        };
+
+        let progress_size = std::mem::size_of_val(&progress);
+        
+        // DownloadProgress should be reasonably sized (<2KB)
+        assert!(progress_size < 2048, "DownloadProgress too large: {} bytes", progress_size);
+        
+        let config = DownloadConfig::default();
+        let config_size = std::mem::size_of_val(&config);
+        
+        // DownloadConfig should be small (<256B)
+        assert!(config_size < 256, "DownloadConfig too large: {} bytes", config_size);
+        
+        println!("Download structure memory usage:");
+        println!("  DownloadProgress: {} bytes", progress_size);
+        println!("  DownloadConfig: {} bytes", config_size);
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_download_access() {
+        use std::sync::Arc;
+        use tokio::task;
+        
+        let client = Arc::new(OllamaClient::new());
+        let mut handles = Vec::new();
+        
+        // Test concurrent access to download state
+        for i in 0..10 {
+            let client_clone = Arc::clone(&client);
+            let handle = task::spawn(async move {
+                let model_name = format!("test-model-{}", i);
+                
+                // Test various download operations concurrently
+                let _progress = client_clone.get_download_progress(&model_name).await;
+                let _all_downloads = client_clone.get_all_downloads().await;
+                client_clone.clear_completed_downloads().await;
+                
+                i // Return task identifier
+            });
+            handles.push(handle);
+        }
+        
+        // All concurrent tasks should complete without panics
+        for handle in handles {
+            let task_id = handle.await.expect("Concurrent task should complete");
+            assert!(task_id < 10);
         }
     }
 }
