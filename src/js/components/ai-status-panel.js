@@ -73,11 +73,25 @@ class AiStatusPanel {
         this.statusCheckInterval = null;
         this.isMonitoring = false;
         
+        // Model management properties
+        this.currentModelStatus = null;
+        this.downloadProgress = null;
+        this.progressCheckInterval = null;
+        this.currentModelName = 'nomic-embed-text';
+        
         // Bind methods
         this.handleStatusCheck = this.handleStatusCheck.bind(this);
         this.handleConfigChange = this.handleConfigChange.bind(this);
         this.handleRetryConnection = this.handleRetryConnection.bind(this);
         this.handleSettingsToggle = this.handleSettingsToggle.bind(this);
+        
+        // Bind model management methods
+        this.handleModelRefresh = this.handleModelRefresh.bind(this);
+        this.handleDownloadModel = this.handleDownloadModel.bind(this);
+        this.handleCancelDownload = this.handleCancelDownload.bind(this);
+        this.handleVerifyModel = this.handleVerifyModel.bind(this);
+        this.updateModelStatus = this.updateModelStatus.bind(this);
+        this.updateDownloadProgress = this.updateDownloadProgress.bind(this);
         
         // Initialize the UI
         this.init();
@@ -141,6 +155,96 @@ class AiStatusPanel {
                         <button class="btn-secondary ai-action-btn" id="aiSettingsBtn">
                             ⚙️ Settings
                         </button>
+                    </div>
+                </div>
+
+                <!-- Model Management Section -->
+                <div class="model-status-panel" id="modelStatusPanel" style="display: none;">
+                    <div class="model-header">
+                        <h3 class="model-title">Model Management</h3>
+                        <button class="model-refresh-btn" id="modelRefreshBtn" aria-label="Refresh models" title="Refresh model list">
+                            🔄
+                        </button>
+                    </div>
+                    
+                    <!-- Model Status Display -->
+                    <div class="model-status-display" id="modelStatusDisplay">
+                        <div class="model-indicator" id="modelIndicator">
+                            <div class="model-status-icon" id="modelStatusIcon">📦</div>
+                            <div class="model-info">
+                                <div class="model-name" id="modelName">nomic-embed-text</div>
+                                <div class="model-status-label" id="modelStatusLabel">Checking...</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Model Actions -->
+                        <div class="model-actions" id="modelActions">
+                            <button class="btn-primary model-action-btn" id="downloadModelBtn" style="display: none;">
+                                📥 Download Model
+                            </button>
+                            <button class="btn-secondary model-action-btn" id="cancelDownloadBtn" style="display: none;">
+                                ❌ Cancel Download
+                            </button>
+                            <button class="btn-secondary model-action-btn" id="verifyModelBtn" style="display: none;">
+                                ✅ Verify Model
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Download Progress Section -->
+                    <div class="download-progress-section" id="downloadProgressSection" style="display: none;">
+                        <div class="progress-header">
+                            <span class="progress-title" id="progressTitle">Downloading Model...</span>
+                            <span class="progress-percentage" id="progressPercentage">0%</span>
+                        </div>
+                        
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="progressBar">
+                                <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="progress-details">
+                            <div class="progress-detail-item">
+                                <span class="detail-label">Downloaded:</span>
+                                <span class="detail-value" id="downloadedSize">0 MB</span>
+                            </div>
+                            <div class="progress-detail-item">
+                                <span class="detail-label">Total Size:</span>
+                                <span class="detail-value" id="totalSize">Unknown</span>
+                            </div>
+                            <div class="progress-detail-item">
+                                <span class="detail-label">Speed:</span>
+                                <span class="detail-value" id="downloadSpeed">0 MB/s</span>
+                            </div>
+                            <div class="progress-detail-item">
+                                <span class="detail-label">ETA:</span>
+                                <span class="detail-value" id="estimatedTime">Unknown</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Model Performance Metrics -->
+                    <div class="model-metrics-section" id="modelMetricsSection" style="display: none;">
+                        <h4 class="metrics-title">Performance Metrics</h4>
+                        <div class="metrics-grid">
+                            <div class="metric-item">
+                                <span class="metric-label">Model Size:</span>
+                                <span class="metric-value" id="modelSizeMetric">Unknown</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-label">Load Time:</span>
+                                <span class="metric-value" id="loadTimeMetric">Unknown</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-label">Compatibility:</span>
+                                <span class="metric-value" id="compatibilityMetric">Unknown</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-label">Last Verified:</span>
+                                <span class="metric-value" id="lastVerifiedMetric">Never</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -245,6 +349,27 @@ class AiStatusPanel {
         const errorClose = document.getElementById('aiErrorClose');
         if (errorClose) {
             errorClose.addEventListener('click', () => this.hideErrorMessage());
+        }
+
+        // Model management event listeners
+        const modelRefreshBtn = document.getElementById('modelRefreshBtn');
+        if (modelRefreshBtn) {
+            modelRefreshBtn.addEventListener('click', this.handleModelRefresh);
+        }
+
+        const downloadModelBtn = document.getElementById('downloadModelBtn');
+        if (downloadModelBtn) {
+            downloadModelBtn.addEventListener('click', this.handleDownloadModel);
+        }
+
+        const cancelDownloadBtn = document.getElementById('cancelDownloadBtn');
+        if (cancelDownloadBtn) {
+            cancelDownloadBtn.addEventListener('click', this.handleCancelDownload);
+        }
+
+        const verifyModelBtn = document.getElementById('verifyModelBtn');
+        if (verifyModelBtn) {
+            verifyModelBtn.addEventListener('click', this.handleVerifyModel);
         }
         
         console.log('🔗 AI Status Panel event listeners attached');
@@ -400,6 +525,10 @@ class AiStatusPanel {
             console.log('🎨 [DEBUG] Hiding error message - status is healthy:', statusType);
             this.hideErrorMessage();
         }
+        
+        // Update model panel visibility based on connection status
+        console.log('🎨 [DEBUG] Updating model panel for status:', statusType);
+        this.showModelPanel(statusType);
         
         // Emit status change event
         console.log('🎨 [DEBUG] Emitting STATUS_CHANGED event');
@@ -770,16 +899,509 @@ class AiStatusPanel {
         return { ...this.currentConfig };
     }
 
+    // === MODEL MANAGEMENT METHODS ===
+
+    /**
+     * Show or hide the model status panel based on connection status
+     * @param {string} connectionStatus - Current AI connection status
+     */
+    showModelPanel(connectionStatus) {
+        const modelPanel = document.getElementById('modelStatusPanel');
+        const statusDisplay = document.getElementById('aiStatusDisplay');
+        
+        if (modelPanel && statusDisplay) {
+            const shouldShow = connectionStatus === 'Connected';
+            console.log('🎨 [DEBUG] Model panel should show:', shouldShow, 'for status:', connectionStatus);
+            
+            if (shouldShow) {
+                statusDisplay.style.display = 'block';
+                modelPanel.style.display = 'block';
+                // Start checking model status
+                this.checkModelStatus();
+            } else {
+                modelPanel.style.display = 'none';
+                // Stop any ongoing progress monitoring
+                this.stopProgressMonitoring();
+            }
+        }
+    }
+
+    /**
+     * Check current model status
+     */
+    async checkModelStatus() {
+        try {
+            console.log('🔍 Checking model status for:', this.currentModelName);
+            
+            // Update UI to show checking state
+            this.updateModelIndicator('checking', 'Checking model status...');
+            
+            const verification = await invoke('verify_model', { modelName: this.currentModelName });
+            this.currentModelStatus = verification;
+            
+            console.log('📊 Model verification result:', verification);
+            
+            // Update UI based on model status
+            this.updateModelStatus(verification);
+            this.updateModelMetrics(verification);
+            
+        } catch (error) {
+            console.error('❌ Failed to check model status:', error);
+            this.updateModelIndicator('error', `Error: ${error}`);
+            this.showModelError('Model Status Check Failed', error.toString());
+        }
+    }
+
+    /**
+     * Update model status display
+     * @param {Object} verification - Model verification result
+     */
+    updateModelStatus(verification) {
+        if (!verification) return;
+
+        const { is_available, is_compatible, model_name } = verification;
+        
+        // Update model name display
+        const modelNameEl = document.getElementById('modelName');
+        if (modelNameEl) {
+            modelNameEl.textContent = model_name;
+        }
+
+        // Determine status and actions
+        if (is_available) {
+            if (is_compatible === 'Compatible') {
+                this.updateModelIndicator('available', '✅ Model Available & Compatible');
+                this.showModelActions(['verify']);
+            } else if (is_compatible?.Incompatible) {
+                this.updateModelIndicator('incompatible', `⚠️ Model Incompatible: ${is_compatible.Incompatible.reason}`);
+                this.showModelActions(['download']);
+            } else {
+                this.updateModelIndicator('unknown', '❓ Model Available (Compatibility Unknown)');
+                this.showModelActions(['verify', 'download']);
+            }
+        } else {
+            this.updateModelIndicator('missing', '❌ Model Not Available');
+            this.showModelActions(['download']);
+        }
+    }
+
+    /**
+     * Update model indicator UI
+     * @param {string} status - Status type (checking, available, missing, incompatible, error)
+     * @param {string} label - Status label text
+     */
+    updateModelIndicator(status, label) {
+        const icon = document.getElementById('modelStatusIcon');
+        const labelEl = document.getElementById('modelStatusLabel');
+        const indicator = document.getElementById('modelIndicator');
+        
+        if (icon && labelEl && indicator) {
+            // Remove all status classes
+            indicator.classList.remove('status-checking', 'status-available', 'status-missing', 'status-incompatible', 'status-error');
+            
+            // Add current status class
+            indicator.classList.add(`status-${status}`);
+            
+            // Update content
+            labelEl.textContent = label;
+            
+            // Update icon based on status
+            const statusIcons = {
+                checking: '⏳',
+                available: '✅',
+                missing: '❌',
+                incompatible: '⚠️',
+                error: '💥'
+            };
+            icon.textContent = statusIcons[status] || '📦';
+        }
+    }
+
+    /**
+     * Show/hide model action buttons
+     * @param {Array} actions - Array of action names to show (['download', 'cancel', 'verify'])
+     */
+    showModelActions(actions = []) {
+        const downloadBtn = document.getElementById('downloadModelBtn');
+        const cancelBtn = document.getElementById('cancelDownloadBtn');
+        const verifyBtn = document.getElementById('verifyModelBtn');
+        
+        // Hide all buttons first
+        [downloadBtn, cancelBtn, verifyBtn].forEach(btn => {
+            if (btn) btn.style.display = 'none';
+        });
+        
+        // Show requested actions
+        actions.forEach(action => {
+            const actionButtons = {
+                download: downloadBtn,
+                cancel: cancelBtn,
+                verify: verifyBtn
+            };
+            
+            const button = actionButtons[action];
+            if (button) {
+                button.style.display = 'block';
+            }
+        });
+    }
+
+    /**
+     * Update model performance metrics
+     * @param {Object} verification - Model verification result
+     */
+    updateModelMetrics(verification) {
+        if (!verification?.info) return;
+
+        const { info, verification_time_ms } = verification;
+        const metricsSection = document.getElementById('modelMetricsSection');
+        
+        if (metricsSection) {
+            metricsSection.style.display = 'block';
+            
+            // Update individual metrics
+            this.updateMetric('modelSizeMetric', this.formatBytes(info.size));
+            this.updateMetric('loadTimeMetric', `${verification_time_ms}ms`);
+            this.updateMetric('compatibilityMetric', this.formatCompatibility(verification.is_compatible));
+            this.updateMetric('lastVerifiedMetric', new Date().toLocaleTimeString());
+        }
+    }
+
+    /**
+     * Update a specific metric value
+     * @param {string} metricId - Element ID of the metric
+     * @param {string} value - New value to display
+     */
+    updateMetric(metricId, value) {
+        const element = document.getElementById(metricId);
+        if (element) {
+            element.textContent = value || 'Unknown';
+        }
+    }
+
+    /**
+     * Handle model refresh button click
+     */
+    async handleModelRefresh() {
+        console.log('🔄 Model refresh requested');
+        
+        const refreshBtn = document.getElementById('modelRefreshBtn');
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '⏳';
+        }
+        
+        await this.checkModelStatus();
+        
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.textContent = '🔄';
+        }
+    }
+
+    /**
+     * Handle download model button click
+     */
+    async handleDownloadModel() {
+        console.log('📥 Download model requested:', this.currentModelName);
+        
+        try {
+            // Show download in progress
+            this.updateModelIndicator('checking', 'Starting download...');
+            this.showModelActions(['cancel']);
+            
+            // Start the download
+            const downloadProgress = await invoke('download_model', { modelName: this.currentModelName });
+            console.log('📊 Download started:', downloadProgress);
+            
+            // Show progress section and start monitoring
+            this.showDownloadProgress(true);
+            this.startProgressMonitoring();
+            
+        } catch (error) {
+            console.error('❌ Failed to start download:', error);
+            this.updateModelIndicator('error', `Download failed: ${error}`);
+            this.showModelError('Download Failed', error.toString());
+            this.showModelActions(['download']);
+        }
+    }
+
+    /**
+     * Handle cancel download button click
+     */
+    async handleCancelDownload() {
+        console.log('❌ Cancel download requested:', this.currentModelName);
+        
+        try {
+            await invoke('cancel_download', { modelName: this.currentModelName });
+            console.log('✅ Download cancelled');
+            
+            // Update UI
+            this.updateModelIndicator('missing', 'Download cancelled');
+            this.showDownloadProgress(false);
+            this.stopProgressMonitoring();
+            this.showModelActions(['download']);
+            
+        } catch (error) {
+            console.error('❌ Failed to cancel download:', error);
+            this.showModelError('Cancel Failed', error.toString());
+        }
+    }
+
+    /**
+     * Handle verify model button click
+     */
+    async handleVerifyModel() {
+        console.log('✅ Verify model requested:', this.currentModelName);
+        
+        const verifyBtn = document.getElementById('verifyModelBtn');
+        if (verifyBtn) {
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = '⏳ Verifying...';
+        }
+        
+        await this.checkModelStatus();
+        
+        if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.textContent = '✅ Verify Model';
+        }
+    }
+
+    /**
+     * Show or hide download progress section
+     * @param {boolean} show - Whether to show the progress section
+     */
+    showDownloadProgress(show) {
+        const progressSection = document.getElementById('downloadProgressSection');
+        if (progressSection) {
+            progressSection.style.display = show ? 'block' : 'none';
+        }
+    }
+
+    /**
+     * Start monitoring download progress
+     */
+    startProgressMonitoring() {
+        // Clear any existing interval
+        this.stopProgressMonitoring();
+        
+        // Start checking progress every 500ms
+        this.progressCheckInterval = setInterval(async () => {
+            try {
+                const progress = await invoke('get_download_progress', { modelName: this.currentModelName });
+                if (progress) {
+                    this.updateDownloadProgress(progress);
+                    
+                    // Check if download is complete
+                    if (progress.status?.Completed) {
+                        this.handleDownloadComplete(progress);
+                    } else if (progress.status?.Failed) {
+                        this.handleDownloadFailed(progress);
+                    } else if (progress.status?.Cancelled) {
+                        this.handleDownloadCancelled(progress);
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Failed to get download progress:', error);
+            }
+        }, 500);
+        
+        console.log('📊 Started progress monitoring');
+    }
+
+    /**
+     * Stop monitoring download progress
+     */
+    stopProgressMonitoring() {
+        if (this.progressCheckInterval) {
+            clearInterval(this.progressCheckInterval);
+            this.progressCheckInterval = null;
+            console.log('📊 Stopped progress monitoring');
+        }
+    }
+
+    /**
+     * Update download progress display
+     * @param {Object} progress - Download progress information
+     */
+    updateDownloadProgress(progress) {
+        this.downloadProgress = progress;
+        
+        if (progress.status?.Downloading) {
+            const { progress_percent, downloaded_bytes, total_bytes, speed_bytes_per_sec } = progress.status.Downloading;
+            
+            // Update progress bar
+            const progressFill = document.getElementById('progressFill');
+            const progressPercentage = document.getElementById('progressPercentage');
+            
+            if (progressFill && progressPercentage) {
+                progressFill.style.width = `${progress_percent}%`;
+                progressPercentage.textContent = `${Math.round(progress_percent)}%`;
+            }
+            
+            // Update progress details
+            this.updateDownloadDetail('downloadedSize', this.formatBytes(downloaded_bytes));
+            this.updateDownloadDetail('totalSize', this.formatBytes(total_bytes));
+            this.updateDownloadDetail('downloadSpeed', this.formatSpeed(speed_bytes_per_sec));
+            
+            // Calculate and show ETA
+            if (speed_bytes_per_sec && total_bytes && downloaded_bytes < total_bytes) {
+                const remaining = total_bytes - downloaded_bytes;
+                const etaSeconds = remaining / speed_bytes_per_sec;
+                this.updateDownloadDetail('estimatedTime', this.formatTime(etaSeconds));
+            }
+            
+            // Update status indicator
+            this.updateModelIndicator('checking', `Downloading... ${Math.round(progress_percent)}%`);
+        }
+    }
+
+    /**
+     * Update a download detail field
+     * @param {string} fieldId - Element ID of the detail field
+     * @param {string} value - Value to display
+     */
+    updateDownloadDetail(fieldId, value) {
+        const element = document.getElementById(fieldId);
+        if (element) {
+            element.textContent = value || 'Unknown';
+        }
+    }
+
+    /**
+     * Handle download completion
+     * @param {Object} progress - Final progress information
+     */
+    async handleDownloadComplete(progress) {
+        console.log('✅ Download completed:', progress);
+        
+        this.stopProgressMonitoring();
+        this.showDownloadProgress(false);
+        
+        // Update UI to show completion
+        this.updateModelIndicator('available', '✅ Download Complete - Verifying...');
+        
+        // Refresh model status to verify the download
+        await this.checkModelStatus();
+    }
+
+    /**
+     * Handle download failure
+     * @param {Object} progress - Progress information with error
+     */
+    handleDownloadFailed(progress) {
+        console.error('❌ Download failed:', progress);
+        
+        this.stopProgressMonitoring();
+        this.showDownloadProgress(false);
+        
+        const errorMsg = progress.status?.Failed?.error || 'Unknown error';
+        this.updateModelIndicator('error', `Download failed: ${errorMsg}`);
+        this.showModelError('Download Failed', errorMsg);
+        this.showModelActions(['download']);
+    }
+
+    /**
+     * Handle download cancellation
+     * @param {Object} progress - Progress information
+     */
+    handleDownloadCancelled(progress) {
+        console.log('⚠️ Download cancelled:', progress);
+        
+        this.stopProgressMonitoring();
+        this.showDownloadProgress(false);
+        
+        this.updateModelIndicator('missing', 'Download cancelled');
+        this.showModelActions(['download']);
+    }
+
+    /**
+     * Show model-specific error message
+     * @param {string} title - Error title
+     * @param {string} description - Error description
+     */
+    showModelError(title, description) {
+        // Reuse the existing error message component
+        this.showErrorMessage(title, description);
+    }
+
+    /**
+     * Format bytes to human-readable format
+     * @param {number} bytes - Number of bytes
+     * @returns {string} Formatted string (e.g., "1.2 GB")
+     */
+    formatBytes(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        
+        return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    /**
+     * Format speed to human-readable format
+     * @param {number} bytesPerSecond - Speed in bytes per second
+     * @returns {string} Formatted string (e.g., "1.2 MB/s")
+     */
+    formatSpeed(bytesPerSecond) {
+        if (!bytesPerSecond || bytesPerSecond === 0) return '0 B/s';
+        return this.formatBytes(bytesPerSecond) + '/s';
+    }
+
+    /**
+     * Format time duration to human-readable format
+     * @param {number} seconds - Duration in seconds
+     * @returns {string} Formatted string (e.g., "2m 30s")
+     */
+    formatTime(seconds) {
+        if (!seconds || seconds <= 0) return 'Unknown';
+        
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        } else if (minutes > 0) {
+            return `${minutes}m ${secs}s`;
+        } else {
+            return `${secs}s`;
+        }
+    }
+
+    /**
+     * Format model compatibility for display
+     * @param {Object|string} compatibility - Compatibility information
+     * @returns {string} Formatted compatibility string
+     */
+    formatCompatibility(compatibility) {
+        if (typeof compatibility === 'string') {
+            return compatibility;
+        }
+        
+        if (compatibility === 'Compatible') {
+            return '✅ Compatible';
+        } else if (compatibility?.Incompatible) {
+            return '❌ Incompatible';
+        } else {
+            return '❓ Unknown';
+        }
+    }
+
     /**
      * Clean up the component
      */
     destroy() {
         this.stopStatusMonitoring();
+        this.stopProgressMonitoring();
         
         // Remove event listeners
         const elements = [
             'aiStatusRefresh', 'aiRetryBtn', 'aiSettingsBtn', 
-            'aiSettingsClose', 'aiSettingsForm', 'aiSettingsCancel', 'aiErrorClose'
+            'aiSettingsClose', 'aiSettingsForm', 'aiSettingsCancel', 'aiErrorClose',
+            'modelRefreshBtn', 'downloadModelBtn', 'cancelDownloadBtn', 'verifyModelBtn'
         ];
         
         elements.forEach(id => {

@@ -559,4 +559,349 @@
   .status-indicator {
     break-inside: avoid;
   }
+  
+  .model-status-panel,
+  .download-progress-section,
+  .model-metrics-section {
+    display: none !important;
+  }
+}
+
+/* ===============================
+   Model Management Styles
+   =============================== */
+
+.model-status-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* Model Header */
+.model-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.model-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.model-refresh-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+}
+
+.model-refresh-btn:hover {
+  background: var(--color-bg-tertiary);
+  transform: translateY(-1px);
+}
+
+.model-refresh-btn:active {
+  transform: translateY(0);
+}
+
+/* Model Status Display */
+.model-status-display {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.model-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  transition: all 0.2s ease;
+}
+
+/* Model Status Classes */
+.model-indicator.status-checking {
+  background: var(--color-info-bg);
+  border-color: var(--color-info-border);
+}
+
+.model-indicator.status-available {
+  background: var(--color-success-bg);
+  border-color: var(--color-success-border);
+}
+
+.model-indicator.status-missing {
+  background: var(--color-error-bg);
+  border-color: var(--color-error-border);
+}
+
+.model-indicator.status-incompatible {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+}
+
+.model-indicator.status-error {
+  background: var(--color-error-bg);
+  border-color: var(--color-error-border);
+}
+
+.model-status-icon {
+  font-size: 1.25rem;
+  min-width: 1.25rem;
+  text-align: center;
+}
+
+.model-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-name {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-1);
+}
+
+.model-status-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.3;
+}
+
+/* Model Action Buttons */
+.model-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.model-action-btn {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.model-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Download Progress Section */
+.download-progress-section {
+  padding: var(--space-4);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.progress-title {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.progress-percentage {
+  font-weight: 600;
+  color: var(--color-info-text);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Progress Bar */
+.progress-bar-container {
+  margin-bottom: var(--space-4);
+}
+
+.progress-bar {
+  width: 100%;
+  height: 0.5rem;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-info-text), var(--color-primary-600));
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Progress Details */
+.progress-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.progress-detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-xs);
+}
+
+.progress-detail-item .detail-label {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.progress-detail-item .detail-value {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Model Performance Metrics */
+.model-metrics-section {
+  padding: var(--space-4);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.metrics-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+}
+
+.metric-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2);
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.metric-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.metric-value {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===============================
+   Model Management Accessibility
+   =============================== */
+
+.model-refresh-btn:focus-visible,
+.model-action-btn:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support for model components */
+@media (prefers-contrast: high) {
+  .model-indicator,
+  .download-progress-section,
+  .model-metrics-section,
+  .metric-item {
+    border-width: 2px;
+  }
+  
+  .progress-bar {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion support for model components */
+@media (prefers-reduced-motion: reduce) {
+  .model-refresh-btn,
+  .model-action-btn,
+  .model-indicator,
+  .progress-fill {
+    transition: none !important;
+  }
+  
+  .progress-fill::after {
+    animation: none !important;
+  }
+}
+
+/* Responsive adjustments for model components */
+@media (max-width: 480px) {
+  .progress-details {
+    grid-template-columns: 1fr;
+  }
+  
+  .model-actions {
+    flex-direction: column;
+  }
+  
+  .model-action-btn {
+    flex: none;
+  }
 }
