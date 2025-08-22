@@ -22,7 +22,7 @@ pub use errors::{FileSystemError, FileSystemResult};
 pub use types::{AppState, WindowState, LayoutState, FileInfo};
 pub use ollama_client::{
     OllamaClient, OllamaConfig, ConnectionStatus, ConnectionState, HealthResponse, OllamaClientError,
-    ModelInfo, ModelCompatibility, ModelVerificationResult
+    ModelInfo, ModelCompatibility, ModelVerificationResult, DownloadStatus, DownloadProgress, DownloadConfig
 };
 
 // Global Ollama client instance
@@ -382,6 +382,98 @@ async fn get_model_info(model_name: String) -> Result<Option<ModelInfo>, String>
     }
 }
 
+// === MODEL DOWNLOAD TAURI COMMANDS ===
+
+#[tauri::command]
+async fn download_model(model_name: String) -> Result<DownloadProgress, String> {
+    let client_lock = OLLAMA_CLIENT.read().await;
+    
+    if let Some(client) = client_lock.as_ref() {
+        client.download_model(&model_name).await
+            .map_err(|e| e.to_string())
+    } else {
+        drop(client_lock);
+        // Initialize client if not exists
+        let mut client_lock = OLLAMA_CLIENT.write().await;
+        let client = OllamaClient::new();
+        let result = client.download_model(&model_name).await
+            .map_err(|e| e.to_string());
+        *client_lock = Some(client);
+        result
+    }
+}
+
+#[tauri::command]
+async fn get_download_progress(model_name: String) -> Result<Option<DownloadProgress>, String> {
+    let client_lock = OLLAMA_CLIENT.read().await;
+    
+    if let Some(client) = client_lock.as_ref() {
+        Ok(client.get_download_progress(&model_name).await)
+    } else {
+        drop(client_lock);
+        // Initialize client if not exists
+        let mut client_lock = OLLAMA_CLIENT.write().await;
+        let client = OllamaClient::new();
+        let result = client.get_download_progress(&model_name).await;
+        *client_lock = Some(client);
+        Ok(result)
+    }
+}
+
+#[tauri::command]
+async fn get_all_downloads() -> Result<std::collections::HashMap<String, DownloadProgress>, String> {
+    let client_lock = OLLAMA_CLIENT.read().await;
+    
+    if let Some(client) = client_lock.as_ref() {
+        Ok(client.get_all_downloads().await)
+    } else {
+        drop(client_lock);
+        // Initialize client if not exists
+        let mut client_lock = OLLAMA_CLIENT.write().await;
+        let client = OllamaClient::new();
+        let result = client.get_all_downloads().await;
+        *client_lock = Some(client);
+        Ok(result)
+    }
+}
+
+#[tauri::command]
+async fn cancel_download(model_name: String) -> Result<(), String> {
+    let client_lock = OLLAMA_CLIENT.read().await;
+    
+    if let Some(client) = client_lock.as_ref() {
+        client.cancel_download(&model_name).await
+            .map_err(|e| e.to_string())
+    } else {
+        drop(client_lock);
+        // Initialize client if not exists
+        let mut client_lock = OLLAMA_CLIENT.write().await;
+        let client = OllamaClient::new();
+        let result = client.cancel_download(&model_name).await
+            .map_err(|e| e.to_string());
+        *client_lock = Some(client);
+        result
+    }
+}
+
+#[tauri::command]
+async fn clear_completed_downloads() -> Result<(), String> {
+    let client_lock = OLLAMA_CLIENT.read().await;
+    
+    if let Some(client) = client_lock.as_ref() {
+        client.clear_completed_downloads().await;
+        Ok(())
+    } else {
+        drop(client_lock);
+        // Initialize client if not exists
+        let mut client_lock = OLLAMA_CLIENT.write().await;
+        let client = OllamaClient::new();
+        client.clear_completed_downloads().await;
+        *client_lock = Some(client);
+        Ok(())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -483,7 +575,12 @@ pub fn run() {
             get_available_models,
             verify_model,
             is_nomic_embed_available,
-            get_model_info
+            get_model_info,
+            download_model,
+            get_download_progress,
+            get_all_downloads,
+            cancel_download,
+            clear_completed_downloads
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1641,5 +1738,154 @@ mod tests {
                 assert!(e.contains("Connection") || e.contains("Network") || e.contains("timeout"));
             }
         }
+    }
+
+    // === DOWNLOAD TAURI COMMAND TESTS ===
+
+    #[tokio::test]
+    async fn test_download_model_command() {
+        // Test download_model Tauri command (will fail without actual Ollama service, but should handle gracefully)
+        let result = download_model("test-model".to_string()).await;
+        
+        match result {
+            Ok(progress) => {
+                // If successful, verify the progress structure
+                assert_eq!(progress.model_name, "test-model");
+                assert!(progress.started_at.is_some());
+                println!("Download initiated: {:?}", progress.status);
+            }
+            Err(e) => {
+                println!("Expected network error (Ollama not available): {}", e);
+                // Network errors are expected in test environment without Ollama
+                assert!(e.contains("Connection") || e.contains("Network") || e.contains("timeout") || e.contains("Download"));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_download_progress_command() {
+        // Test get_download_progress Tauri command
+        let result = get_download_progress("test-model".to_string()).await;
+        
+        // Should return Ok(None) for non-existent download
+        assert!(result.is_ok());
+        let progress = result.unwrap();
+        assert!(progress.is_none());
+        
+        println!("Download progress for non-existent model: {:?}", progress);
+    }
+
+    #[tokio::test]
+    async fn test_get_all_downloads_command() {
+        // Test get_all_downloads Tauri command
+        let result = get_all_downloads().await;
+        
+        // Should return Ok with empty HashMap initially
+        assert!(result.is_ok());
+        let downloads = result.unwrap();
+        assert!(downloads.is_empty());
+        
+        println!("All downloads (initially empty): {} items", downloads.len());
+    }
+
+    #[tokio::test]
+    async fn test_cancel_download_command() {
+        // Test cancel_download Tauri command
+        let result = cancel_download("non-existent-model".to_string()).await;
+        
+        // Should return error for non-existent download
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(error.contains("No download found"));
+        
+        println!("Expected error for cancelling non-existent download: {}", error);
+    }
+
+    #[tokio::test]
+    async fn test_clear_completed_downloads_command() {
+        // Test clear_completed_downloads Tauri command
+        let result = clear_completed_downloads().await;
+        
+        // Should always succeed
+        assert!(result.is_ok());
+        
+        println!("Clear completed downloads command executed successfully");
+    }
+
+    #[tokio::test]
+    async fn test_download_command_performance() {
+        use std::time::Instant;
+        
+        // Test that download commands complete within reasonable time
+        let start = Instant::now();
+        let _result = get_download_progress("test-model".to_string()).await;
+        let get_progress_duration = start.elapsed();
+        
+        let start = Instant::now();
+        let _result = get_all_downloads().await;
+        let get_all_duration = start.elapsed();
+        
+        let start = Instant::now();
+        let _result = clear_completed_downloads().await;
+        let clear_duration = start.elapsed();
+        
+        println!("Download command performance:");
+        println!("  get_download_progress: {:?}", get_progress_duration);
+        println!("  get_all_downloads: {:?}", get_all_duration);
+        println!("  clear_completed_downloads: {:?}", clear_duration);
+        
+        // All commands should complete within reasonable time (allowing for initial client setup)
+        assert!(get_progress_duration < tokio::time::Duration::from_millis(1000));
+        assert!(get_all_duration < tokio::time::Duration::from_millis(100));
+        assert!(clear_duration < tokio::time::Duration::from_millis(100));
+    }
+
+    #[tokio::test]
+    async fn test_download_command_concurrent_access() {
+        use tokio::task;
+        
+        // Test concurrent access to download commands
+        let mut handles = Vec::new();
+        
+        for i in 0..5 {
+            let handle = task::spawn(async move {
+                let model_name = format!("test-model-{}", i);
+                
+                // Test various download commands concurrently
+                let _progress = get_download_progress(model_name.clone()).await;
+                let _all_downloads = get_all_downloads().await;
+                let _clear_result = clear_completed_downloads().await;
+                
+                i // Return task identifier
+            });
+            handles.push(handle);
+        }
+        
+        // All concurrent tasks should complete without panics
+        for handle in handles {
+            let task_id = handle.await.expect("Concurrent task should complete");
+            assert!(task_id < 5);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_download_client_state_consistency() {
+        // Test that the global OLLAMA_CLIENT state remains consistent across download operations
+        
+        // First operation should initialize client
+        let _result1 = get_all_downloads().await;
+        
+        // Subsequent operations should reuse existing client
+        let _result2 = get_download_progress("test".to_string()).await;
+        let _result3 = clear_completed_downloads().await;
+        
+        // Change configuration and verify it affects download operations
+        let custom_url = "http://custom-ollama:11434".to_string();
+        let config_result = configure_ollama_url(custom_url.clone()).await;
+        assert!(config_result.is_ok());
+        
+        // Download operations should now use the new configuration
+        let _result4 = get_all_downloads().await;
+        // Can't directly verify the URL was used, but operation should complete without panics
     }
 }
