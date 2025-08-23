@@ -80,14 +80,47 @@ pnpm tauri dev
 ```
 
 ### Frontend JavaScript Console Setup
-Before using the performance monitoring commands in the browser console, you need to import the `invoke` function:
+Before using the performance monitoring commands in the browser console, you need to import the `invoke` function. Try these methods in order:
 
+#### Method 1: Check Tauri availability first
 ```javascript
-// Import the invoke function (paste this first in the console)
-const { invoke } = window.__TAURI__.tauri;
+// First, verify Tauri is available
+console.log('Tauri object:', window.__TAURI__);
 
-// Alternative method if the above doesn't work:
-// const invoke = window.__TAURI__.tauri.invoke;
+// If you see the Tauri object, try destructuring:
+const { invoke } = window.__TAURI__.tauri;
+```
+
+#### Method 2: Direct assignment (if destructuring fails)
+```javascript
+// If Method 1 fails with "cannot be destructured", use direct assignment:
+const invoke = window.__TAURI__.tauri.invoke;
+```
+
+#### Method 3: Alternative Tauri API (for newer versions)
+```javascript
+// For newer Tauri versions, try:
+const { invoke } = window.__TAURI__;
+// or
+const invoke = window.__TAURI__.invoke;
+```
+
+#### Method 4: Wait for Tauri to load
+```javascript
+// If Tauri isn't loaded yet, wait for it:
+function waitForTauri() {
+    if (window.__TAURI__ && window.__TAURI__.tauri) {
+        const invoke = window.__TAURI__.tauri.invoke;
+        console.log('✅ Tauri loaded, invoke available:', typeof invoke);
+        return invoke;
+    } else {
+        console.log('⏳ Waiting for Tauri to load...');
+        setTimeout(waitForTauri, 500);
+    }
+}
+
+// Use this if the above methods don't work:
+const invoke = waitForTauri();
 ```
 
 ### Frontend JavaScript API Usage
@@ -136,13 +169,37 @@ To test the performance monitoring system via the browser console:
 
 2. **Open browser developer tools** (F12) and go to Console tab
 
-3. **Import Tauri functions**:
+3. **Import Tauri functions** (try these in order until one works):
    ```javascript
-   // Paste this first:
-   const { invoke } = window.__TAURI__.tauri;
+   // Option A: Check what's available first
+   console.log('Tauri available:', !!window.__TAURI__);
+   console.log('Tauri structure:', window.__TAURI__);
+   
+   // Option B: Try direct assignment first
+   const invoke = window.__TAURI__.tauri.invoke;
+   
+   // Option C: If that fails, try destructuring
+   // const { invoke } = window.__TAURI__.tauri;
+   
+   // Option D: For newer Tauri versions
+   // const invoke = window.__TAURI__.invoke;
    ```
 
-4. **Run a simple benchmark test**:
+4. **Verify invoke function is available**:
+   ```javascript
+   // Check if invoke is properly loaded
+   console.log('Invoke function type:', typeof invoke);
+   
+   // Test with a simple command first
+   try {
+       const testResult = await invoke('greet', { name: 'Test' });
+       console.log('✅ Tauri connection working:', testResult);
+   } catch (error) {
+       console.error('❌ Tauri connection failed:', error);
+   }
+   ```
+
+5. **Run a simple benchmark test**:
    ```javascript
    // Test basic functionality:
    try {
@@ -501,13 +558,48 @@ initializePerformanceMonitoring();
 If you want to test the commands quickly in the browser console after starting the app:
 
 ```javascript
-// 1. First, import the invoke function:
-const { invoke } = window.__TAURI__.tauri;
+// 1. First, check Tauri availability and import invoke:
+console.log('Tauri available:', !!window.__TAURI__);
 
-// 2. Then run a quick test:
+// 2. Import invoke function (use direct assignment to avoid destructuring errors):
+const invoke = window.__TAURI__.tauri.invoke;
+
+// 3. Verify it's working:
+console.log('Invoke function:', typeof invoke);
+
+// 4. Run a quick test:
 invoke('run_embedding_benchmarks')
     .then(results => console.log('✅ Benchmarks:', results))
     .catch(error => console.error('❌ Error:', error));
+```
+
+### Universal Console Setup (Copy-Paste Ready)
+```javascript
+// Universal setup that handles different Tauri versions and structures:
+(function setupTauriInvoke() {
+    let invoke;
+    
+    // Try different methods to get invoke function
+    if (window.__TAURI__ && window.__TAURI__.tauri && window.__TAURI__.tauri.invoke) {
+        invoke = window.__TAURI__.tauri.invoke;
+        console.log('✅ Using window.__TAURI__.tauri.invoke');
+    } else if (window.__TAURI__ && window.__TAURI__.invoke) {
+        invoke = window.__TAURI__.invoke;
+        console.log('✅ Using window.__TAURI__.invoke');
+    } else {
+        console.error('❌ Tauri invoke function not found. Make sure the app is running.');
+        return;
+    }
+    
+    // Make invoke globally available
+    window.invoke = invoke;
+    console.log('✅ Invoke function is ready! Type: typeof invoke');
+    
+    // Test connection
+    invoke('greet', { name: 'Console Test' })
+        .then(result => console.log('🎉 Tauri connection successful:', result))
+        .catch(error => console.warn('⚠️  Greet command not available, but invoke is ready:', error.message));
+})();
 ```
 
 ### Performance Alerts and Thresholds
@@ -605,16 +697,32 @@ Regression Summary by Severity:
 ### Common Issues
 
 #### JavaScript Console Issues
-1. **"ReferenceError: invoke is not defined"**
+1. **"TypeError: Right side of assignment cannot be destructured"**
    ```javascript
-   // Solution: Import the invoke function first
+   // Problem: Tauri object structure doesn't support destructuring
+   // Wrong:
    const { invoke } = window.__TAURI__.tauri;
    
-   // Alternative if the above doesn't work:
+   // Solution: Use direct assignment instead
    const invoke = window.__TAURI__.tauri.invoke;
+   
+   // Or check the structure first:
+   console.log('Tauri structure:', window.__TAURI__);
    ```
 
-2. **"SyntaxError: Unexpected identifier 'invoke'"**
+2. **"ReferenceError: invoke is not defined"**
+   ```javascript
+   // Solution 1: Direct assignment (most reliable)
+   const invoke = window.__TAURI__.tauri.invoke;
+   
+   // Solution 2: Check Tauri version/structure
+   console.log('Available methods:', Object.keys(window.__TAURI__));
+   
+   // Solution 3: For different Tauri versions
+   const invoke = window.__TAURI__.invoke || window.__TAURI__.tauri.invoke;
+   ```
+
+3. **"SyntaxError: Unexpected identifier 'invoke'"**
    ```javascript
    // Problem: Missing const/let declaration
    // Wrong:
@@ -624,10 +732,11 @@ Regression Summary by Severity:
    const results = await invoke('run_embedding_benchmarks');
    ```
 
-3. **"TypeError: Cannot read properties of undefined (reading 'tauri')"**
+4. **"TypeError: Cannot read properties of undefined (reading 'tauri')"**
    - Ensure the Tauri app is running (`pnpm tauri dev`)
    - Make sure you're in the correct browser window/tab
    - Check that the app has fully loaded
+   - Wait a few seconds after app startup for Tauri to initialize
 
 4. **Commands return errors about missing parameters**
    ```javascript
