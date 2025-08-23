@@ -1694,3 +1694,269 @@ window.hideProgressIndicator = function() {
     indicator.style.display = 'none';
   }
 };
+
+// === HIDDEN PERFORMANCE TESTING INTERFACE ===
+// This is a discrete testing interface for performance monitoring system
+// Access via: triple-click on the app title to reveal testing panel
+
+let performanceTestingPanelVisible = false;
+let titleClickCount = 0;
+let titleClickTimer = null;
+
+// Create hidden performance testing panel
+function createPerformanceTestingPanel() {
+  if (document.getElementById('performanceTestingPanel')) {
+    return; // Already created
+  }
+
+  const panel = document.createElement('div');
+  panel.id = 'performanceTestingPanel';
+  panel.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 320px;
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    z-index: 10000;
+    display: none;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-size: 11px;
+    color: #e0e0e0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  `;
+  
+  panel.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 8px;">
+      <div style="color: #4fc3f7; font-weight: 600;">🔧 Performance Testing</div>
+      <button onclick="hidePerformanceTestingPanel()" style="background: none; border: none; color: #f44336; cursor: pointer; font-size: 16px; line-height: 1;">&times;</button>
+    </div>
+    
+    <div style="margin-bottom: 8px;">
+      <button onclick="runBenchmarkTest()" style="width: 100%; padding: 6px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 10px; margin-bottom: 4px;">Run Benchmarks</button>
+      <button onclick="establishBaselineTest()" style="width: 100%; padding: 6px; background: #388e3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 10px; margin-bottom: 4px;">Establish Baseline</button>
+      <button onclick="runRegressionAnalysisTest()" style="width: 100%; padding: 6px; background: #f57c00; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 10px; margin-bottom: 4px;">Regression Analysis</button>
+      <button onclick="runFullPerformanceTest()" style="width: 100%; padding: 6px; background: #7b1fa2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 10px; margin-bottom: 4px;">Full Test Suite</button>
+    </div>
+    
+    <div id="performanceTestOutput" style="background: rgba(0, 0, 0, 0.3); padding: 8px; border-radius: 4px; max-height: 200px; overflow-y: auto; font-size: 9px; line-height: 1.3;">
+      <div style="color: #81c784;">Ready for testing...</div>
+    </div>
+  `;
+  
+  document.body.appendChild(panel);
+}
+
+// Show/hide performance testing panel
+function showPerformanceTestingPanel() {
+  createPerformanceTestingPanel();
+  const panel = document.getElementById('performanceTestingPanel');
+  if (panel) {
+    panel.style.display = 'block';
+    performanceTestingPanelVisible = true;
+  }
+}
+
+function hidePerformanceTestingPanel() {
+  const panel = document.getElementById('performanceTestingPanel');
+  if (panel) {
+    panel.style.display = 'none';
+    performanceTestingPanelVisible = false;
+  }
+}
+
+// Output helper for testing panel
+function logToTestOutput(message, type = 'info') {
+  const output = document.getElementById('performanceTestOutput');
+  if (!output) return;
+  
+  const colors = {
+    info: '#81c784',
+    success: '#4fc3f7', 
+    error: '#f44336',
+    warning: '#ff9800'
+  };
+  
+  const timestamp = new Date().toLocaleTimeString();
+  const logEntry = document.createElement('div');
+  logEntry.style.color = colors[type] || colors.info;
+  logEntry.innerHTML = `<span style="color: #666;">[${timestamp}]</span> ${message}`;
+  
+  output.appendChild(logEntry);
+  output.scrollTop = output.scrollHeight;
+}
+
+// Performance testing functions
+window.runBenchmarkTest = async function() {
+  logToTestOutput('🔄 Running performance benchmarks...', 'info');
+  try {
+    const results = await invoke('run_embedding_benchmarks');
+    logToTestOutput(`✅ Benchmarks completed: ${results.length} operations tested`, 'success');
+    
+    // Show summary
+    results.forEach((result, i) => {
+      logToTestOutput(`  ${i+1}. ${result.operation_name}: ${result.avg_duration_ms.toFixed(1)}ms avg`, 'info');
+    });
+    
+    return results;
+  } catch (error) {
+    logToTestOutput(`❌ Benchmark failed: ${error}`, 'error');
+    console.error('Benchmark test error:', error);
+  }
+};
+
+window.establishBaselineTest = async function() {
+  logToTestOutput('📏 Establishing performance baseline...', 'info');
+  try {
+    const result = await invoke('establish_performance_baseline', { 
+      operationName: 'embedding_generation' 
+    });
+    logToTestOutput(`✅ ${result}`, 'success');
+  } catch (error) {
+    logToTestOutput(`❌ Baseline establishment failed: ${error}`, 'error');
+    console.error('Baseline test error:', error);
+  }
+};
+
+window.runRegressionAnalysisTest = async function() {
+  logToTestOutput('🔍 Running regression analysis...', 'info');
+  try {
+    // First run benchmarks to get current data
+    const results = await invoke('run_embedding_benchmarks');
+    logToTestOutput(`📊 Got ${results.length} benchmark results`, 'info');
+    
+    // Then analyze for regressions
+    const analysis = await invoke('analyze_performance_regressions', { 
+      benchmarkResults: results 
+    });
+    
+    logToTestOutput(`✅ Analysis complete: ${analysis.total_regressions_detected} regressions detected`, 'success');
+    logToTestOutput(`   Overall health: ${analysis.overall_health}`, 'info');
+    
+    if (analysis.recommendations.length > 0) {
+      logToTestOutput('📋 Recommendations:', 'warning');
+      analysis.recommendations.forEach(rec => {
+        logToTestOutput(`   • ${rec}`, 'warning');
+      });
+    }
+    
+  } catch (error) {
+    logToTestOutput(`❌ Regression analysis failed: ${error}`, 'error');
+    console.error('Regression analysis error:', error);
+  }
+};
+
+window.runFullPerformanceTest = async function() {
+  logToTestOutput('🚀 Running full performance test suite...', 'info');
+  
+  try {
+    // Step 1: Benchmarks
+    logToTestOutput('Step 1/4: Running benchmarks...', 'info');
+    const benchmarkResults = await window.runBenchmarkTest();
+    
+    // Step 2: Generate report
+    logToTestOutput('Step 2/4: Generating performance report...', 'info');
+    const report = await invoke('generate_benchmark_report', { results: benchmarkResults });
+    logToTestOutput('📄 Performance report generated', 'success');
+    
+    // Step 3: Establish baseline
+    logToTestOutput('Step 3/4: Establishing baseline...', 'info');
+    await window.establishBaselineTest();
+    
+    // Step 4: Regression analysis
+    logToTestOutput('Step 4/4: Analyzing regressions...', 'info');
+    await window.runRegressionAnalysisTest();
+    
+    logToTestOutput('🎉 Full performance test suite completed!', 'success');
+    
+    // Show brief report summary
+    const reportLines = report.split('\n').slice(0, 5);
+    logToTestOutput('📋 Report preview:', 'info');
+    reportLines.forEach(line => {
+      if (line.trim()) {
+        logToTestOutput(`   ${line.trim()}`, 'info');
+      }
+    });
+    
+  } catch (error) {
+    logToTestOutput(`❌ Full test suite failed: ${error}`, 'error');
+    console.error('Full performance test error:', error);
+  }
+};
+
+// Triple-click detection on app title to show testing panel
+document.addEventListener('DOMContentLoaded', () => {
+  // Wait a bit for DOM to be ready
+  setTimeout(() => {
+    const titleElement = document.querySelector('h1') || document.querySelector('.app-title') || document.querySelector('title');
+    
+    // Try to find a title element to attach the click handler
+    const titleSelectors = [
+      '.header h1',
+      '.app-title', 
+      '.title',
+      'h1',
+      '.header .title-text',
+      '.header-title'
+    ];
+    
+    let targetElement = null;
+    for (const selector of titleSelectors) {
+      targetElement = document.querySelector(selector);
+      if (targetElement) break;
+    }
+    
+    // If no title found, create a small hidden trigger element
+    if (!targetElement) {
+      targetElement = document.createElement('div');
+      targetElement.style.cssText = `
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        width: 20px;
+        height: 20px;
+        opacity: 0.1;
+        z-index: 9999;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 50%;
+      `;
+      targetElement.title = 'Triple-click to show performance testing panel';
+      document.body.appendChild(targetElement);
+    }
+    
+    if (targetElement) {
+      targetElement.addEventListener('click', () => {
+        titleClickCount++;
+        
+        if (titleClickTimer) {
+          clearTimeout(titleClickTimer);
+        }
+        
+        titleClickTimer = setTimeout(() => {
+          titleClickCount = 0;
+        }, 1000);
+        
+        if (titleClickCount === 3) {
+          titleClickCount = 0;
+          clearTimeout(titleClickTimer);
+          
+          if (performanceTestingPanelVisible) {
+            hidePerformanceTestingPanel();
+          } else {
+            showPerformanceTestingPanel();
+            logToTestOutput('🔧 Performance testing panel activated', 'success');
+            logToTestOutput('💡 This panel provides access to performance monitoring commands', 'info');
+          }
+        }
+      });
+    }
+  }, 1000);
+});
+
+// Make functions globally accessible
+window.showPerformanceTestingPanel = showPerformanceTestingPanel;
+window.hidePerformanceTestingPanel = hidePerformanceTestingPanel;
