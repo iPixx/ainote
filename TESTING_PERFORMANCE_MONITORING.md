@@ -79,39 +79,118 @@ cargo test -- --test-threads=1
 pnpm tauri dev
 ```
 
-### Frontend JavaScript API Usage
+### Frontend JavaScript Console Setup
+Before using the performance monitoring commands in the browser console, you need to import the `invoke` function:
+
 ```javascript
-// Run comprehensive benchmarks
+// Import the invoke function (paste this first in the console)
+const { invoke } = window.__TAURI__.tauri;
+
+// Alternative method if the above doesn't work:
+// const invoke = window.__TAURI__.tauri.invoke;
+```
+
+### Frontend JavaScript API Usage
+Once you've imported `invoke`, you can use these commands:
+
+```javascript
+// 1. Run comprehensive benchmarks
 const results = await invoke('run_embedding_benchmarks');
 console.log('Benchmark results:', results);
 
-// Generate performance report
+// 2. Generate performance report
 const report = await invoke('generate_benchmark_report', { results });
 console.log('Performance report:', report);
 
-// Establish baseline for an operation
+// 3. Establish baseline for an operation
 const baseline = await invoke('establish_performance_baseline', { 
     operationName: 'embedding_generation' 
 });
 console.log('Baseline established:', baseline);
 
-// Compare performance against baseline
+// 4. Compare performance against baseline
 const comparison = await invoke('compare_performance_against_baseline', {
     operationName: 'embedding_generation',
     benchmarkResult: results[0]
 });
 console.log('Baseline comparison:', comparison);
 
-// Analyze for regressions
+// 5. Analyze for regressions
 const analysis = await invoke('analyze_performance_regressions', { 
     benchmarkResults: results 
 });
 console.log('Regression analysis:', analysis);
 
-// Get baseline report
+// 6. Get baseline report
 const baselineReport = await invoke('get_baseline_report');
 console.log('Baseline report:', baselineReport);
 ```
+
+### Step-by-Step Console Testing
+To test the performance monitoring system via the browser console:
+
+1. **Start the application**:
+   ```bash
+   pnpm tauri dev
+   ```
+
+2. **Open browser developer tools** (F12) and go to Console tab
+
+3. **Import Tauri functions**:
+   ```javascript
+   // Paste this first:
+   const { invoke } = window.__TAURI__.tauri;
+   ```
+
+4. **Run a simple benchmark test**:
+   ```javascript
+   // Test basic functionality:
+   try {
+       const results = await invoke('run_embedding_benchmarks');
+       console.log('✅ Benchmarks completed:', results);
+   } catch (error) {
+       console.error('❌ Benchmark failed:', error);
+   }
+   ```
+
+5. **Full testing sequence**:
+   ```javascript
+   // Complete test sequence (paste all at once):
+   (async function testPerformanceMonitoring() {
+       try {
+           console.log('🚀 Starting performance monitoring tests...');
+           
+           // Step 1: Run benchmarks
+           console.log('📊 Running benchmarks...');
+           const results = await invoke('run_embedding_benchmarks');
+           console.log('✅ Benchmarks completed:', results);
+           
+           // Step 2: Generate report
+           console.log('📄 Generating report...');
+           const report = await invoke('generate_benchmark_report', { results });
+           console.log('✅ Report generated:\n', report);
+           
+           // Step 3: Establish baseline
+           console.log('📏 Establishing baseline...');
+           const baseline = await invoke('establish_performance_baseline', { 
+               operationName: 'embedding_generation' 
+           });
+           console.log('✅ Baseline established:', baseline);
+           
+           // Step 4: Analyze regressions
+           console.log('🔍 Analyzing regressions...');
+           const analysis = await invoke('analyze_performance_regressions', { 
+               benchmarkResults: results 
+           });
+           console.log('✅ Regression analysis:', analysis);
+           
+           console.log('🎉 All tests completed successfully!');
+           
+       } catch (error) {
+           console.error('❌ Test failed:', error);
+       }
+   })();
+   ```
 
 ### Available Tauri Commands
 - `run_embedding_benchmarks()`: Execute comprehensive performance benchmarks
@@ -349,6 +428,18 @@ cargo test -- -Z unstable-options --report-time
 
 ## Production Monitoring
 
+### Setting Up Production Monitoring
+For production applications, you'll need to set up the monitoring system in your main JavaScript files. Here's how to integrate it:
+
+#### In your main JavaScript file (main.js):
+```javascript
+// Import Tauri functions at the top of your file
+import { invoke } from '@tauri-apps/api/tauri';
+
+// Or if using vanilla JavaScript in the browser:
+// const { invoke } = window.__TAURI__.tauri;
+```
+
 ### Using Built-in Commands in Production
 ```javascript
 // Establish baseline (run once during setup)
@@ -391,11 +482,32 @@ async function monitorPerformance() {
     }
 }
 
-// Schedule regular monitoring (every 5 minutes)
-setInterval(monitorPerformance, 300000);
+// Initialize performance monitoring system
+async function initializePerformanceMonitoring() {
+    // Set up baseline first
+    await setupPerformanceBaseline();
+    
+    // Schedule regular monitoring (every 5 minutes)
+    setInterval(monitorPerformance, 300000);
+    
+    console.log('✅ Performance monitoring system initialized');
+}
 
-// One-time baseline setup
-setupPerformanceBaseline();
+// Call this when your application starts
+initializePerformanceMonitoring();
+```
+
+### Quick Test in Browser Console
+If you want to test the commands quickly in the browser console after starting the app:
+
+```javascript
+// 1. First, import the invoke function:
+const { invoke } = window.__TAURI__.tauri;
+
+// 2. Then run a quick test:
+invoke('run_embedding_benchmarks')
+    .then(results => console.log('✅ Benchmarks:', results))
+    .catch(error => console.error('❌ Error:', error));
 ```
 
 ### Performance Alerts and Thresholds
@@ -491,17 +603,57 @@ Regression Summary by Severity:
 ## Troubleshooting
 
 ### Common Issues
-1. **Tests fail with "Ollama not available"**
+
+#### JavaScript Console Issues
+1. **"ReferenceError: invoke is not defined"**
+   ```javascript
+   // Solution: Import the invoke function first
+   const { invoke } = window.__TAURI__.tauri;
+   
+   // Alternative if the above doesn't work:
+   const invoke = window.__TAURI__.tauri.invoke;
+   ```
+
+2. **"SyntaxError: Unexpected identifier 'invoke'"**
+   ```javascript
+   // Problem: Missing const/let declaration
+   // Wrong:
+   invoke('run_embedding_benchmarks');
+   
+   // Correct:
+   const results = await invoke('run_embedding_benchmarks');
+   ```
+
+3. **"TypeError: Cannot read properties of undefined (reading 'tauri')"**
+   - Ensure the Tauri app is running (`pnpm tauri dev`)
+   - Make sure you're in the correct browser window/tab
+   - Check that the app has fully loaded
+
+4. **Commands return errors about missing parameters**
+   ```javascript
+   // Wrong: Missing required parameters
+   await invoke('generate_benchmark_report');
+   
+   // Correct: Include required parameters
+   const results = await invoke('run_embedding_benchmarks');
+   await invoke('generate_benchmark_report', { results });
+   ```
+
+#### Rust Testing Issues
+5. **Tests fail with "Ollama not available"**
    - Ensure Ollama is running: `ollama serve`
    - Check connection: `curl http://localhost:11434/api/tags`
+   - Wait for Ollama to fully start (may take 30 seconds)
 
-2. **Memory tests show inconsistent results**
+6. **Memory tests show inconsistent results**
    - Run tests with `--test-threads=1` for consistent memory measurements
    - Ensure no other heavy processes are running
+   - Clear system memory before running tests
 
-3. **Regression detection shows false positives**
+7. **Regression detection shows false positives**
    - Adjust detection thresholds in configuration
    - Establish new baselines after significant changes
+   - Ensure sufficient samples for statistical significance
 
 ### Debug Commands
 ```bash
@@ -513,6 +665,23 @@ cargo test test_name -- --nocapture --exact
 
 # Check test compilation without running
 cargo test --no-run
+
+# Verify Ollama connectivity
+curl -s http://localhost:11434/api/tags | jq '.'
+```
+
+### JavaScript Console Debug Commands
+```javascript
+// Check if Tauri is available
+console.log('Tauri available:', !!window.__TAURI__);
+
+// Check invoke function
+console.log('Invoke function:', typeof window.__TAURI__?.tauri?.invoke);
+
+// Test connection to Rust backend
+window.__TAURI__.tauri.invoke('greet', { name: 'Test' })
+    .then(result => console.log('Connection test:', result))
+    .catch(error => console.error('Connection failed:', error));
 ```
 
 ## Performance Targets
