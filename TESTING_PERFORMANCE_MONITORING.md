@@ -12,6 +12,7 @@ The performance monitoring system includes:
 
 ## Table of Contents
 
+- [Hidden Testing Interface](#hidden-testing-interface) ⭐ **Recommended**
 - [Standard Rust Testing](#standard-rust-testing)
 - [Performance Benchmarking via Tauri Commands](#performance-benchmarking-via-tauri-commands)
 - [Memory Usage Testing](#memory-usage-testing)
@@ -23,6 +24,96 @@ The performance monitoring system includes:
 - [Continuous Testing](#continuous-testing)
 - [Production Monitoring](#production-monitoring)
 - [Test Output Examples](#test-output-examples)
+
+## Hidden Testing Interface
+
+**⭐ This is the recommended method for testing the performance monitoring system.**
+
+The aiNote application includes a built-in hidden testing interface that provides easy access to all performance monitoring commands without needing the browser console or external tools.
+
+### Access Methods
+
+#### Method 1: Triple-Click Activation
+1. Start the application: `pnpm tauri dev`
+2. **Triple-click** on any title element in the app (such as "aiNote" header)
+3. If no title element is found, a small semi-transparent trigger element will appear in the top-left corner
+4. The testing panel will appear in the top-right corner of the app
+
+#### Method 2: Keyboard Shortcut
+1. Start the application: `pnpm tauri dev`
+2. Press the keyboard combination:
+   - **Windows/Linux**: `Ctrl+Shift+Alt+P`
+   - **macOS**: `Cmd+Shift+Alt+P`
+3. The testing panel will toggle visibility
+
+### Testing Interface Features
+
+The hidden testing panel provides four main testing functions:
+
+#### 🔵 Run Benchmarks
+- Executes `run_embedding_benchmarks` command
+- Shows performance metrics for all operations
+- Displays average duration and success rates
+- Real-time logging with timestamps
+
+#### 🟢 Establish Baseline
+- Runs `establish_performance_baseline` for embedding_generation
+- Sets performance baseline for future comparisons
+- Provides confirmation of baseline establishment
+- Essential for regression detection
+
+#### 🟠 Regression Analysis
+- Executes comprehensive regression detection
+- Analyzes performance trends and deviations
+- Provides severity classification (Minor, Moderate, Major, Critical)
+- Shows actionable recommendations
+
+#### 🟣 Full Test Suite
+- Runs complete performance monitoring sequence:
+  1. Execute benchmarks
+  2. Generate performance report
+  3. Establish baseline (if needed)
+  4. Analyze regressions
+- Shows step-by-step progress
+- Displays report preview and final results
+
+### Interface Design
+
+```
+┌─────────────── 🔧 Performance Testing ─────────────────┐
+│                                                    ✕   │
+├────────────────────────────────────────────────────────┤
+│ [Run Benchmarks]          [Establish Baseline]        │
+│ [Regression Analysis]     [Full Test Suite]           │
+├────────────────────────────────────────────────────────┤
+│ Real-time Log Output:                                  │
+│ [10:30:45] 🔧 Performance testing panel activated     │
+│ [10:30:47] 🔄 Running performance benchmarks...       │
+│ [10:30:52] ✅ Benchmarks completed: 5 operations      │
+│ [10:30:52]   1. embedding_generation: 45.2ms avg     │
+│ [10:30:52]   2. model_verification: 1200.0ms avg     │
+│ └── Scrollable output with color-coded messages ──────┘
+```
+
+### Advantages of Hidden Interface
+
+✅ **No Console Needed**: Works entirely within the application UI
+✅ **Real-time Feedback**: Immediate visual feedback with timestamps
+✅ **Error Handling**: User-friendly error messages
+✅ **Production Safe**: Completely hidden by default
+✅ **Cross-platform**: Works on Windows, macOS, and Linux
+✅ **Easy Access**: Two simple activation methods
+✅ **Professional UI**: Consistent with application design
+
+### Usage Example
+
+1. Start the app: `pnpm tauri dev`
+2. Activate panel: Triple-click title or press `Ctrl+Shift+Alt+P`
+3. Click "Full Test Suite" to run complete performance analysis
+4. Monitor real-time output for results and recommendations
+5. Close panel by clicking X or using activation shortcut again
+
+This interface eliminates all the JavaScript console setup issues and provides a much more user-friendly testing experience.
 
 ## Standard Rust Testing
 
@@ -577,6 +668,18 @@ invoke('run_embedding_benchmarks')
 ```javascript
 // Universal setup that handles different Tauri versions and structures:
 (function setupTauriInvoke() {
+    console.log('🔍 Debugging Tauri availability...');
+    console.log('window.__TAURI__ exists:', !!window.__TAURI__);
+    console.log('window.__TAURI__ value:', window.__TAURI__);
+    
+    // Check all possible locations
+    if (window.__TAURI__) {
+        console.log('Available properties in __TAURI__:', Object.keys(window.__TAURI__));
+        if (window.__TAURI__.tauri) {
+            console.log('Available properties in __TAURI__.tauri:', Object.keys(window.__TAURI__.tauri));
+        }
+    }
+    
     let invoke;
     
     // Try different methods to get invoke function
@@ -586,8 +689,16 @@ invoke('run_embedding_benchmarks')
     } else if (window.__TAURI__ && window.__TAURI__.invoke) {
         invoke = window.__TAURI__.invoke;
         console.log('✅ Using window.__TAURI__.invoke');
+    } else if (window.__TAURI__ && window.__TAURI__.api && window.__TAURI__.api.invoke) {
+        invoke = window.__TAURI__.api.invoke;
+        console.log('✅ Using window.__TAURI__.api.invoke');
     } else {
-        console.error('❌ Tauri invoke function not found. Make sure the app is running.');
+        console.error('❌ Tauri invoke function not found.');
+        console.log('📋 Troubleshooting checklist:');
+        console.log('   1. Is the Tauri app running? (pnpm tauri dev)');
+        console.log('   2. Are you in the correct browser tab?');
+        console.log('   3. Did the app finish loading completely?');
+        console.log('   4. Try refreshing the page (Ctrl+R or Cmd+R)');
         return;
     }
     
@@ -600,6 +711,74 @@ invoke('run_embedding_benchmarks')
         .then(result => console.log('🎉 Tauri connection successful:', result))
         .catch(error => console.warn('⚠️  Greet command not available, but invoke is ready:', error.message));
 })();
+```
+
+### Troubleshooting: Tauri Not Available
+
+If you get "❌ Tauri invoke function not found", try these steps:
+
+#### Step 1: Verify App is Running
+```bash
+# Make sure the Tauri dev server is running
+pnpm tauri dev
+
+# You should see output like:
+# "Running beforeDevCommand `npm run dev`"
+# "Finished dev [unoptimized + debuginfo] target(s)"
+# "Listening on http://127.0.0.1:1420"
+```
+
+#### Step 2: Check Browser Tab
+- Make sure you're in the Tauri application window (not a regular browser tab)
+- The URL should be something like `tauri://localhost` or `http://127.0.0.1:1420`
+- If you opened a browser tab manually, close it and use the Tauri app window
+
+#### Step 3: Wait for Complete Loading
+```javascript
+// Run this to monitor when Tauri becomes available:
+function waitForTauri() {
+    console.log('Checking for Tauri...', new Date().toLocaleTimeString());
+    
+    if (window.__TAURI__) {
+        console.log('✅ Tauri found!', window.__TAURI__);
+        setupTauriInvoke(); // Run the setup function
+    } else {
+        console.log('⏳ Tauri not ready yet, checking again in 1 second...');
+        setTimeout(waitForTauri, 1000);
+    }
+}
+
+// Start monitoring
+waitForTauri();
+```
+
+#### Step 4: Debug Tauri Structure
+```javascript
+// Debug what's actually available:
+console.log('=== TAURI DEBUG INFO ===');
+console.log('window.__TAURI__:', window.__TAURI__);
+console.log('typeof window.__TAURI__:', typeof window.__TAURI__);
+
+if (window.__TAURI__) {
+    console.log('Keys in __TAURI__:', Object.keys(window.__TAURI__));
+    
+    // Check each possible location
+    const locations = [
+        'window.__TAURI__.invoke',
+        'window.__TAURI__.tauri.invoke',
+        'window.__TAURI__.api.invoke',
+        'window.__TAURI__.core.invoke'
+    ];
+    
+    locations.forEach(location => {
+        try {
+            const fn = eval(location);
+            console.log(`${location}:`, typeof fn);
+        } catch (e) {
+            console.log(`${location}: not available`);
+        }
+    });
+}
 ```
 
 ### Performance Alerts and Thresholds

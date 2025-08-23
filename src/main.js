@@ -1222,6 +1222,20 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
       }
     }
+    
+    // Handle performance testing panel keyboard shortcut (Ctrl+Shift+Alt+P or Cmd+Shift+Alt+P)
+    if (((event.metaKey || event.ctrlKey) && event.shiftKey && event.altKey && event.key === 'P')) {
+      event.preventDefault();
+      console.log('🔧 Performance testing panel shortcut detected');
+      
+      if (performanceTestingPanelVisible) {
+        hidePerformanceTestingPanel();
+      } else {
+        showPerformanceTestingPanel();
+        logToTestOutput('🔧 Performance testing panel activated via keyboard shortcut', 'success');
+        logToTestOutput('💡 This panel provides access to performance monitoring commands', 'info');
+      }
+    }
   });
 
   // Initialize UI state after services are ready
@@ -1697,7 +1711,9 @@ window.hideProgressIndicator = function() {
 
 // === HIDDEN PERFORMANCE TESTING INTERFACE ===
 // This is a discrete testing interface for performance monitoring system
-// Access via: triple-click on the app title to reveal testing panel
+// Access methods:
+//   1. Triple-click on the app title (or hidden trigger element)
+//   2. Keyboard shortcut: Ctrl+Shift+Alt+P (or Cmd+Shift+Alt+P on macOS)
 
 let performanceTestingPanelVisible = false;
 let titleClickCount = 0;
