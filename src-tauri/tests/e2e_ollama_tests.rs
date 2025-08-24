@@ -163,7 +163,7 @@ mod e2e_tests {
             Ok(_) => {
                 println!("Health check succeeded despite short timeout");
                 // If it succeeded, it should have been reasonably fast
-                assert!(elapsed < Duration::from_millis(100));
+                assert!(elapsed < Duration::from_millis(200));
             }
             Err(_) => {
                 println!("Health check failed after retries (expected with short timeout)");

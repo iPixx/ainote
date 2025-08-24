@@ -62,8 +62,10 @@ struct EmbeddingOptions {
 struct EmbeddingResponse {
     embedding: Vec<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[allow(dead_code)]  // This field might be used in future
     model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[allow(dead_code)]  // This field might be used in future
     prompt: Option<String>,
 }
 
@@ -81,6 +83,7 @@ struct BatchEmbeddingRequest {
 struct BatchEmbeddingResponse {
     embeddings: Vec<Vec<f32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[allow(dead_code)]  // This field might be used in future
     model: Option<String>,
 }
 
@@ -435,7 +438,6 @@ impl EmbeddingGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio_test;
     
     fn create_test_config() -> OllamaConfig {
         OllamaConfig {

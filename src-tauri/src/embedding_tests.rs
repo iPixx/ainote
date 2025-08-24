@@ -3,7 +3,7 @@
 
 #![cfg(test)]
 
-use crate::text_processing::{TextProcessor, TextProcessingError, ChunkingConfig};
+use crate::text_processing::{TextProcessor, TextProcessingError};
 use crate::embedding_generator::{EmbeddingGenerator, EmbeddingError, EmbeddingConfig};
 use crate::embedding_cache::{EmbeddingCache, CacheConfig};
 use crate::ollama_client::OllamaConfig;

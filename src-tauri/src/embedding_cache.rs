@@ -213,6 +213,12 @@ impl Clone for EmbeddingCache {
     }
 }
 
+impl Default for EmbeddingCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EmbeddingCache {
     /// Create a new embedding cache with default configuration
     pub fn new() -> Self {
