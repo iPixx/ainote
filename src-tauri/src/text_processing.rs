@@ -66,6 +66,7 @@ pub struct ChunkingBenchmark {
 }
 
 /// Text processing and chunking utilities
+#[derive(Clone)]
 pub struct TextProcessor {
     config: ChunkingConfig,
 }
