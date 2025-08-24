@@ -16,6 +16,7 @@ pub mod ollama_client;
 pub mod benchmarks;
 pub mod performance_baseline;
 pub mod regression_detection;
+pub mod text_processing;
 
 #[cfg(test)]
 pub mod ollama_integration_tests;
@@ -26,6 +27,9 @@ pub use types::{AppState, WindowState, LayoutState, FileInfo};
 pub use ollama_client::{
     OllamaClient, OllamaConfig, ConnectionStatus, ConnectionState, HealthResponse, OllamaClientError,
     ModelInfo, ModelCompatibility, ModelVerificationResult, DownloadStatus, DownloadProgress, DownloadConfig
+};
+pub use text_processing::{
+    TextProcessor, TextProcessingError, TextProcessingResult, ChunkingConfig, ChunkingBenchmark
 };
 
 // Global Ollama client instance
@@ -576,6 +580,77 @@ async fn clear_completed_downloads() -> Result<(), String> {
     }
 }
 
+// === TEXT PROCESSING TAURI COMMANDS ===
+
+#[tauri::command]
+fn preprocess_text(input: String) -> Result<String, String> {
+    let processor = TextProcessor::new();
+    processor.preprocess_text(input)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn chunk_text(text: String, chunk_size: usize, overlap: usize) -> Result<Vec<String>, String> {
+    let processor = TextProcessor::new();
+    processor.chunk_text(text, chunk_size, overlap)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn validate_text(text: String) -> Result<(), String> {
+    TextProcessor::validate_text(&text)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_optimal_chunk_size(text: String) -> Result<usize, String> {
+    let processor = TextProcessor::new();
+    Ok(processor.get_optimal_chunk_size(&text))
+}
+
+#[tauri::command]
+fn benchmark_chunk_sizes(sample_text: String, sizes: Vec<usize>) -> Result<Vec<ChunkingBenchmark>, String> {
+    let processor = TextProcessor::new();
+    processor.benchmark_chunk_sizes(&sample_text, &sizes)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn create_chunking_config(
+    chunk_size: Option<usize>,
+    overlap: Option<usize>, 
+    preserve_sentences: Option<bool>,
+    preserve_paragraphs: Option<bool>,
+    min_chunk_size: Option<usize>
+) -> ChunkingConfig {
+    let mut config = ChunkingConfig::default();
+    
+    if let Some(size) = chunk_size {
+        config.chunk_size = size;
+    }
+    if let Some(ovlp) = overlap {
+        config.overlap = ovlp;
+    }
+    if let Some(sentences) = preserve_sentences {
+        config.preserve_sentences = sentences;
+    }
+    if let Some(paragraphs) = preserve_paragraphs {
+        config.preserve_paragraphs = paragraphs;
+    }
+    if let Some(min_size) = min_chunk_size {
+        config.min_chunk_size = min_size;
+    }
+    
+    config
+}
+
+#[tauri::command]
+fn chunk_text_with_config(text: String, config: ChunkingConfig) -> Result<Vec<String>, String> {
+    let processor = TextProcessor::with_config(config.clone());
+    processor.chunk_text(text, config.chunk_size, config.overlap)
+        .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -689,7 +764,14 @@ pub fn run() {
             establish_performance_baseline,
             compare_performance_against_baseline,
             get_baseline_report,
-            analyze_performance_regressions
+            analyze_performance_regressions,
+            preprocess_text,
+            chunk_text,
+            validate_text,
+            get_optimal_chunk_size,
+            benchmark_chunk_sizes,
+            create_chunking_config,
+            chunk_text_with_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
