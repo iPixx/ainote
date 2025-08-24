@@ -1,7 +1,7 @@
 // End-to-end tests for model management UI functionality
 // Tests the complete user workflow from UI interaction to backend operations
 
-use ainote_lib::ollama_client::{OllamaClient, OllamaConfig, ConnectionStatus, DownloadStatus};
+use ainote_lib::ollama_client::{OllamaClient, OllamaConfig, DownloadStatus};
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use serde_json::Value;
@@ -761,7 +761,6 @@ mod ui_e2e_tests {
 /// Manual testing utilities for model management UI
 #[cfg(test)]
 mod manual_ui_testing_utils {
-    use super::*;
 
     #[tokio::test]
     async fn print_ui_testing_checklist() {

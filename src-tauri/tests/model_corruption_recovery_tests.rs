@@ -2,17 +2,15 @@
 // Tests handling of corrupted models, partial downloads, and recovery strategies
 
 use ainote_lib::ollama_client::{
-    OllamaClient, OllamaConfig, DownloadStatus, DownloadProgress, 
-    ModelVerificationResult, ModelCompatibility, OllamaClientError
+    OllamaClient, OllamaConfig, DownloadStatus, 
+    ModelCompatibility
 };
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
-use serde_json::json;
 
 /// Configuration for corruption and recovery tests
 #[derive(Debug, Clone)]
 struct CorruptionTestConfig {
-    pub test_timeout_ms: u64,
     pub recovery_attempt_timeout_ms: u64,
     pub corruption_detection_timeout_ms: u64,
     pub max_recovery_attempts: usize,
@@ -21,7 +19,6 @@ struct CorruptionTestConfig {
 impl Default for CorruptionTestConfig {
     fn default() -> Self {
         Self {
-            test_timeout_ms: 60000,              // 1 minute max for corruption tests
             recovery_attempt_timeout_ms: 10000,  // 10 seconds per recovery attempt
             corruption_detection_timeout_ms: 5000, // 5 seconds to detect corruption
             max_recovery_attempts: 3,            // Maximum recovery retry attempts
@@ -692,7 +689,7 @@ mod corruption_recovery_tests {
     async fn test_partial_download_corruption_recovery() {
         require_ollama_for_corruption_testing!();
         
-        let mut tester = ModelCorruptionTester::new();
+        let tester = ModelCorruptionTester::new();
         let result = tester.test_partial_download_recovery("nomic-embed-text").await
             .expect("Partial download recovery test should complete");
         
@@ -708,7 +705,7 @@ mod corruption_recovery_tests {
     async fn test_network_interruption_recovery() {
         require_ollama_for_corruption_testing!();
         
-        let mut tester = ModelCorruptionTester::new();
+        let tester = ModelCorruptionTester::new();
         let result = tester.test_network_interruption_recovery("nomic-embed-text").await
             .expect("Network interruption recovery test should complete");
         
@@ -723,7 +720,7 @@ mod corruption_recovery_tests {
     async fn test_invalid_model_data_recovery() {
         require_ollama_for_corruption_testing!();
         
-        let mut tester = ModelCorruptionTester::new();
+        let tester = ModelCorruptionTester::new();
         let result = tester.test_invalid_model_data_recovery("nomic-embed-text").await
             .expect("Invalid model data recovery test should complete");
         
@@ -736,7 +733,7 @@ mod corruption_recovery_tests {
     async fn test_incomplete_verification_recovery() {
         require_ollama_for_corruption_testing!();
         
-        let mut tester = ModelCorruptionTester::new();
+        let tester = ModelCorruptionTester::new();
         let result = tester.test_incomplete_verification_recovery("nomic-embed-text").await
             .expect("Incomplete verification recovery test should complete");
         
@@ -749,7 +746,7 @@ mod corruption_recovery_tests {
     async fn test_concurrent_modification_recovery() {
         require_ollama_for_corruption_testing!();
         
-        let mut tester = ModelCorruptionTester::new();
+        let tester = ModelCorruptionTester::new();
         let result = tester.test_concurrent_modification_recovery("nomic-embed-text").await
             .expect("Concurrent modification recovery test should complete");
         
@@ -879,7 +876,6 @@ mod corruption_recovery_tests {
 /// Manual testing documentation for corruption and recovery
 #[cfg(test)]
 mod manual_corruption_testing_utils {
-    use super::*;
 
     #[tokio::test]
     async fn print_corruption_testing_checklist() {

@@ -3,7 +3,7 @@
 
 use ainote_lib::ollama_client::{
     OllamaClient, OllamaConfig, DownloadStatus, DownloadProgress, 
-    ModelVerificationResult, ModelCompatibility, OllamaClientError
+    ModelCompatibility
 };
 use ainote_lib::benchmarks::{EmbeddingBenchmarks, BenchmarkConfig};
 use std::time::{Duration, Instant};
@@ -402,7 +402,7 @@ mod download_integration_tests {
         let invalid_download = helper.client.download_model(invalid_model).await;
         
         match invalid_download {
-            Ok(progress) => {
+            Ok(_progress) => {
                 // If download starts, it should eventually fail
                 let final_result = helper.monitor_download_progress(invalid_model).await;
                 assert!(final_result.is_err(), "Download of non-existent model should fail");
@@ -484,7 +484,7 @@ mod download_integration_tests {
                "Download initiation took {:?}, should be <1s", initiation_time);
         
         match download_result {
-            Ok(progress) => {
+            Ok(_progress) => {
                 // Test progress update frequency
                 let mut update_intervals = Vec::new();
                 let mut last_update = Instant::now();
@@ -658,7 +658,6 @@ mod download_integration_tests {
 /// Manual testing utilities and documentation for download workflow
 #[cfg(test)]
 mod manual_testing_utils {
-    use super::*;
 
     #[tokio::test]
     async fn print_download_testing_checklist() {

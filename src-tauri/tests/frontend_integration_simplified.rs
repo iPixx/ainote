@@ -30,8 +30,8 @@ mod client_integration_tests {
             assert!(last_check.timestamp() > 0);
         }
         
-        // Retry count should be initialized
-        assert!(status.retry_count >= 0);
+        // Retry count should be initialized (usize is always >= 0)
+        assert!(status.retry_count <= 10); // Reasonable upper bound check
     }
 
     #[tokio::test]

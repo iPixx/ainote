@@ -475,6 +475,10 @@ impl OllamaClient {
             "nomic",
             "mxbai",
             "minilm",
+            "bge",
+            "e5-",
+            "gte",
+            "instructor",
         ];
         
         let model_lower = model_name.to_lowercase();
@@ -1551,7 +1555,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_speed_calculation() {
-        use std::time::Duration;
         
         let bytes_downloaded = 1024u64;
         let elapsed_seconds = 2.0;

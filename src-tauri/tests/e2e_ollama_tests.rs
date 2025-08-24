@@ -651,7 +651,6 @@ mod system_integration_tests {
 /// Manual testing utilities and documentation
 #[cfg(test)]
 mod manual_testing_utils {
-    use super::*;
 
     /// Print manual testing checklist
     #[tokio::test]

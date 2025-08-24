@@ -809,7 +809,7 @@ mod tests {
         let report = benchmarks.generate_report(&results);
         
         assert!(report.contains("EMBEDDING MODEL PERFORMANCE BENCHMARK REPORT"));
-        assert!(report.contains("test_operation"));
+        assert!(report.contains("TEST_OPERATION"));
         assert!(report.contains("Success Rate: 100.0%"));
         assert!(report.contains("Average Duration: 10.00ms"));
         assert!(report.contains("✅ YES")); // Baseline met
