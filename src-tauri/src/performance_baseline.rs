@@ -359,7 +359,7 @@ impl BaselineManager {
         let success_factor = avg_success_rate;
         
         // Combined confidence score
-        (sample_count_factor * 0.3 + consistency_factor * 0.4 + success_factor * 0.3).max(0.0).min(1.0)
+        (sample_count_factor * 0.3 + consistency_factor * 0.4 + success_factor * 0.3).clamp(0.0, 1.0)
     }
 
     /// Get baseline key for storage
@@ -490,7 +490,7 @@ impl BaselineManager {
                 report.push_str(&format!("  Success Rate: {:.1}%\n", baseline.baseline_metrics.success_rate * 100.0));
                 report.push_str(&format!("  Memory Usage: {:.1}MB\n", baseline.baseline_metrics.memory_usage_mb));
                 report.push_str(&format!("  Std Deviation: {:.2}ms\n", baseline.baseline_metrics.std_deviation_ms));
-                report.push_str("\n");
+                report.push('\n');
             }
         }
         

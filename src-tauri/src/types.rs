@@ -79,18 +79,10 @@ impl Default for SessionState {
 }
 
 /// Vault preferences structure for persistence
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct VaultPreferences {
     /// Recently used vault paths (max 5)
     pub recent_vaults: Vec<String>,
-}
-
-impl Default for VaultPreferences {
-    fn default() -> Self {
-        Self {
-            recent_vaults: Vec::new(),
-        }
-    }
 }
 
 /// Combined application state

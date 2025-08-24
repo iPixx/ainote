@@ -158,7 +158,7 @@ impl RegressionDetector {
             regressions.push(RegressionDetection {
                 operation_name: result.operation_name.clone(),
                 regression_type: RegressionType::Latency,
-                severity: severity.clone(),
+                severity,
                 statistical_confidence: confidence,
                 baseline_value: baseline_latency,
                 current_value: current_latency,
@@ -227,7 +227,7 @@ impl RegressionDetector {
             regressions.push(RegressionDetection {
                 operation_name: result.operation_name.clone(),
                 regression_type: RegressionType::SuccessRate,
-                severity: severity.clone(),
+                severity,
                 statistical_confidence: confidence,
                 baseline_value: baseline_success_rate,
                 current_value: current_success_rate,
@@ -419,7 +419,7 @@ impl RegressionDetector {
         let baseline_confidence_factor = baseline.confidence_level;
         
         (sample_size_factor * 0.3 + baseline_factor * 0.3 + baseline_confidence_factor * 0.4)
-            .max(0.0).min(1.0)
+            .clamp(0.0, 1.0)
     }
 
     /// Analyze trend direction from historical data
@@ -690,7 +690,7 @@ impl RegressionAnalysisReport {
         report.push_str(&format!("  🟠 Major: {}\n", major_count));
         report.push_str(&format!("  🟡 Moderate: {}\n", moderate_count));
         report.push_str(&format!("  🔵 Minor: {}\n", minor_count));
-        report.push_str("\n");
+        report.push('\n');
         
         // Detailed regression information
         if !self.regressions.is_empty() {
@@ -706,7 +706,7 @@ impl RegressionAnalysisReport {
                 report.push_str(&format!("  Trend: {:?}\n", regression.trend_direction));
                 report.push_str(&format!("  Detected: {}\n", regression.detected_at.format("%H:%M:%S")));
                 report.push_str(&format!("  Recommendation: {}\n", regression.recommendation));
-                report.push_str("\n");
+                report.push('\n');
             }
         }
         
@@ -723,7 +723,7 @@ impl RegressionAnalysisReport {
             report.push_str(&format!("  Baseline Available: {}\n", if summary.baseline_available { "✅ YES" } else { "❌ NO" }));
             report.push_str(&format!("  Current Performance: {:.2}ms\n", summary.current_performance));
             report.push_str(&format!("  Trend: {:?}\n", summary.trend_direction));
-            report.push_str("\n");
+            report.push('\n');
         }
         
         // Recommendations
