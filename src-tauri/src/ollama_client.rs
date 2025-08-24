@@ -4,7 +4,7 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
 // StreamExt is used for processing download streams
-use futures::StreamExt;
+// use futures::StreamExt; // Currently unused, but kept for future streaming features
 
 /// Configuration for Ollama client connection
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -459,7 +459,7 @@ impl OllamaClient {
     /// Check if a model is compatible for embedding use
     fn check_model_compatibility(&self, model_name: &str) -> ModelCompatibility {
         // Known compatible embedding models
-        let compatible_models = vec![
+        let compatible_models = [
             "nomic-embed-text",
             "nomic-embed-text:latest",
             "mxbai-embed-large",
@@ -468,7 +468,7 @@ impl OllamaClient {
             "all-minilm:latest",
         ];
         
-        let embedding_patterns = vec![
+        let embedding_patterns = [
             "embed",
             "embedding",
             "sentence",
@@ -490,7 +490,7 @@ impl OllamaClient {
         }
         
         // Check if it's a chat/completion model (incompatible for embeddings)
-        let incompatible_patterns = vec![
+        let incompatible_patterns = [
             "llama",
             "mistral", 
             "codellama",

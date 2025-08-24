@@ -588,7 +588,7 @@ impl EmbeddingBenchmarks {
         report.push_str(&format!("Total Operations Tested: {}\n", total_operations));
         report.push_str(&format!("Overall Success Rate: {:.1}%\n", avg_success_rate * 100.0));
         report.push_str(&format!("Baselines Met: {}/{}\n", baselines_met, results.len()));
-        report.push_str("\n");
+        report.push('\n');
 
         // Individual operation results
         for result in results {
@@ -610,7 +610,7 @@ impl EmbeddingBenchmarks {
                 report.push_str(&format!("  Memory Usage: {:.2}MB avg, {:.2}MB peak\n", avg_memory, max_memory));
             }
             
-            report.push_str("\n");
+            report.push('\n');
         }
 
         // Performance regression summary
@@ -620,7 +620,7 @@ impl EmbeddingBenchmarks {
             for regression in &regressions {
                 report.push_str(&format!("⚠️ {}\n", regression));
             }
-            report.push_str("\n");
+            report.push('\n');
         } else {
             report.push_str("✅ No performance regressions detected\n\n");
         }
@@ -641,7 +641,7 @@ impl EmbeddingBenchmarks {
             
             let memory_ok = max_memory <= self.config.performance_baseline_targets.memory_usage_max_mb as f64;
             report.push_str(&format!("Memory Target Met: {}\n", if memory_ok { "✅ YES" } else { "❌ NO" }));
-            report.push_str("\n");
+            report.push('\n');
         }
 
         // Recommendations
