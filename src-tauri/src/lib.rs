@@ -13,6 +13,9 @@ pub mod file_operations;
 pub mod vault_operations;
 pub mod state_management;
 pub mod ollama_client;
+pub mod benchmarks;
+pub mod performance_baseline;
+pub mod regression_detection;
 
 #[cfg(test)]
 pub mod ollama_integration_tests;
@@ -382,6 +385,105 @@ async fn get_model_info(model_name: String) -> Result<Option<ModelInfo>, String>
     }
 }
 
+// === PERFORMANCE BENCHMARKING TAURI COMMANDS ===
+
+use crate::benchmarks::{EmbeddingBenchmarks, BenchmarkConfig, BenchmarkResult};
+use crate::performance_baseline::{BaselineManager, BaselineConfig, BaselineComparison};
+use crate::regression_detection::{RegressionDetector, RegressionDetectionConfig, RegressionAnalysisReport};
+
+#[tauri::command]
+async fn run_embedding_benchmarks() -> Result<Vec<BenchmarkResult>, String> {
+    let ollama_config = {
+        let client_lock = OLLAMA_CLIENT.read().await;
+        if let Some(client) = client_lock.as_ref() {
+            client.get_config().clone()
+        } else {
+            OllamaConfig::default()
+        }
+    };
+    
+    let benchmark_config = BenchmarkConfig::default();
+    let mut benchmarks = EmbeddingBenchmarks::new(ollama_config, benchmark_config);
+    
+    benchmarks.run_comprehensive_benchmarks().await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn generate_benchmark_report(results: Vec<BenchmarkResult>) -> Result<String, String> {
+    let ollama_config = OllamaConfig::default();
+    let benchmark_config = BenchmarkConfig::default();
+    let benchmarks = EmbeddingBenchmarks::new(ollama_config, benchmark_config);
+    
+    Ok(benchmarks.generate_report(&results))
+}
+
+#[tauri::command]
+async fn detect_performance_regressions(results: Vec<BenchmarkResult>) -> Result<Vec<String>, String> {
+    let ollama_config = OllamaConfig::default();
+    let benchmark_config = BenchmarkConfig::default();
+    let benchmarks = EmbeddingBenchmarks::new(ollama_config, benchmark_config);
+    
+    Ok(benchmarks.detect_performance_regressions(&results))
+}
+
+#[tauri::command]
+async fn establish_performance_baseline(operation_name: String) -> Result<String, String> {
+    let ollama_config = {
+        let client_lock = OLLAMA_CLIENT.read().await;
+        if let Some(client) = client_lock.as_ref() {
+            client.get_config().clone()
+        } else {
+            OllamaConfig::default()
+        }
+    };
+    
+    let baseline_config = BaselineConfig::default();
+    let mut manager = BaselineManager::new(baseline_config)
+        .map_err(|e| format!("Failed to create baseline manager: {}", e))?;
+    
+    let baseline = manager.establish_baseline(&operation_name, &ollama_config).await
+        .map_err(|e| format!("Failed to establish baseline: {}", e))?;
+    
+    Ok(format!("Baseline established for '{}' with {:.1}% confidence", 
+               baseline.operation_name, baseline.confidence_level * 100.0))
+}
+
+#[tauri::command]
+async fn compare_performance_against_baseline(operation_name: String, benchmark_result: BenchmarkResult) -> Result<BaselineComparison, String> {
+    let baseline_config = BaselineConfig::default();
+    let manager = BaselineManager::new(baseline_config)
+        .map_err(|e| format!("Failed to create baseline manager: {}", e))?;
+    
+    Ok(manager.compare_against_baseline(&operation_name, &benchmark_result))
+}
+
+#[tauri::command]
+async fn get_baseline_report() -> Result<String, String> {
+    let baseline_config = BaselineConfig::default();
+    let manager = BaselineManager::new(baseline_config)
+        .map_err(|e| format!("Failed to create baseline manager: {}", e))?;
+    
+    Ok(manager.generate_baseline_report())
+}
+
+#[tauri::command]
+async fn analyze_performance_regressions(benchmark_results: Vec<BenchmarkResult>) -> Result<RegressionAnalysisReport, String> {
+    let config = RegressionDetectionConfig::default();
+    let mut detector = RegressionDetector::new(config);
+    
+    // Load existing baselines if available
+    let baseline_config = BaselineConfig::default();
+    let baseline_manager = BaselineManager::new(baseline_config)
+        .map_err(|e| format!("Failed to load baselines: {}", e))?;
+    
+    for baseline in baseline_manager.get_all_baselines() {
+        detector.add_baseline(baseline.clone());
+    }
+    
+    Ok(detector.analyze_performance_regressions(&benchmark_results))
+}
+
 // === MODEL DOWNLOAD TAURI COMMANDS ===
 
 #[tauri::command]
@@ -580,7 +682,14 @@ pub fn run() {
             get_download_progress,
             get_all_downloads,
             cancel_download,
-            clear_completed_downloads
+            clear_completed_downloads,
+            run_embedding_benchmarks,
+            generate_benchmark_report,
+            detect_performance_regressions,
+            establish_performance_baseline,
+            compare_performance_against_baseline,
+            get_baseline_report,
+            analyze_performance_regressions
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
