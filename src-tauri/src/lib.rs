@@ -23,6 +23,9 @@ pub mod embedding_cache;
 #[cfg(test)]
 pub mod ollama_integration_tests;
 
+#[cfg(test)]
+pub mod embedding_tests;
+
 // Re-exports for commonly used types
 pub use errors::{FileSystemError, FileSystemResult};
 pub use types::{AppState, WindowState, LayoutState, FileInfo};
