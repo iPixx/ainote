@@ -17,6 +17,7 @@ pub mod benchmarks;
 pub mod performance_baseline;
 pub mod regression_detection;
 pub mod text_processing;
+pub mod embedding_generator;
 
 #[cfg(test)]
 pub mod ollama_integration_tests;
@@ -30,6 +31,9 @@ pub use ollama_client::{
 };
 pub use text_processing::{
     TextProcessor, TextProcessingError, TextProcessingResult, ChunkingConfig, ChunkingBenchmark
+};
+pub use embedding_generator::{
+    EmbeddingGenerator, EmbeddingError, EmbeddingResult, EmbeddingConfig
 };
 
 // Global Ollama client instance
@@ -651,6 +655,109 @@ fn chunk_text_with_config(text: String, config: ChunkingConfig) -> Result<Vec<St
         .map_err(|e| e.to_string())
 }
 
+// === EMBEDDING GENERATION TAURI COMMANDS ===
+
+/// Global embedding generator instance
+static EMBEDDING_GENERATOR: once_cell::sync::Lazy<Arc<RwLock<Option<EmbeddingGenerator>>>> = 
+    once_cell::sync::Lazy::new(|| Arc::new(RwLock::new(None)));
+
+/// Helper function to get or create embedding generator
+async fn get_embedding_generator() -> EmbeddingGenerator {
+    let generator_lock = EMBEDDING_GENERATOR.read().await;
+    if let Some(generator) = generator_lock.as_ref() {
+        generator.clone()
+    } else {
+        drop(generator_lock);
+        // Initialize generator if not exists
+        let mut generator_lock = EMBEDDING_GENERATOR.write().await;
+        
+        // Double-check pattern to avoid race conditions
+        if let Some(generator) = generator_lock.as_ref() {
+            return generator.clone();
+        }
+        
+        // Get Ollama config from global client
+        let ollama_config = {
+            let client_lock = OLLAMA_CLIENT.read().await;
+            if let Some(client) = client_lock.as_ref() {
+                client.get_config().clone()
+            } else {
+                OllamaConfig::default()
+            }
+        };
+        
+        let new_generator = EmbeddingGenerator::new(ollama_config);
+        *generator_lock = Some(new_generator.clone());
+        new_generator
+    }
+}
+
+#[tauri::command]
+async fn generate_embedding(text: String, model: String) -> Result<Vec<f32>, String> {
+    let generator = get_embedding_generator().await;
+    generator.generate_embedding(text, model).await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn generate_batch_embeddings(texts: Vec<String>, model: String) -> Result<Vec<Vec<f32>>, String> {
+    let generator = get_embedding_generator().await;
+    generator.generate_batch_embeddings(texts, model).await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_embedding_generator_config(
+    timeout_ms: Option<u64>,
+    max_retries: Option<usize>,
+    connection_pool_size: Option<usize>,
+    preprocess_text: Option<bool>,
+    max_text_length: Option<usize>,
+    batch_size: Option<usize>,
+) -> Result<(), String> {
+    let mut generator_lock = EMBEDDING_GENERATOR.write().await;
+    
+    if let Some(generator) = generator_lock.as_mut() {
+        let mut config = generator.get_embedding_config().clone();
+        
+        if let Some(timeout) = timeout_ms {
+            config.timeout_ms = timeout;
+        }
+        if let Some(retries) = max_retries {
+            config.max_retries = retries;
+        }
+        if let Some(pool_size) = connection_pool_size {
+            config.connection_pool_size = pool_size;
+        }
+        if let Some(preprocess) = preprocess_text {
+            config.preprocess_text = preprocess;
+        }
+        if let Some(max_length) = max_text_length {
+            config.max_text_length = max_length;
+        }
+        if let Some(batch) = batch_size {
+            config.batch_size = batch;
+        }
+        
+        generator.update_embedding_config(config);
+        Ok(())
+    } else {
+        Err("Embedding generator not initialized".to_string())
+    }
+}
+
+#[tauri::command]
+async fn get_embedding_generator_config() -> Result<EmbeddingConfig, String> {
+    let generator_lock = EMBEDDING_GENERATOR.read().await;
+    
+    if let Some(generator) = generator_lock.as_ref() {
+        Ok(generator.get_embedding_config().clone())
+    } else {
+        // Return default config if generator not initialized
+        Ok(EmbeddingConfig::default())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -771,7 +878,11 @@ pub fn run() {
             get_optimal_chunk_size,
             benchmark_chunk_sizes,
             create_chunking_config,
-            chunk_text_with_config
+            chunk_text_with_config,
+            generate_embedding,
+            generate_batch_embeddings,
+            update_embedding_generator_config,
+            get_embedding_generator_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
