@@ -18,6 +18,7 @@ pub mod performance_baseline;
 pub mod regression_detection;
 pub mod text_processing;
 pub mod embedding_generator;
+pub mod embedding_cache;
 
 #[cfg(test)]
 pub mod ollama_integration_tests;
@@ -34,6 +35,9 @@ pub use text_processing::{
 };
 pub use embedding_generator::{
     EmbeddingGenerator, EmbeddingError, EmbeddingResult, EmbeddingConfig
+};
+pub use embedding_cache::{
+    EmbeddingCache, CacheError, CacheResult, CacheConfig, CacheMetrics
 };
 
 // Global Ollama client instance
@@ -661,6 +665,31 @@ fn chunk_text_with_config(text: String, config: ChunkingConfig) -> Result<Vec<St
 static EMBEDDING_GENERATOR: once_cell::sync::Lazy<Arc<RwLock<Option<EmbeddingGenerator>>>> = 
     once_cell::sync::Lazy::new(|| Arc::new(RwLock::new(None)));
 
+/// Global embedding cache instance
+static EMBEDDING_CACHE: once_cell::sync::Lazy<Arc<RwLock<Option<EmbeddingCache>>>> = 
+    once_cell::sync::Lazy::new(|| Arc::new(RwLock::new(None)));
+
+/// Helper function to get or create embedding cache
+async fn get_embedding_cache() -> EmbeddingCache {
+    let cache_lock = EMBEDDING_CACHE.read().await;
+    if let Some(cache) = cache_lock.as_ref() {
+        cache.clone()
+    } else {
+        drop(cache_lock);
+        // Initialize cache if not exists
+        let mut cache_lock = EMBEDDING_CACHE.write().await;
+        
+        // Double-check pattern to avoid race conditions
+        if let Some(cache) = cache_lock.as_ref() {
+            return cache.clone();
+        }
+        
+        let new_cache = EmbeddingCache::new();
+        *cache_lock = Some(new_cache.clone());
+        new_cache
+    }
+}
+
 /// Helper function to get or create embedding generator
 async fn get_embedding_generator() -> EmbeddingGenerator {
     let generator_lock = EMBEDDING_GENERATOR.read().await;
@@ -694,16 +723,90 @@ async fn get_embedding_generator() -> EmbeddingGenerator {
 
 #[tauri::command]
 async fn generate_embedding(text: String, model: String) -> Result<Vec<f32>, String> {
+    let cache = get_embedding_cache().await;
+    
+    // Try cache first
+    if let Ok(Some(cached_embedding)) = cache.get(&text, &model).await {
+        return Ok(cached_embedding);
+    }
+    
+    // Cache miss, generate embedding
     let generator = get_embedding_generator().await;
-    generator.generate_embedding(text, model).await
-        .map_err(|e| e.to_string())
+    let start_time = std::time::Instant::now();
+    
+    match generator.generate_embedding(text.clone(), model.clone()).await {
+        Ok(embedding) => {
+            let _generation_time = start_time.elapsed().as_millis() as f64;
+            
+            // Cache the result
+            if let Err(e) = cache.set(&text, &model, embedding.clone()).await {
+                eprintln!("⚠️ Failed to cache embedding: {}", e);
+            }
+            
+            // Note: Generation time metrics are updated internally in the cache
+            
+            Ok(embedding)
+        }
+        Err(e) => Err(e.to_string())
+    }
 }
 
 #[tauri::command]
 async fn generate_batch_embeddings(texts: Vec<String>, model: String) -> Result<Vec<Vec<f32>>, String> {
+    let cache = get_embedding_cache().await;
     let generator = get_embedding_generator().await;
-    generator.generate_batch_embeddings(texts, model).await
-        .map_err(|e| e.to_string())
+    
+    let mut results = Vec::new();
+    let mut cache_misses = Vec::new();
+    let mut cache_miss_indices = Vec::new();
+    
+    eprintln!("🔄 Processing batch of {} embeddings with caching", texts.len());
+    
+    // Check cache for each text
+    for (i, text) in texts.iter().enumerate() {
+        if let Ok(Some(cached_embedding)) = cache.get(text, &model).await {
+            results.push(cached_embedding);
+        } else {
+            // Track cache misses
+            cache_misses.push(text.clone());
+            cache_miss_indices.push(i);
+            results.push(Vec::new()); // Placeholder
+        }
+    }
+    
+    let hit_count = texts.len() - cache_misses.len();
+    eprintln!("📊 Cache stats: {} hits, {} misses ({:.1}% hit rate)", 
+              hit_count, cache_misses.len(), 
+              if !texts.is_empty() { hit_count as f64 / texts.len() as f64 * 100.0 } else { 0.0 });
+    
+    // Generate embeddings for cache misses
+    if !cache_misses.is_empty() {
+        let start_time = std::time::Instant::now();
+        
+        match generator.generate_batch_embeddings(cache_misses.clone(), model.clone()).await {
+            Ok(new_embeddings) => {
+                let generation_time = start_time.elapsed().as_millis() as f64;
+                eprintln!("⚡ Generated {} embeddings in {:.1}ms", new_embeddings.len(), generation_time);
+                
+                // Update results and cache new embeddings
+                for (miss_idx, new_embedding) in new_embeddings.into_iter().enumerate() {
+                    if let Some(&result_idx) = cache_miss_indices.get(miss_idx) {
+                        results[result_idx] = new_embedding.clone();
+                        
+                        // Cache the new embedding
+                        if let Some(text) = cache_misses.get(miss_idx) {
+                            if let Err(e) = cache.set(text, &model, new_embedding).await {
+                                eprintln!("⚠️ Failed to cache embedding for text {}: {}", miss_idx, e);
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => return Err(e.to_string())
+        }
+    }
+    
+    Ok(results)
 }
 
 #[tauri::command]
@@ -756,6 +859,76 @@ async fn get_embedding_generator_config() -> Result<EmbeddingConfig, String> {
         // Return default config if generator not initialized
         Ok(EmbeddingConfig::default())
     }
+}
+
+// === EMBEDDING CACHE TAURI COMMANDS ===
+
+#[tauri::command]
+async fn get_embedding_cache_metrics() -> Result<CacheMetrics, String> {
+    let cache = get_embedding_cache().await;
+    Ok(cache.get_metrics().await)
+}
+
+#[tauri::command]
+async fn clear_embedding_cache() -> Result<(), String> {
+    let cache = get_embedding_cache().await;
+    cache.clear().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_embedding_cache_size() -> Result<usize, String> {
+    let cache = get_embedding_cache().await;
+    Ok(cache.size().await)
+}
+
+#[tauri::command]
+async fn update_embedding_cache_config(
+    max_entries: Option<usize>,
+    ttl_seconds: Option<u64>,
+    persist_to_disk: Option<bool>,
+    enable_metrics: Option<bool>,
+) -> Result<(), String> {
+    let mut cache_lock = EMBEDDING_CACHE.write().await;
+    
+    if let Some(cache) = cache_lock.as_mut() {
+        let mut config = cache.get_config().clone();
+        
+        if let Some(max_entries_val) = max_entries {
+            config.max_entries = max_entries_val;
+        }
+        if let Some(ttl_val) = ttl_seconds {
+            config.ttl_seconds = ttl_val;
+        }
+        if let Some(persist_val) = persist_to_disk {
+            config.persist_to_disk = persist_val;
+        }
+        if let Some(metrics_val) = enable_metrics {
+            config.enable_metrics = metrics_val;
+        }
+        
+        cache.update_config(config);
+        Ok(())
+    } else {
+        Err("Embedding cache not initialized".to_string())
+    }
+}
+
+#[tauri::command]
+async fn get_embedding_cache_config() -> Result<CacheConfig, String> {
+    let cache = get_embedding_cache().await;
+    Ok(cache.get_config().clone())
+}
+
+#[tauri::command]
+async fn cleanup_expired_embeddings() -> Result<usize, String> {
+    let cache = get_embedding_cache().await;
+    cache.cleanup_expired().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn check_embedding_cached(text: String, model: String) -> Result<bool, String> {
+    let cache = get_embedding_cache().await;
+    cache.contains(&text, &model).await.map_err(|e| e.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -882,7 +1055,14 @@ pub fn run() {
             generate_embedding,
             generate_batch_embeddings,
             update_embedding_generator_config,
-            get_embedding_generator_config
+            get_embedding_generator_config,
+            get_embedding_cache_metrics,
+            clear_embedding_cache,
+            get_embedding_cache_size,
+            update_embedding_cache_config,
+            get_embedding_cache_config,
+            cleanup_expired_embeddings,
+            check_embedding_cached
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
