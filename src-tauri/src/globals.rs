@@ -40,6 +40,7 @@ use once_cell::sync::Lazy;
 use crate::ollama_client::{OllamaClient, OllamaConfig};
 use crate::embedding_generator::EmbeddingGenerator;  
 use crate::embedding_cache::EmbeddingCache;
+use crate::vector_db::VectorDatabase;
 
 /// Global Ollama client instance for AI model interactions
 /// 
@@ -63,6 +64,14 @@ pub static EMBEDDING_GENERATOR: Lazy<Arc<RwLock<Option<EmbeddingGenerator>>>> =
 /// computation. Includes TTL support, persistence options, and metrics
 /// tracking for cache efficiency monitoring.
 pub static EMBEDDING_CACHE: Lazy<Arc<RwLock<Option<EmbeddingCache>>>> = 
+    Lazy::new(|| Arc::new(RwLock::new(None)));
+
+/// Global vector database instance for embedding storage and retrieval
+///
+/// Manages the vector database for storing and querying embeddings.
+/// Includes support for incremental updates, similarity search, and
+/// comprehensive database operations with transaction safety.
+pub static VECTOR_DATABASE: Lazy<Arc<RwLock<Option<VectorDatabase>>>> = 
     Lazy::new(|| Arc::new(RwLock::new(None)));
 
 /// Helper function to get or initialize the embedding cache
