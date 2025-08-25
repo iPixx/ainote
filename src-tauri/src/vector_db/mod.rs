@@ -101,6 +101,8 @@ use tokio::sync::RwLock;
 
 pub mod types;
 pub mod storage;
+pub mod operations;
+pub mod indexing;
 pub mod atomic;
 pub mod file_ops;
 pub mod operations;
@@ -111,6 +113,8 @@ mod atomic_performance_test;
 
 use types::{EmbeddingEntry, StorageMetrics, VectorStorageConfig, VectorDbResult, VectorDbError};
 use storage::{VectorStorage, CompactionResult, IntegrityReport};
+use operations::{VectorOperations, BatchOperations, ValidationOperations, CleanupOperations};
+use indexing::{IndexingSystem, IndexStats};
 use file_ops::{FileOperations, InitializationStatus, CleanupResult, BackupResult, RecoveryResult, FileSystemMetrics};
 use operations::{VectorOperations, BatchOperations, ValidationOperations, CleanupOperations};
 use indexing::{IndexingSystem, IndexStats};
@@ -833,6 +837,9 @@ pub use types::{
     EmbeddingMetadata,
     CompressionAlgorithm,
 };
+
+// Re-export additional operations types not already imported above
+pub use indexing::IndexMetadata;
 
 // Re-export atomic operations types
 pub use atomic::{
