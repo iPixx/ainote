@@ -1,8 +1,9 @@
 use tauri::Manager;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 // Module declarations
+pub mod commands;           // New: Command modules for better organization
+pub mod globals;            // New: Global state management
+pub mod app_setup;          // New: Application setup and window management
 pub mod performance;
 pub mod errors;
 pub mod types;
@@ -56,9 +57,8 @@ pub use search_commands::{
     SearchCommandError, initialize_search_engine, get_search_engine_stats
 };
 
-// Global Ollama client instance
-static OLLAMA_CLIENT: once_cell::sync::Lazy<Arc<RwLock<Option<OllamaClient>>>> = 
-    once_cell::sync::Lazy::new(|| Arc::new(RwLock::new(None)));
+// Import global instances from globals module
+use globals::{OLLAMA_CLIENT, get_embedding_cache, get_embedding_generator};
 
 // Tauri command implementations
 #[tauri::command]
@@ -677,65 +677,7 @@ fn chunk_text_with_config(text: String, config: ChunkingConfig) -> Result<Vec<St
 
 // === EMBEDDING GENERATION TAURI COMMANDS ===
 
-/// Global embedding generator instance
-static EMBEDDING_GENERATOR: once_cell::sync::Lazy<Arc<RwLock<Option<EmbeddingGenerator>>>> = 
-    once_cell::sync::Lazy::new(|| Arc::new(RwLock::new(None)));
-
-/// Global embedding cache instance
-static EMBEDDING_CACHE: once_cell::sync::Lazy<Arc<RwLock<Option<EmbeddingCache>>>> = 
-    once_cell::sync::Lazy::new(|| Arc::new(RwLock::new(None)));
-
-/// Helper function to get or create embedding cache
-async fn get_embedding_cache() -> EmbeddingCache {
-    let cache_lock = EMBEDDING_CACHE.read().await;
-    if let Some(cache) = cache_lock.as_ref() {
-        cache.clone()
-    } else {
-        drop(cache_lock);
-        // Initialize cache if not exists
-        let mut cache_lock = EMBEDDING_CACHE.write().await;
-        
-        // Double-check pattern to avoid race conditions
-        if let Some(cache) = cache_lock.as_ref() {
-            return cache.clone();
-        }
-        
-        let new_cache = EmbeddingCache::new();
-        *cache_lock = Some(new_cache.clone());
-        new_cache
-    }
-}
-
-/// Helper function to get or create embedding generator
-async fn get_embedding_generator() -> EmbeddingGenerator {
-    let generator_lock = EMBEDDING_GENERATOR.read().await;
-    if let Some(generator) = generator_lock.as_ref() {
-        generator.clone()
-    } else {
-        drop(generator_lock);
-        // Initialize generator if not exists
-        let mut generator_lock = EMBEDDING_GENERATOR.write().await;
-        
-        // Double-check pattern to avoid race conditions
-        if let Some(generator) = generator_lock.as_ref() {
-            return generator.clone();
-        }
-        
-        // Get Ollama config from global client
-        let ollama_config = {
-            let client_lock = OLLAMA_CLIENT.read().await;
-            if let Some(client) = client_lock.as_ref() {
-                client.get_config().clone()
-            } else {
-                OllamaConfig::default()
-            }
-        };
-        
-        let new_generator = EmbeddingGenerator::new(ollama_config);
-        *generator_lock = Some(new_generator.clone());
-        new_generator
-    }
-}
+// Note: Global embedding instances and helper functions moved to globals.rs module
 
 #[tauri::command]
 async fn generate_embedding(text: String, model: String) -> Result<Vec<f32>, String> {
@@ -834,7 +776,7 @@ async fn update_embedding_generator_config(
     max_text_length: Option<usize>,
     batch_size: Option<usize>,
 ) -> Result<(), String> {
-    let mut generator_lock = EMBEDDING_GENERATOR.write().await;
+    let mut generator_lock = globals::EMBEDDING_GENERATOR.write().await;
     
     if let Some(generator) = generator_lock.as_mut() {
         let mut config = generator.get_embedding_config().clone();
@@ -867,7 +809,7 @@ async fn update_embedding_generator_config(
 
 #[tauri::command]
 async fn get_embedding_generator_config() -> Result<EmbeddingConfig, String> {
-    let generator_lock = EMBEDDING_GENERATOR.read().await;
+    let generator_lock = globals::EMBEDDING_GENERATOR.read().await;
     
     if let Some(generator) = generator_lock.as_ref() {
         Ok(generator.get_embedding_config().clone())
@@ -904,7 +846,7 @@ async fn update_embedding_cache_config(
     persist_to_disk: Option<bool>,
     enable_metrics: Option<bool>,
 ) -> Result<(), String> {
-    let mut cache_lock = EMBEDDING_CACHE.write().await;
+    let mut cache_lock = globals::EMBEDDING_CACHE.write().await;
     
     if let Some(cache) = cache_lock.as_mut() {
         let mut config = cache.get_config().clone();
@@ -954,65 +896,9 @@ pub fn run() {
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
             
-            // Load and apply saved window state
-            if let Ok(app_state) = state_management::load_app_state_internal() {
-                let window_state = &app_state.window;
-                
-                // Validate and constrain window size to reasonable bounds
-                let validated_width = window_state.width.clamp(800.0, 2000.0);
-                let validated_height = window_state.height.clamp(600.0, 1400.0);
-                
-                // Apply saved window size with validation
-                let _ = window.set_size(tauri::LogicalSize::new(
-                    validated_width,
-                    validated_height,
-                ));
-                
-                // Apply saved window position if available
-                if let (Some(x), Some(y)) = (window_state.x, window_state.y) {
-                    // Validate position to ensure window is on screen
-                    let validated_x = x.clamp(-100, 1500);
-                    let validated_y = y.clamp(-100, 1000);
-                    let _ = window.set_position(tauri::LogicalPosition::new(validated_x, validated_y));
-                }
-                
-                // Apply maximized state
-                if window_state.maximized {
-                    let _ = window.maximize();
-                }
-            }
-            
-            // Helper function to save window state consistently
-            fn save_current_window_state(window: &tauri::WebviewWindow) {
-                if let (Ok(size), Ok(position)) = (window.inner_size(), window.outer_position()) {
-                    let is_maximized = window.is_maximized().unwrap_or(false);
-                    let scale_factor = window.scale_factor().unwrap_or(1.0);
-                    let logical_size = size.to_logical::<f64>(scale_factor);
-                    let logical_position = position.to_logical::<i32>(scale_factor);
-                    let _ = save_window_state(
-                        logical_size.width,
-                        logical_size.height,
-                        Some(logical_position.x),
-                        Some(logical_position.y),
-                        is_maximized
-                    );
-                }
-            }
-
-            // Handle window events
-            let window_clone = window.clone();
-            window.on_window_event(move |event| {
-                match event {
-                    tauri::WindowEvent::CloseRequested { .. } => {
-                        save_current_window_state(&window_clone);
-                        std::process::exit(0);
-                    }
-                    tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
-                        save_current_window_state(&window_clone);
-                    }
-                    _ => {}
-                }
-            });
+            // Setup window state and event handlers using app_setup module
+            app_setup::setup_window_state(&window);
+            app_setup::setup_window_events(&window);
             
             Ok(())
         })
