@@ -109,6 +109,9 @@ pub mod file_ops;
 #[cfg(test)]
 mod atomic_performance_test;
 
+#[cfg(test)]
+mod tests;
+
 use types::{EmbeddingEntry, StorageMetrics, VectorStorageConfig, VectorDbResult, VectorDbError};
 use storage::{VectorStorage, CompactionResult, IntegrityReport};
 use operations::{VectorOperations, BatchOperations, ValidationOperations, CleanupOperations};
@@ -842,64 +845,8 @@ pub use atomic::{
     AtomicConfig,
 };
 
+
+/// Comprehensive test utilities and additional tests  
+/// located in separate tests.rs module
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-    
-    fn create_test_config() -> VectorStorageConfig {
-        let temp_dir = TempDir::new().unwrap();
-        let storage_dir = temp_dir.path().to_string_lossy().to_string();
-        std::mem::forget(temp_dir); // Keep temp dir alive for test
-        
-        VectorStorageConfig {
-            storage_dir,
-            enable_compression: false,
-            compression_algorithm: CompressionAlgorithm::None,
-            max_entries_per_file: 100,
-            enable_checksums: false,
-            auto_backup: false,
-            max_backups: 0,
-            enable_metrics: false,
-        }
-    }
-    
-    #[test]
-    fn test_database_creation_structure() {
-        let config = create_test_config();
-        
-        // Test basic structure creation without async operations
-        assert!(!config.storage_dir.is_empty());
-        assert_eq!(config.enable_compression, false);
-        assert_eq!(config.enable_checksums, false);
-        assert_eq!(config.auto_backup, false);
-        assert_eq!(config.enable_metrics, false);
-    }
-    
-    #[test]
-    fn test_store_and_retrieve_embedding_structure() {
-        // Test embedding entry creation without async file operations
-        let vector = vec![0.1, 0.2, 0.3, 0.4, 0.5];
-        let text = "This is a test document for embedding";
-        
-        let entry = EmbeddingEntry::new(
-            vector.clone(),
-            "/test/document.md".to_string(),
-            "chunk_1".to_string(),
-            text,
-            "test-model".to_string(),
-        );
-        
-        assert!(!entry.id.is_empty());
-        assert_eq!(entry.vector, vector);
-        assert_eq!(entry.metadata.file_path, "/test/document.md");
-        assert_eq!(entry.metadata.model_name, "test-model");
-        assert_eq!(entry.metadata.text_length, text.len());
-        assert!(!entry.metadata.text_hash.is_empty());
-    }
-    
-    // Note: Comprehensive async integration tests for the VectorDatabase API 
-    // will be implemented in sub-issue #105 (Testing: Comprehensive test suite 
-    // and performance validation). The current tests focus on data structure 
-    // validation to avoid async/file I/O hanging issues during development.
-}
+pub use tests::test_utils;
