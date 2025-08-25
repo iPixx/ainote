@@ -55,36 +55,47 @@
 //!     ])
 //! ```
 
-// Command modules will be created in Phase 2 of the refactoring
-// This module structure is prepared for future command extraction
+// Command modules - Phase 2 Complete
+// All command modules have been extracted from the monolithic lib.rs
 
-// File Operations Module (Phase 2)
-// Will handle: CRUD operations, file preview, auto-save
-// pub mod file_operations;
+// File Operations Module
+// Handles: CRUD operations, file preview, auto-save, folder creation
+pub mod file_operations;
 
-// Vault Operations Module (Phase 2)
-// Will handle: vault scanning, validation, folder selection, and file watching
-// pub mod vault_operations;
+// Vault Operations Module
+// Handles: vault scanning, validation, folder selection, and file watching
+pub mod vault_operations;
 
-// State Management Module (Phase 2)
-// Will handle: application state, window state, layout preferences, and session data
-// pub mod state_management;
+// State Management Module
+// Handles: application state, window state, layout preferences, and session data
+pub mod state_management;
 
-// Ollama Commands Module (Phase 2)
-// Will handle: Ollama client management, health checks, model operations, and monitoring
-// pub mod ollama_commands;
+// Text Processing Module
+// Handles: text preprocessing, chunking, validation, and optimization
+pub mod text_processing;
 
-// Embedding Commands Module (Phase 2)
-// Will handle: embedding generation, batch processing, caching, and configuration
-// pub mod embedding_commands;
+// Ollama Commands Module
+// Handles: Ollama client management, health checks, model operations, and monitoring
+pub mod ollama_commands;
 
-// Search Commands Module (Phase 2)
-// Will handle: similarity search operations and vector database queries
-// pub mod search_commands;
+// Embedding Commands Module
+// Handles: embedding generation, batch processing, caching, and configuration
+pub mod embedding_commands;
 
-// Performance Commands Module (Phase 2)
-// Will handle: benchmarking, baseline management, and regression detection
-// pub mod performance_commands;
+// Performance Commands Module
+// Handles: benchmarking, baseline management, and regression detection
+pub mod performance_commands;
+
+// Search Commands Module
+// Handles: similarity search operations and vector database queries
+pub mod search_commands;
 
 // Re-export all command functions for easy access in lib.rs
-// Note: Actual re-exports will be added as modules are implemented in Phase 2
+pub use file_operations::*;
+pub use vault_operations::*;
+pub use state_management::*;
+pub use text_processing::*;
+pub use ollama_commands::*;
+pub use embedding_commands::*;
+pub use performance_commands::*;
+pub use search_commands::*;

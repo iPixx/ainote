@@ -58,836 +58,19 @@ pub use search_commands::{
 };
 
 // Import global instances from globals module
-use globals::{OLLAMA_CLIENT, get_embedding_cache, get_embedding_generator};
-
-// Tauri command implementations
-#[tauri::command]
-fn read_file(file_path: String) -> Result<String, String> {
-    file_operations::read_file_internal(&file_path).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn preview_file(file_path: String, max_length: Option<usize>) -> Result<String, String> {
-    file_operations::preview_file_internal(&file_path, max_length.unwrap_or(1000)).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn auto_save_file(file_path: String, content: String) -> Result<(), String> {
-    file_operations::auto_save_file_internal(&file_path, &content).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn write_file(file_path: String, content: String) -> Result<(), String> {
-    file_operations::write_file_internal(&file_path, &content).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn create_file(file_path: String) -> Result<(), String> {
-    file_operations::create_file_internal(&file_path).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn delete_file(file_path: String) -> Result<(), String> {
-    file_operations::delete_file_internal(&file_path).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
-    file_operations::rename_file_internal(&old_path, &new_path).map_err(|e| e.into())
-}
-
-#[tauri::command]
-async fn select_vault_folder() -> Result<Option<String>, String> {
-    use rfd::AsyncFileDialog;
-    
-    let folder = AsyncFileDialog::new()
-        .set_title("Select Vault Folder")
-        .pick_folder()
-        .await;
-
-    match folder {
-        Some(handle) => {
-            let path = handle.path().to_string_lossy().to_string();
-            Ok(Some(path))
-        }
-        None => Ok(None),
-    }
-}
-
-#[tauri::command]
-async fn select_vault() -> Result<Option<String>, String> {
-    // Alias for select_vault_folder to match the API requirements
-    select_vault_folder().await
-}
-
-#[tauri::command]
-fn validate_vault(vault_path: String) -> Result<bool, String> {
-    vault_operations::validate_vault_internal(&vault_path).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn load_vault(vault_path: String) -> Result<Vec<FileInfo>, String> {
-    // Enhanced vault loading with validation
-    vault_operations::load_vault_internal(&vault_path).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn scan_vault_files(vault_path: String) -> Result<Vec<FileInfo>, String> {
-    vault_operations::scan_vault_files_internal(&vault_path).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn get_file_info(file_path: String) -> Result<FileInfo, String> {
-    file_operations::get_file_info_internal(&file_path).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn create_folder(folder_path: String) -> Result<(), String> {
-    file_operations::create_folder_internal(&folder_path).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn watch_vault(vault_path: String) -> Result<(), String> {
-    vault_operations::watch_vault_internal(&vault_path).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn scan_vault_files_chunked(
-    vault_path: String, 
-    page: usize, 
-    page_size: usize
-) -> Result<(Vec<FileInfo>, bool), String> {
-    vault_operations::scan_vault_files_chunked_internal(&vault_path, page, page_size).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn reveal_in_finder(file_path: String) -> Result<(), String> {
-    file_operations::reveal_in_finder_internal(&file_path).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn load_app_state() -> Result<AppState, String> {
-    state_management::load_app_state_internal().map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn save_app_state(state: AppState) -> Result<(), String> {
-    state_management::save_app_state_internal(&state).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn save_window_state(width: f64, height: f64, x: Option<i32>, y: Option<i32>, maximized: bool) -> Result<(), String> {
-    state_management::save_window_state_internal(width, height, x, y, maximized).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn save_layout_state(
-    file_tree_width: f64,
-    ai_panel_width: f64,
-    file_tree_visible: bool,
-    ai_panel_visible: bool,
-    editor_mode: String,
-) -> Result<(), String> {
-    state_management::save_layout_state_internal(
-        file_tree_width,
-        ai_panel_width,
-        file_tree_visible,
-        ai_panel_visible,
-        editor_mode,
-    ).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn save_session_state(
-    current_vault: Option<String>,
-    current_file: Option<String>,
-    view_mode: String,
-) -> Result<(), String> {
-    state_management::save_session_state_internal(current_vault, current_file, view_mode).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn save_vault_preferences(recent_vaults: Vec<String>) -> Result<(), String> {
-    state_management::save_vault_preferences_internal(recent_vaults).map_err(|e| e.into())
-}
-
-#[tauri::command]
-fn get_vault_preferences() -> Result<Vec<String>, String> {
-    state_management::get_vault_preferences_internal().map_err(|e| e.into())
-}
-
-// Ollama service commands
-#[tauri::command]
-async fn check_ollama_status() -> Result<ConnectionState, String> {
-    eprintln!("🔍 [DEBUG RUST] check_ollama_status command called");
-    
-    let client = {
-        let client_lock = OLLAMA_CLIENT.read().await;
-        if let Some(client) = client_lock.as_ref() {
-            eprintln!("🔍 [DEBUG RUST] Using existing Ollama client instance");
-            client.clone()
-        } else {
-            eprintln!("🔍 [DEBUG RUST] No existing client found, creating new OllamaClient");
-            // Initialize client if not exists
-            drop(client_lock);
-            let mut client_lock = OLLAMA_CLIENT.write().await;
-            let new_client = OllamaClient::new();
-            eprintln!("🔍 [DEBUG RUST] Created new client with config: {:?}", new_client.get_config());
-            *client_lock = Some(new_client.clone());
-            new_client
-        }
-    };
-    
-    // Perform actual health check to get current status
-    eprintln!("🔍 [DEBUG RUST] Performing fresh health check");
-    let _health_result = client.check_health().await; // This updates the internal state
-    
-    // Now get the updated connection state
-    let state = client.get_connection_state().await;
-    eprintln!("🔍 [DEBUG RUST] Fresh connection state after health check: {:?}", state);
-    Ok(state)
-}
-
-#[tauri::command]
-async fn get_ollama_health() -> Result<HealthResponse, String> {
-    let client = {
-        let client_lock = OLLAMA_CLIENT.read().await;
-        if let Some(client) = client_lock.as_ref() {
-            client.clone()
-        } else {
-            drop(client_lock);
-            let mut client_lock = OLLAMA_CLIENT.write().await;
-            let new_client = OllamaClient::new();
-            *client_lock = Some(new_client.clone());
-            new_client
-        }
-    };
-    
-    match client.check_health().await {
-        Ok(health) => Ok(health),
-        Err(e) => Err(format!("Health check failed: {}", e))
-    }
-}
-
-#[tauri::command]
-async fn configure_ollama_url(base_url: String) -> Result<(), String> {
-    // Input validation
-    if base_url.trim().is_empty() {
-        return Err("Base URL cannot be empty".to_string());
-    }
-    
-    // Basic URL validation
-    if !base_url.starts_with("http://") && !base_url.starts_with("https://") {
-        return Err("Base URL must start with http:// or https://".to_string());
-    }
-    
-    let sanitized_url = base_url.trim().trim_end_matches('/').to_string();
-    
-    let mut client_lock = OLLAMA_CLIENT.write().await;
-    let config = OllamaConfig {
-        base_url: sanitized_url.clone(),
-        ..Default::default()
-    };
-    
-    if let Some(existing_client) = client_lock.as_mut() {
-        // Update existing client configuration
-        existing_client.update_config(config).await;
-    } else {
-        // Create new client with configuration
-        let client = OllamaClient::with_config(config);
-        *client_lock = Some(client);
-    }
-    
-    Ok(())
-}
-
-#[tauri::command]
-async fn start_ollama_monitoring() -> Result<(), String> {
-    let config = {
-        let client_lock = OLLAMA_CLIENT.read().await;
-        if let Some(client) = client_lock.as_ref() {
-            client.get_config().clone()
-        } else {
-            drop(client_lock);
-            let mut client_lock = OLLAMA_CLIENT.write().await;
-            let client = OllamaClient::new();
-            let config = client.get_config().clone();
-            *client_lock = Some(client);
-            config
-        }
-    };
-    
-    // Start monitoring with retry logic - this is non-blocking
-    // Create a new client instance for background monitoring to avoid borrowing issues
-    tokio::spawn(async move {
-        let monitoring_client = OllamaClient::with_config(config);
-        // Perform health check with retries in background
-        match monitoring_client.check_health_with_retry().await {
-            Ok(_) => {
-                eprintln!("Ollama monitoring started successfully");
-            }
-            Err(e) => {
-                eprintln!("Ollama monitoring failed to connect: {}", e);
-            }
-        }
-    });
-    
-    Ok(())
-}
-
-// === MODEL MANAGEMENT TAURI COMMANDS ===
-
-#[tauri::command]
-async fn get_available_models() -> Result<Vec<ModelInfo>, String> {
-    let client_lock = OLLAMA_CLIENT.read().await;
-    
-    if let Some(client) = client_lock.as_ref() {
-        client.get_available_models().await
-            .map_err(|e| e.to_string())
-    } else {
-        drop(client_lock);
-        // Initialize client if not exists
-        let mut client_lock = OLLAMA_CLIENT.write().await;
-        let client = OllamaClient::new();
-        let result = client.get_available_models().await
-            .map_err(|e| e.to_string());
-        *client_lock = Some(client);
-        result
-    }
-}
-
-#[tauri::command]
-async fn verify_model(model_name: String) -> Result<ModelVerificationResult, String> {
-    let client_lock = OLLAMA_CLIENT.read().await;
-    
-    if let Some(client) = client_lock.as_ref() {
-        client.verify_model(&model_name).await
-            .map_err(|e| e.to_string())
-    } else {
-        drop(client_lock);
-        // Initialize client if not exists
-        let mut client_lock = OLLAMA_CLIENT.write().await;
-        let client = OllamaClient::new();
-        let result = client.verify_model(&model_name).await
-            .map_err(|e| e.to_string());
-        *client_lock = Some(client);
-        result
-    }
-}
-
-#[tauri::command]
-async fn is_nomic_embed_available() -> Result<bool, String> {
-    let client_lock = OLLAMA_CLIENT.read().await;
-    
-    if let Some(client) = client_lock.as_ref() {
-        client.is_nomic_embed_available().await
-            .map_err(|e| e.to_string())
-    } else {
-        drop(client_lock);
-        // Initialize client if not exists
-        let mut client_lock = OLLAMA_CLIENT.write().await;
-        let client = OllamaClient::new();
-        let result = client.is_nomic_embed_available().await
-            .map_err(|e| e.to_string());
-        *client_lock = Some(client);
-        result
-    }
-}
-
-#[tauri::command]
-async fn get_model_info(model_name: String) -> Result<Option<ModelInfo>, String> {
-    let client_lock = OLLAMA_CLIENT.read().await;
-    
-    if let Some(client) = client_lock.as_ref() {
-        client.get_model_info(&model_name).await
-            .map_err(|e| e.to_string())
-    } else {
-        drop(client_lock);
-        // Initialize client if not exists
-        let mut client_lock = OLLAMA_CLIENT.write().await;
-        let client = OllamaClient::new();
-        let result = client.get_model_info(&model_name).await
-            .map_err(|e| e.to_string());
-        *client_lock = Some(client);
-        result
-    }
-}
-
-// === PERFORMANCE BENCHMARKING TAURI COMMANDS ===
-
-use crate::benchmarks::{EmbeddingBenchmarks, BenchmarkConfig, BenchmarkResult};
-use crate::performance_baseline::{BaselineManager, BaselineConfig, BaselineComparison};
-use crate::regression_detection::{RegressionDetector, RegressionDetectionConfig, RegressionAnalysisReport};
-
-#[tauri::command]
-async fn run_embedding_benchmarks() -> Result<Vec<BenchmarkResult>, String> {
-    let ollama_config = {
-        let client_lock = OLLAMA_CLIENT.read().await;
-        if let Some(client) = client_lock.as_ref() {
-            client.get_config().clone()
-        } else {
-            OllamaConfig::default()
-        }
-    };
-    
-    let benchmark_config = BenchmarkConfig::default();
-    let mut benchmarks = EmbeddingBenchmarks::new(ollama_config, benchmark_config);
-    
-    benchmarks.run_comprehensive_benchmarks().await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn generate_benchmark_report(results: Vec<BenchmarkResult>) -> Result<String, String> {
-    let ollama_config = OllamaConfig::default();
-    let benchmark_config = BenchmarkConfig::default();
-    let benchmarks = EmbeddingBenchmarks::new(ollama_config, benchmark_config);
-    
-    Ok(benchmarks.generate_report(&results))
-}
-
-#[tauri::command]
-async fn detect_performance_regressions(results: Vec<BenchmarkResult>) -> Result<Vec<String>, String> {
-    let ollama_config = OllamaConfig::default();
-    let benchmark_config = BenchmarkConfig::default();
-    let benchmarks = EmbeddingBenchmarks::new(ollama_config, benchmark_config);
-    
-    Ok(benchmarks.detect_performance_regressions(&results))
-}
-
-#[tauri::command]
-async fn establish_performance_baseline(operation_name: String) -> Result<String, String> {
-    let ollama_config = {
-        let client_lock = OLLAMA_CLIENT.read().await;
-        if let Some(client) = client_lock.as_ref() {
-            client.get_config().clone()
-        } else {
-            OllamaConfig::default()
-        }
-    };
-    
-    let baseline_config = BaselineConfig::default();
-    let mut manager = BaselineManager::new(baseline_config)
-        .map_err(|e| format!("Failed to create baseline manager: {}", e))?;
-    
-    let baseline = manager.establish_baseline(&operation_name, &ollama_config).await
-        .map_err(|e| format!("Failed to establish baseline: {}", e))?;
-    
-    Ok(format!("Baseline established for '{}' with {:.1}% confidence", 
-               baseline.operation_name, baseline.confidence_level * 100.0))
-}
-
-#[tauri::command]
-async fn compare_performance_against_baseline(operation_name: String, benchmark_result: BenchmarkResult) -> Result<BaselineComparison, String> {
-    let baseline_config = BaselineConfig::default();
-    let manager = BaselineManager::new(baseline_config)
-        .map_err(|e| format!("Failed to create baseline manager: {}", e))?;
-    
-    Ok(manager.compare_against_baseline(&operation_name, &benchmark_result))
-}
-
-#[tauri::command]
-async fn get_baseline_report() -> Result<String, String> {
-    let baseline_config = BaselineConfig::default();
-    let manager = BaselineManager::new(baseline_config)
-        .map_err(|e| format!("Failed to create baseline manager: {}", e))?;
-    
-    Ok(manager.generate_baseline_report())
-}
-
-#[tauri::command]
-async fn analyze_performance_regressions(benchmark_results: Vec<BenchmarkResult>) -> Result<RegressionAnalysisReport, String> {
-    let config = RegressionDetectionConfig::default();
-    let mut detector = RegressionDetector::new(config);
-    
-    // Load existing baselines if available
-    let baseline_config = BaselineConfig::default();
-    let baseline_manager = BaselineManager::new(baseline_config)
-        .map_err(|e| format!("Failed to load baselines: {}", e))?;
-    
-    for baseline in baseline_manager.get_all_baselines() {
-        detector.add_baseline(baseline.clone());
-    }
-    
-    Ok(detector.analyze_performance_regressions(&benchmark_results))
-}
-
-// === MODEL DOWNLOAD TAURI COMMANDS ===
-
-#[tauri::command]
-async fn download_model(model_name: String) -> Result<DownloadProgress, String> {
-    let client_lock = OLLAMA_CLIENT.read().await;
-    
-    if let Some(client) = client_lock.as_ref() {
-        client.download_model(&model_name).await
-            .map_err(|e| e.to_string())
-    } else {
-        drop(client_lock);
-        // Initialize client if not exists
-        let mut client_lock = OLLAMA_CLIENT.write().await;
-        let client = OllamaClient::new();
-        let result = client.download_model(&model_name).await
-            .map_err(|e| e.to_string());
-        *client_lock = Some(client);
-        result
-    }
-}
-
-#[tauri::command]
-async fn get_download_progress(model_name: String) -> Result<Option<DownloadProgress>, String> {
-    let client_lock = OLLAMA_CLIENT.read().await;
-    
-    if let Some(client) = client_lock.as_ref() {
-        Ok(client.get_download_progress(&model_name).await)
-    } else {
-        drop(client_lock);
-        // Initialize client if not exists
-        let mut client_lock = OLLAMA_CLIENT.write().await;
-        let client = OllamaClient::new();
-        let result = client.get_download_progress(&model_name).await;
-        *client_lock = Some(client);
-        Ok(result)
-    }
-}
-
-#[tauri::command]
-async fn get_all_downloads() -> Result<std::collections::HashMap<String, DownloadProgress>, String> {
-    let client_lock = OLLAMA_CLIENT.read().await;
-    
-    if let Some(client) = client_lock.as_ref() {
-        Ok(client.get_all_downloads().await)
-    } else {
-        drop(client_lock);
-        // Initialize client if not exists
-        let mut client_lock = OLLAMA_CLIENT.write().await;
-        let client = OllamaClient::new();
-        let result = client.get_all_downloads().await;
-        *client_lock = Some(client);
-        Ok(result)
-    }
-}
-
-#[tauri::command]
-async fn cancel_download(model_name: String) -> Result<(), String> {
-    let client_lock = OLLAMA_CLIENT.read().await;
-    
-    if let Some(client) = client_lock.as_ref() {
-        client.cancel_download(&model_name).await
-            .map_err(|e| e.to_string())
-    } else {
-        drop(client_lock);
-        // Initialize client if not exists
-        let mut client_lock = OLLAMA_CLIENT.write().await;
-        let client = OllamaClient::new();
-        let result = client.cancel_download(&model_name).await
-            .map_err(|e| e.to_string());
-        *client_lock = Some(client);
-        result
-    }
-}
-
-#[tauri::command]
-async fn clear_completed_downloads() -> Result<(), String> {
-    let client_lock = OLLAMA_CLIENT.read().await;
-    
-    if let Some(client) = client_lock.as_ref() {
-        client.clear_completed_downloads().await;
-        Ok(())
-    } else {
-        drop(client_lock);
-        // Initialize client if not exists
-        let mut client_lock = OLLAMA_CLIENT.write().await;
-        let client = OllamaClient::new();
-        client.clear_completed_downloads().await;
-        *client_lock = Some(client);
-        Ok(())
-    }
-}
-
-// === TEXT PROCESSING TAURI COMMANDS ===
-
-#[tauri::command]
-fn preprocess_text(input: String) -> Result<String, String> {
-    let processor = TextProcessor::new();
-    processor.preprocess_text(input)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn chunk_text(text: String, chunk_size: usize, overlap: usize) -> Result<Vec<String>, String> {
-    let processor = TextProcessor::new();
-    processor.chunk_text(text, chunk_size, overlap)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn validate_text(text: String) -> Result<(), String> {
-    TextProcessor::validate_text(&text)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn get_optimal_chunk_size(text: String) -> Result<usize, String> {
-    let processor = TextProcessor::new();
-    Ok(processor.get_optimal_chunk_size(&text))
-}
-
-#[tauri::command]
-fn benchmark_chunk_sizes(sample_text: String, sizes: Vec<usize>) -> Result<Vec<ChunkingBenchmark>, String> {
-    let processor = TextProcessor::new();
-    processor.benchmark_chunk_sizes(&sample_text, &sizes)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn create_chunking_config(
-    chunk_size: Option<usize>,
-    overlap: Option<usize>, 
-    preserve_sentences: Option<bool>,
-    preserve_paragraphs: Option<bool>,
-    min_chunk_size: Option<usize>
-) -> ChunkingConfig {
-    let mut config = ChunkingConfig::default();
-    
-    if let Some(size) = chunk_size {
-        config.chunk_size = size;
-    }
-    if let Some(ovlp) = overlap {
-        config.overlap = ovlp;
-    }
-    if let Some(sentences) = preserve_sentences {
-        config.preserve_sentences = sentences;
-    }
-    if let Some(paragraphs) = preserve_paragraphs {
-        config.preserve_paragraphs = paragraphs;
-    }
-    if let Some(min_size) = min_chunk_size {
-        config.min_chunk_size = min_size;
-    }
-    
-    config
-}
-
-#[tauri::command]
-fn chunk_text_with_config(text: String, config: ChunkingConfig) -> Result<Vec<String>, String> {
-    let processor = TextProcessor::with_config(config.clone());
-    processor.chunk_text(text, config.chunk_size, config.overlap)
-        .map_err(|e| e.to_string())
-}
-
-// === EMBEDDING GENERATION TAURI COMMANDS ===
-
-// Note: Global embedding instances and helper functions moved to globals.rs module
-
-#[tauri::command]
-async fn generate_embedding(text: String, model: String) -> Result<Vec<f32>, String> {
-    let cache = get_embedding_cache().await;
-    
-    // Try cache first
-    if let Ok(Some(cached_embedding)) = cache.get(&text, &model).await {
-        return Ok(cached_embedding);
-    }
-    
-    // Cache miss, generate embedding
-    let generator = get_embedding_generator().await;
-    let start_time = std::time::Instant::now();
-    
-    match generator.generate_embedding(text.clone(), model.clone()).await {
-        Ok(embedding) => {
-            let _generation_time = start_time.elapsed().as_millis() as f64;
-            
-            // Cache the result
-            if let Err(e) = cache.set(&text, &model, embedding.clone()).await {
-                eprintln!("⚠️ Failed to cache embedding: {}", e);
-            }
-            
-            // Note: Generation time metrics are updated internally in the cache
-            
-            Ok(embedding)
-        }
-        Err(e) => Err(e.to_string())
-    }
-}
-
-#[tauri::command]
-async fn generate_batch_embeddings(texts: Vec<String>, model: String) -> Result<Vec<Vec<f32>>, String> {
-    let cache = get_embedding_cache().await;
-    let generator = get_embedding_generator().await;
-    
-    let mut results = Vec::new();
-    let mut cache_misses = Vec::new();
-    let mut cache_miss_indices = Vec::new();
-    
-    eprintln!("🔄 Processing batch of {} embeddings with caching", texts.len());
-    
-    // Check cache for each text
-    for (i, text) in texts.iter().enumerate() {
-        if let Ok(Some(cached_embedding)) = cache.get(text, &model).await {
-            results.push(cached_embedding);
-        } else {
-            // Track cache misses
-            cache_misses.push(text.clone());
-            cache_miss_indices.push(i);
-            results.push(Vec::new()); // Placeholder
-        }
-    }
-    
-    let hit_count = texts.len() - cache_misses.len();
-    eprintln!("📊 Cache stats: {} hits, {} misses ({:.1}% hit rate)", 
-              hit_count, cache_misses.len(), 
-              if !texts.is_empty() { hit_count as f64 / texts.len() as f64 * 100.0 } else { 0.0 });
-    
-    // Generate embeddings for cache misses
-    if !cache_misses.is_empty() {
-        let start_time = std::time::Instant::now();
-        
-        match generator.generate_batch_embeddings(cache_misses.clone(), model.clone()).await {
-            Ok(new_embeddings) => {
-                let generation_time = start_time.elapsed().as_millis() as f64;
-                eprintln!("⚡ Generated {} embeddings in {:.1}ms", new_embeddings.len(), generation_time);
-                
-                // Update results and cache new embeddings
-                for (miss_idx, new_embedding) in new_embeddings.into_iter().enumerate() {
-                    if let Some(&result_idx) = cache_miss_indices.get(miss_idx) {
-                        results[result_idx] = new_embedding.clone();
-                        
-                        // Cache the new embedding
-                        if let Some(text) = cache_misses.get(miss_idx) {
-                            if let Err(e) = cache.set(text, &model, new_embedding).await {
-                                eprintln!("⚠️ Failed to cache embedding for text {}: {}", miss_idx, e);
-                            }
-                        }
-                    }
-                }
-            }
-            Err(e) => return Err(e.to_string())
-        }
-    }
-    
-    Ok(results)
-}
-
-#[tauri::command]
-async fn update_embedding_generator_config(
-    timeout_ms: Option<u64>,
-    max_retries: Option<usize>,
-    connection_pool_size: Option<usize>,
-    preprocess_text: Option<bool>,
-    max_text_length: Option<usize>,
-    batch_size: Option<usize>,
-) -> Result<(), String> {
-    let mut generator_lock = globals::EMBEDDING_GENERATOR.write().await;
-    
-    if let Some(generator) = generator_lock.as_mut() {
-        let mut config = generator.get_embedding_config().clone();
-        
-        if let Some(timeout) = timeout_ms {
-            config.timeout_ms = timeout;
-        }
-        if let Some(retries) = max_retries {
-            config.max_retries = retries;
-        }
-        if let Some(pool_size) = connection_pool_size {
-            config.connection_pool_size = pool_size;
-        }
-        if let Some(preprocess) = preprocess_text {
-            config.preprocess_text = preprocess;
-        }
-        if let Some(max_length) = max_text_length {
-            config.max_text_length = max_length;
-        }
-        if let Some(batch) = batch_size {
-            config.batch_size = batch;
-        }
-        
-        generator.update_embedding_config(config);
-        Ok(())
-    } else {
-        Err("Embedding generator not initialized".to_string())
-    }
-}
-
-#[tauri::command]
-async fn get_embedding_generator_config() -> Result<EmbeddingConfig, String> {
-    let generator_lock = globals::EMBEDDING_GENERATOR.read().await;
-    
-    if let Some(generator) = generator_lock.as_ref() {
-        Ok(generator.get_embedding_config().clone())
-    } else {
-        // Return default config if generator not initialized
-        Ok(EmbeddingConfig::default())
-    }
-}
-
-// === EMBEDDING CACHE TAURI COMMANDS ===
-
-#[tauri::command]
-async fn get_embedding_cache_metrics() -> Result<CacheMetrics, String> {
-    let cache = get_embedding_cache().await;
-    Ok(cache.get_metrics().await)
-}
-
-#[tauri::command]
-async fn clear_embedding_cache() -> Result<(), String> {
-    let cache = get_embedding_cache().await;
-    cache.clear().await.map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn get_embedding_cache_size() -> Result<usize, String> {
-    let cache = get_embedding_cache().await;
-    Ok(cache.size().await)
-}
-
-#[tauri::command]
-async fn update_embedding_cache_config(
-    max_entries: Option<usize>,
-    ttl_seconds: Option<u64>,
-    persist_to_disk: Option<bool>,
-    enable_metrics: Option<bool>,
-) -> Result<(), String> {
-    let mut cache_lock = globals::EMBEDDING_CACHE.write().await;
-    
-    if let Some(cache) = cache_lock.as_mut() {
-        let mut config = cache.get_config().clone();
-        
-        if let Some(max_entries_val) = max_entries {
-            config.max_entries = max_entries_val;
-        }
-        if let Some(ttl_val) = ttl_seconds {
-            config.ttl_seconds = ttl_val;
-        }
-        if let Some(persist_val) = persist_to_disk {
-            config.persist_to_disk = persist_val;
-        }
-        if let Some(metrics_val) = enable_metrics {
-            config.enable_metrics = metrics_val;
-        }
-        
-        cache.update_config(config);
-        Ok(())
-    } else {
-        Err("Embedding cache not initialized".to_string())
-    }
-}
-
-#[tauri::command]
-async fn get_embedding_cache_config() -> Result<CacheConfig, String> {
-    let cache = get_embedding_cache().await;
-    Ok(cache.get_config().clone())
-}
-
-#[tauri::command]
-async fn cleanup_expired_embeddings() -> Result<usize, String> {
-    let cache = get_embedding_cache().await;
-    cache.cleanup_expired().await.map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn check_embedding_cached(text: String, model: String) -> Result<bool, String> {
-    let cache = get_embedding_cache().await;
-    cache.contains(&text, &model).await.map_err(|e| e.to_string())
-}
+// Note: OLLAMA_CLIENT access is now handled within command modules
+
+// All Tauri command implementations have been moved to separate modules
+// in the commands/ directory for better organization and maintainability.
+// Commands are now organized by domain:
+// - commands/file_operations.rs: File CRUD operations
+// - commands/vault_operations.rs: Vault management
+// - commands/state_management.rs: Application state
+// - commands/text_processing.rs: Text processing
+// - commands/ollama_commands.rs: Ollama client management
+// - commands/embedding_commands.rs: Embedding generation
+// - commands/performance_commands.rs: Performance benchmarking
+// - commands/search_commands.rs: Similarity search
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -903,69 +86,76 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            read_file,
-            write_file,
-            auto_save_file,
-            create_file,
-            delete_file,
-            rename_file,
-            select_vault_folder,
-            select_vault,
-            validate_vault,
-            load_vault,
-            scan_vault_files,
-            scan_vault_files_chunked,
-            get_file_info,
-            create_folder,
-            watch_vault,
-            preview_file,
-            reveal_in_finder,
-            load_app_state,
-            save_app_state,
-            save_window_state,
-            save_layout_state,
-            save_session_state,
-            save_vault_preferences,
-            get_vault_preferences,
-            check_ollama_status,
-            get_ollama_health,
-            configure_ollama_url,
-            start_ollama_monitoring,
-            get_available_models,
-            verify_model,
-            is_nomic_embed_available,
-            get_model_info,
-            download_model,
-            get_download_progress,
-            get_all_downloads,
-            cancel_download,
-            clear_completed_downloads,
-            run_embedding_benchmarks,
-            generate_benchmark_report,
-            detect_performance_regressions,
-            establish_performance_baseline,
-            compare_performance_against_baseline,
-            get_baseline_report,
-            analyze_performance_regressions,
-            preprocess_text,
-            chunk_text,
-            validate_text,
-            get_optimal_chunk_size,
-            benchmark_chunk_sizes,
-            create_chunking_config,
-            chunk_text_with_config,
-            generate_embedding,
-            generate_batch_embeddings,
-            update_embedding_generator_config,
-            get_embedding_generator_config,
-            get_embedding_cache_metrics,
-            clear_embedding_cache,
-            get_embedding_cache_size,
-            update_embedding_cache_config,
-            get_embedding_cache_config,
-            cleanup_expired_embeddings,
-            check_embedding_cached,
-            // Basic similarity search commands (caching-focused)
+            // File Operations Commands
+            commands::read_file,
+            commands::write_file,
+            commands::auto_save_file,
+            commands::create_file,
+            commands::delete_file,
+            commands::rename_file,
+            commands::preview_file,
+            commands::reveal_in_finder,
+            commands::get_file_info,
+            commands::create_folder,
+            // Vault Operations Commands  
+            commands::select_vault_folder,
+            commands::select_vault,
+            commands::validate_vault,
+            commands::load_vault,
+            commands::scan_vault_files,
+            commands::scan_vault_files_chunked,
+            commands::watch_vault,
+            // State Management Commands
+            commands::load_app_state,
+            commands::save_app_state,
+            commands::save_window_state,
+            commands::save_layout_state,
+            commands::save_session_state,
+            commands::save_vault_preferences,
+            commands::get_vault_preferences,
+            // Text Processing Commands
+            commands::preprocess_text,
+            commands::chunk_text,
+            commands::validate_text,
+            commands::get_optimal_chunk_size,
+            commands::benchmark_chunk_sizes,
+            commands::create_chunking_config,
+            commands::chunk_text_with_config,
+            // Ollama Client Commands
+            commands::check_ollama_status,
+            commands::get_ollama_health,
+            commands::configure_ollama_url,
+            commands::start_ollama_monitoring,
+            commands::get_available_models,
+            commands::verify_model,
+            commands::is_nomic_embed_available,
+            commands::get_model_info,
+            commands::download_model,
+            commands::get_download_progress,
+            commands::get_all_downloads,
+            commands::cancel_download,
+            commands::clear_completed_downloads,
+            // Embedding Commands
+            commands::generate_embedding,
+            commands::generate_batch_embeddings,
+            commands::update_embedding_generator_config,
+            commands::get_embedding_generator_config,
+            commands::get_embedding_cache_metrics,
+            commands::clear_embedding_cache,
+            commands::get_embedding_cache_size,
+            commands::update_embedding_cache_config,
+            commands::get_embedding_cache_config,
+            commands::cleanup_expired_embeddings,
+            commands::check_embedding_cached,
+            // Performance Commands
+            commands::run_embedding_benchmarks,
+            commands::generate_benchmark_report,
+            commands::detect_performance_regressions,
+            commands::establish_performance_baseline,
+            commands::compare_performance_against_baseline,
+            commands::get_baseline_report,
+            commands::analyze_performance_regressions,
+            // Search Commands - Basic (caching-focused)
             search_commands::search_similar_notes,
             search_commands::batch_search_similar_notes,
             search_commands::configure_similarity_search,
@@ -975,7 +165,7 @@ pub fn run() {
             search_commands::cleanup_search_cache,
             search_commands::initialize_search_system,
             search_commands::get_search_system_status,
-            // Advanced performance-optimized search commands
+            // Search Commands - Advanced (performance-optimized)
             similarity_search_commands::optimized_search_similar_notes,
             similarity_search_commands::optimized_batch_search_similar_notes,
             similarity_search_commands::approximate_search_similar_notes,
@@ -996,6 +186,10 @@ mod tests {
     use std::fs;
     use std::path::{Path, PathBuf};
     use tempfile::TempDir;
+    
+    // Import all command functions for tests
+    use crate::commands::*;
+    use crate::globals::OLLAMA_CLIENT;
 
     /// Test utilities for better isolation and common operations
     struct TestEnv {
