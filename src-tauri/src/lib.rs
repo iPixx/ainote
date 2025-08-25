@@ -22,6 +22,7 @@ pub mod embedding_cache;
 pub mod vector_db;
 pub mod similarity_search;
 pub mod search_commands;
+pub mod similarity_search_commands;
 
 #[cfg(test)]
 pub mod ollama_integration_tests;
@@ -46,7 +47,9 @@ pub use embedding_cache::{
     EmbeddingCache, CacheError, CacheResult, CacheConfig, CacheMetrics
 };
 pub use similarity_search::{
-    SimilaritySearch, SimilarityError, SearchResult, SearchConfig
+    SimilaritySearch, SimilarityError, SearchResult, SearchConfig,
+    SearchMetrics, PerformanceConfig, EnhancedSearchResult, BenchmarkReport,
+    ConcurrentSearchManager, GlobalSearchMetrics
 };
 pub use search_commands::{
     SimilaritySearchConfig, SimilaritySearchResult, BatchSearchRequest, BatchSearchResult,
@@ -1076,6 +1079,7 @@ pub fn run() {
             get_embedding_cache_config,
             cleanup_expired_embeddings,
             check_embedding_cached,
+            // Basic similarity search commands (caching-focused)
             search_commands::search_similar_notes,
             search_commands::batch_search_similar_notes,
             search_commands::configure_similarity_search,
@@ -1084,7 +1088,17 @@ pub fn run() {
             search_commands::clear_search_cache,
             search_commands::cleanup_search_cache,
             search_commands::initialize_search_system,
-            search_commands::get_search_system_status
+            search_commands::get_search_system_status,
+            // Advanced performance-optimized search commands
+            similarity_search_commands::optimized_search_similar_notes,
+            similarity_search_commands::optimized_batch_search_similar_notes,
+            similarity_search_commands::approximate_search_similar_notes,
+            similarity_search_commands::get_search_metrics,
+            similarity_search_commands::is_search_high_load,
+            similarity_search_commands::get_active_search_count,
+            similarity_search_commands::benchmark_search_performance,
+            similarity_search_commands::configure_search_performance,
+            similarity_search_commands::test_search_functionality
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
