@@ -103,11 +103,17 @@ pub mod types;
 pub mod storage;
 pub mod operations;
 pub mod indexing;
+pub mod atomic;
+pub mod file_ops;
+
+#[cfg(test)]
+mod atomic_performance_test;
 
 use types::{EmbeddingEntry, StorageMetrics, VectorStorageConfig, VectorDbResult, VectorDbError};
 use storage::{VectorStorage, CompactionResult, IntegrityReport};
 use operations::{VectorOperations, BatchOperations, ValidationOperations, CleanupOperations};
 use indexing::{IndexingSystem, IndexStats};
+use file_ops::{FileOperations, InitializationStatus, CleanupResult, BackupResult, RecoveryResult, FileSystemMetrics};
 
 /// High-level vector database interface
 /// 
@@ -117,6 +123,8 @@ use indexing::{IndexingSystem, IndexStats};
 pub struct VectorDatabase {
     /// Underlying storage engine
     storage: Arc<VectorStorage>,
+    /// File operations manager
+    file_ops: FileOperations,
     /// Database configuration
     config: VectorStorageConfig,
     /// In-memory cache for frequently accessed entries
@@ -139,6 +147,7 @@ impl VectorDatabase {
     /// Create a new vector database with the given configuration
     pub async fn new(config: VectorStorageConfig) -> VectorDbResult<Self> {
         let storage = Arc::new(VectorStorage::new(config.clone())?);
+        let file_ops = FileOperations::new(config.clone())?;
         let cache_max_size = 100; // Cache up to 100 frequently accessed entries
         
         // Create operations interfaces
@@ -157,6 +166,7 @@ impl VectorDatabase {
         
         Ok(Self {
             storage,
+            file_ops,
             config,
             cache: Arc::new(RwLock::new(HashMap::new())),
             cache_max_size,
@@ -579,6 +589,65 @@ impl VectorDatabase {
         })
     }
     
+    // === File Operations Methods ===
+    
+    /// Initialize the database file system and perform startup checks
+    /// 
+    /// This method should be called after creating the VectorDatabase instance
+    /// to ensure the storage directory structure is properly set up and any
+    /// existing data is validated.
+    pub async fn initialize(&self) -> VectorDbResult<InitializationStatus> {
+        self.file_ops.initialize_database().await
+    }
+    
+    /// Clean up temporary files, stale locks, and old backups
+    /// 
+    /// This is useful for maintenance operations and can be called periodically
+    /// to keep the storage directory clean and optimize disk usage.
+    pub async fn cleanup(&self) -> VectorDbResult<CleanupResult> {
+        self.file_ops.cleanup_stale_files().await
+    }
+    
+    /// Create a full backup of the vector database
+    /// 
+    /// This creates a point-in-time backup that can be used for recovery.
+    /// Backup creation is atomic and safe to run during normal operations.
+    pub async fn create_backup(&self) -> VectorDbResult<BackupResult> {
+        self.file_ops.create_backup().await
+    }
+    
+    /// Recover from backup or attempt automatic recovery
+    /// 
+    /// If backup_path is provided, recovery will be attempted from that specific
+    /// backup. Otherwise, automatic recovery will try to use the most recent backup.
+    pub async fn recover(&self, backup_path: Option<PathBuf>) -> VectorDbResult<RecoveryResult> {
+        self.file_ops.recover_from_backup(backup_path).await
+    }
+    
+    /// Get detailed file system metrics
+    /// 
+    /// This provides comprehensive information about storage usage, including
+    /// storage files, backups, temporary files, and active locks.
+    pub async fn get_file_metrics(&self) -> VectorDbResult<FileSystemMetrics> {
+        self.file_ops.get_file_metrics().await
+    }
+    
+    /// Get combined database metrics including storage, cache, and file system
+    /// 
+    /// This extends the basic metrics with file system information for a
+    /// complete view of the database state.
+    pub async fn get_comprehensive_file_metrics(&self) -> VectorDbResult<ComprehensiveMetrics> {
+        let storage_metrics = self.storage.get_metrics().await;
+        let cache_metrics = self.get_cache_metrics().await;
+        let file_metrics = self.file_ops.get_file_metrics().await?;
+        
+        Ok(ComprehensiveMetrics {
+            storage: storage_metrics,
+            cache: cache_metrics,
+            file_system: file_metrics,
+        })
+    }
+    
     // Private helper methods
     
     /// Update the in-memory cache with an entry
@@ -615,6 +684,17 @@ pub struct DatabaseMetrics {
     pub storage: StorageMetrics,
     /// Cache layer metrics
     pub cache: CacheMetrics,
+}
+
+/// Comprehensive database metrics including file system information
+#[derive(Debug, Clone)]
+pub struct ComprehensiveMetrics {
+    /// Storage layer metrics
+    pub storage: StorageMetrics,
+    /// Cache layer metrics  
+    pub cache: CacheMetrics,
+    /// File system metrics
+    pub file_system: FileSystemMetrics,
 }
 
 /// Cache-specific metrics
@@ -657,6 +737,47 @@ impl DatabaseMetrics {
             self.storage.total_size_bytes as f64 / (1024.0 * 1024.0),
             self.cache.entries_count,
             self.cache_utilization() * 100.0
+        )
+    }
+}
+
+impl ComprehensiveMetrics {
+    /// Get total number of unique embeddings (from storage)
+    pub fn total_embeddings(&self) -> usize {
+        self.storage.total_entries
+    }
+    
+    /// Get cache hit ratio estimate (simplified)
+    pub fn cache_utilization(&self) -> f64 {
+        if self.cache.max_size > 0 {
+            self.cache.entries_count as f64 / self.cache.max_size as f64
+        } else {
+            0.0
+        }
+    }
+    
+    /// Get total memory usage estimate
+    pub fn total_memory_usage(&self) -> usize {
+        self.cache.memory_usage_bytes // Storage and file system are on disk
+    }
+    
+    /// Get total disk usage estimate
+    pub fn total_disk_usage(&self) -> usize {
+        self.storage.total_size_bytes + self.file_system.total_size_bytes
+    }
+    
+    /// Generate a comprehensive human-readable summary
+    pub fn summary(&self) -> String {
+        format!(
+            "Vector DB: {} embeddings, {} storage files ({:.1} MB), {} backups ({:.1} MB), {} cached entries ({:.1}% cache), {} locks",
+            self.storage.total_entries,
+            self.file_system.storage_files,
+            self.file_system.storage_size_bytes as f64 / (1024.0 * 1024.0),
+            self.file_system.backup_files,
+            self.file_system.backup_size_bytes as f64 / (1024.0 * 1024.0),
+            self.cache.entries_count,
+            self.cache_utilization() * 100.0,
+            self.file_system.active_locks
         )
     }
 }
@@ -715,6 +836,11 @@ pub use types::{
 
 // Re-export additional operations types not already imported above
 pub use indexing::IndexMetadata;
+
+// Re-export atomic operations types
+pub use atomic::{
+    AtomicConfig,
+};
 
 #[cfg(test)]
 mod tests {
