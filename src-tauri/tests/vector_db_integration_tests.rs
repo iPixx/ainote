@@ -4,7 +4,6 @@
 //! focusing on real file operations, concurrent access scenarios, error recovery,
 //! and performance validation with actual I/O operations.
 
-use std::path::PathBuf;
 use std::sync::{Arc, Barrier};
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
@@ -22,9 +21,9 @@ struct TestConfigFactory;
 
 impl TestConfigFactory {
     fn minimal_config() -> (VectorStorageConfig, TempDir) {
-        let temp_dir = TempDir::new().unwrap();
+        let _temp_dir = TempDir::new().unwrap();
         let config = VectorStorageConfig {
-            storage_dir: temp_dir.path().to_string_lossy().to_string(),
+            storage_dir: _temp_dir.path().to_string_lossy().to_string(),
             enable_compression: false,
             compression_algorithm: CompressionAlgorithm::None,
             max_entries_per_file: 100,
@@ -33,13 +32,13 @@ impl TestConfigFactory {
             max_backups: 0,
             enable_metrics: false,
         };
-        (config, temp_dir)
+        (config, _temp_dir)
     }
 
     fn full_featured_config() -> (VectorStorageConfig, TempDir) {
-        let temp_dir = TempDir::new().unwrap();
+        let _temp_dir = TempDir::new().unwrap();
         let config = VectorStorageConfig {
-            storage_dir: temp_dir.path().to_string_lossy().to_string(),
+            storage_dir: _temp_dir.path().to_string_lossy().to_string(),
             enable_compression: true,
             compression_algorithm: CompressionAlgorithm::Gzip,
             max_entries_per_file: 50,
@@ -48,13 +47,13 @@ impl TestConfigFactory {
             max_backups: 5,
             enable_metrics: true,
         };
-        (config, temp_dir)
+        (config, _temp_dir)
     }
 
     fn performance_config() -> (VectorStorageConfig, TempDir) {
-        let temp_dir = TempDir::new().unwrap();
+        let _temp_dir = TempDir::new().unwrap();
         let config = VectorStorageConfig {
-            storage_dir: temp_dir.path().to_string_lossy().to_string(),
+            storage_dir: _temp_dir.path().to_string_lossy().to_string(),
             enable_compression: false, // Disabled for performance
             compression_algorithm: CompressionAlgorithm::None,
             max_entries_per_file: 1000, // Large batches
@@ -63,7 +62,7 @@ impl TestConfigFactory {
             max_backups: 0,
             enable_metrics: true, // Keep metrics for validation
         };
-        (config, temp_dir)
+        (config, _temp_dir)
     }
 }
 
@@ -115,7 +114,7 @@ impl TestDataFactory {
 
 #[tokio::test]
 async fn test_basic_crud_operations() {
-    let (config, _temp_dir) = TestConfigFactory::minimal_config();
+    let (config, __temp_dir) = TestConfigFactory::minimal_config();
     let db = VectorDatabase::new(config).await.unwrap();
     
     // Test database initialization
@@ -159,6 +158,9 @@ async fn test_basic_crud_operations() {
     assert_eq!(retrieved_entry.metadata.file_path, test_entry.metadata.file_path);
     
     // Test UPDATE operation
+    // Wait to ensure timestamp difference (timestamps are in seconds)
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    
     let new_vector = vec![0.9; 384];
     let update_result = db.update_embedding(&stored_id, new_vector.clone()).await;
     assert!(update_result.is_ok(), "Update operation failed: {:?}", update_result);
@@ -185,7 +187,7 @@ async fn test_basic_crud_operations() {
 
 #[tokio::test]
 async fn test_batch_operations() {
-    let (config, _temp_dir) = TestConfigFactory::minimal_config();
+    let (config, __temp_dir) = TestConfigFactory::minimal_config();
     let db = VectorDatabase::new(config).await.unwrap();
     
     db.initialize().await.unwrap();
@@ -244,7 +246,7 @@ async fn test_batch_operations() {
 
 #[tokio::test]
 async fn test_file_locking_and_atomic_operations() {
-    let (config, _temp_dir) = TestConfigFactory::full_featured_config();
+    let (config, __temp_dir) = TestConfigFactory::full_featured_config();
     let db = VectorDatabase::new(config).await.unwrap();
     
     db.initialize().await.unwrap();
@@ -321,7 +323,7 @@ async fn test_file_locking_and_atomic_operations() {
 
 #[tokio::test]
 async fn test_backup_and_recovery() {
-    let (config, temp_dir) = TestConfigFactory::full_featured_config();
+    let (config, _temp_dir) = TestConfigFactory::full_featured_config();
     let db = VectorDatabase::new(config).await.unwrap();
     
     db.initialize().await.unwrap();
@@ -336,7 +338,7 @@ async fn test_backup_and_recovery() {
     assert!(backup_result.is_ok(), "Backup creation failed: {:?}", backup_result);
     
     // Verify backup file exists
-    let backup_dir = temp_dir.path().join("backups");
+    let backup_dir = _temp_dir.path().join("backups");
     assert!(backup_dir.exists());
     let backup_files: Vec<_> = std::fs::read_dir(&backup_dir).unwrap().collect();
     assert!(!backup_files.is_empty(), "No backup files created");
@@ -360,7 +362,7 @@ async fn test_backup_and_recovery() {
 
 #[tokio::test]
 async fn test_compression_and_serialization() {
-    let (config, _temp_dir) = TestConfigFactory::full_featured_config();
+    let (config, __temp_dir) = TestConfigFactory::full_featured_config();
     let db = VectorDatabase::new(config).await.unwrap();
     
     db.initialize().await.unwrap();
@@ -411,7 +413,7 @@ async fn test_compression_and_serialization() {
 
 #[tokio::test]
 async fn test_error_handling_and_corruption_recovery() {
-    let (config, _temp_dir) = TestConfigFactory::minimal_config();
+    let (config, __temp_dir) = TestConfigFactory::minimal_config();
     let db = VectorDatabase::new(config).await.unwrap();
     
     db.initialize().await.unwrap();
@@ -486,7 +488,7 @@ async fn test_error_handling_and_corruption_recovery() {
 
 #[tokio::test]
 async fn test_concurrent_access_scenarios() {
-    let (config, _temp_dir) = TestConfigFactory::performance_config();
+    let (config, __temp_dir) = TestConfigFactory::performance_config();
     let db = Arc::new(VectorDatabase::new(config).await.unwrap());
     
     db.initialize().await.unwrap();
@@ -497,7 +499,8 @@ async fn test_concurrent_access_scenarios() {
     let entries_per_writer = 20;
     
     let barrier = Arc::new(Barrier::new(num_writers + num_readers));
-    let mut handles = vec![];
+    let mut writer_handles = vec![];
+    let mut reader_handles = vec![];
     let mut all_expected_ids = Vec::new();
     
     // Spawn writer tasks
@@ -519,7 +522,7 @@ async fn test_concurrent_access_scenarios() {
             result
         });
         
-        handles.push(handle);
+        writer_handles.push(handle);
     }
     
     // Spawn reader tasks that will read existing data
@@ -539,7 +542,7 @@ async fn test_concurrent_access_scenarios() {
             // Continuously read for a short period
             let read_deadline = start_time + Duration::from_millis(500);
             while Instant::now() < read_deadline {
-                let current_count = db_clone.count_embeddings().await;
+                let _current_count = db_clone.count_embeddings().await;
                 let all_ids = db_clone.list_embedding_ids().await;
                 
                 // Try to read some entries if they exist
@@ -558,26 +561,28 @@ async fn test_concurrent_access_scenarios() {
             total_reads
         });
         
-        handles.push(handle);
+        reader_handles.push(handle);
     }
     
-    // Wait for all tasks to complete
-    let mut successful_operations = 0;
-    for (i, handle) in handles.into_iter().enumerate() {
+    // Wait for all writer tasks to complete
+    let mut successful_writers = 0;
+    for (i, handle) in writer_handles.into_iter().enumerate() {
         let result = handle.await;
-        assert!(result.is_ok(), "Task {} panicked", i);
-        
-        if i < num_writers {
-            // Writer task
-            assert!(result.unwrap().is_ok(), "Writer task {} failed", i);
-            successful_operations += 1;
-        } else {
-            // Reader task - just check it didn't panic
-            successful_operations += 1;
-        }
+        assert!(result.is_ok(), "Writer task {} panicked", i);
+        assert!(result.unwrap().is_ok(), "Writer task {} failed", i);
+        successful_writers += 1;
     }
     
-    assert_eq!(successful_operations, num_writers + num_readers);
+    // Wait for all reader tasks to complete
+    let mut successful_readers = 0;
+    for (i, handle) in reader_handles.into_iter().enumerate() {
+        let result = handle.await;
+        assert!(result.is_ok(), "Reader task {} panicked", i);
+        successful_readers += 1;
+    }
+    
+    assert_eq!(successful_writers, num_writers);
+    assert_eq!(successful_readers, num_readers);
     
     // Verify all data was stored correctly
     let final_count = db.count_embeddings().await;
@@ -593,7 +598,7 @@ async fn test_concurrent_access_scenarios() {
 
 #[tokio::test]
 async fn test_large_scale_storage_operations() {
-    let (config, _temp_dir) = TestConfigFactory::performance_config();
+    let (config, __temp_dir) = TestConfigFactory::performance_config();
     let db = VectorDatabase::new(config).await.unwrap();
     
     db.initialize().await.unwrap();
@@ -722,14 +727,14 @@ async fn test_large_scale_storage_operations() {
 
 #[tokio::test]
 async fn test_corruption_recovery_scenarios() {
-    let (config, temp_dir) = TestConfigFactory::full_featured_config();
+    let (config, _temp_dir) = TestConfigFactory::full_featured_config();
     let db = VectorDatabase::new(config).await.unwrap();
     
     db.initialize().await.unwrap();
     
     // Store initial test data
     let test_data = TestDataFactory::create_large_batch(50);
-    let stored_ids = db.store_embeddings_batch(test_data).await.unwrap();
+    let _stored_ids = db.store_embeddings_batch(test_data).await.unwrap();
     
     // Create backup before corruption
     let backup_result = db.create_backup().await;
@@ -756,7 +761,7 @@ async fn test_corruption_recovery_scenarios() {
     
     // Create some additional data
     let additional_data = TestDataFactory::create_large_batch(25);
-    let additional_ids = db.store_embeddings_batch(additional_data).await.unwrap();
+    let _additional_ids = db.store_embeddings_batch(additional_data).await.unwrap();
     
     // Check current state
     assert_eq!(db.count_embeddings().await, 75); // 50 + 25
@@ -810,7 +815,7 @@ async fn test_corruption_recovery_scenarios() {
 
 #[tokio::test]
 async fn test_comprehensive_performance_validation() {
-    let (config, _temp_dir) = TestConfigFactory::performance_config();
+    let (config, __temp_dir) = TestConfigFactory::performance_config();
     let db = VectorDatabase::new(config).await.unwrap();
     
     db.initialize().await.unwrap();
@@ -917,12 +922,6 @@ async fn test_comprehensive_performance_validation() {
     println!("📊 Final metrics: {}", metrics.summary());
 }
 
-/// Helper macro for performance assertions with detailed error messages
-macro_rules! assert_performance {
-    ($condition:expr, $requirement:expr, $actual:expr) => {
-        assert!($condition, "❌ Performance requirement failed: {} (actual: {:?})", $requirement, $actual);
-    };
-}
 
 /// Test runner for all integration tests
 #[tokio::test]
