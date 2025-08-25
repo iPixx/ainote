@@ -107,22 +107,26 @@ impl VectorStorage {
         })?;
         
         // Update index
-        let mut index = self.index.write().await;
-        let entry_ids = entries.iter().map(|e| e.id.clone()).collect::<Vec<_>>();
+        let entry_ids = {
+            let mut index = self.index.write().await;
+            let entry_ids = entries.iter().map(|e| e.id.clone()).collect::<Vec<_>>();
+            
+            for (i, entry) in entries.iter().enumerate() {
+                let location = FileLocation {
+                    file_name: file_name.clone(),
+                    entry_index: i,
+                    indexed_at: SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                };
+                index.insert(entry.id.clone(), location);
+            }
+            
+            entry_ids
+        }; // Drop the write lock here
         
-        for (i, entry) in entries.iter().enumerate() {
-            let location = FileLocation {
-                file_name: file_name.clone(),
-                entry_index: i,
-                indexed_at: SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs(),
-            };
-            index.insert(entry.id.clone(), location);
-        }
-        
-        // Update metrics
+        // Update metrics (after dropping the write lock)
         if self.config.enable_metrics {
             self.update_metrics().await;
         }

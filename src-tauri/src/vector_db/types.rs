@@ -368,7 +368,7 @@ impl Default for VectorStorageConfig {
 }
 
 /// Supported compression algorithms
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CompressionAlgorithm {
     /// No compression
     None,
@@ -390,7 +390,7 @@ impl CompressionAlgorithm {
 }
 
 /// Header information for vector storage files
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageFileHeader {
     /// Data format version
     pub version: DataVersion,
