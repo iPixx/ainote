@@ -56,6 +56,10 @@ harness = false
 name = "vector_db_benchmarks"
 harness = false
 
+[[bench]]
+name = "search_benchmarks"
+harness = false
+
 # Test configuration
 [profile.test]
 opt-level = 1
