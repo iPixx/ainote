@@ -21,6 +21,7 @@ pub mod embedding_generator;
 pub mod embedding_cache;
 pub mod vector_db;
 pub mod similarity_search;
+pub mod search_commands;
 
 #[cfg(test)]
 pub mod ollama_integration_tests;
@@ -46,6 +47,10 @@ pub use embedding_cache::{
 };
 pub use similarity_search::{
     SimilaritySearch, SimilarityError, SearchResult, SearchConfig
+};
+pub use search_commands::{
+    SimilaritySearchConfig, SimilaritySearchResult, BatchSearchRequest, BatchSearchResult,
+    SearchCommandError, initialize_search_engine, get_search_engine_stats
 };
 
 // Global Ollama client instance
@@ -1070,7 +1075,16 @@ pub fn run() {
             update_embedding_cache_config,
             get_embedding_cache_config,
             cleanup_expired_embeddings,
-            check_embedding_cached
+            check_embedding_cached,
+            search_commands::search_similar_notes,
+            search_commands::batch_search_similar_notes,
+            search_commands::configure_similarity_search,
+            search_commands::threshold_search_similar_notes,
+            search_commands::get_search_cache_stats,
+            search_commands::clear_search_cache,
+            search_commands::cleanup_search_cache,
+            search_commands::initialize_search_system,
+            search_commands::get_search_system_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
