@@ -105,8 +105,6 @@ pub mod operations;
 pub mod indexing;
 pub mod atomic;
 pub mod file_ops;
-pub mod operations;
-pub mod indexing;
 
 #[cfg(test)]
 mod atomic_performance_test;
@@ -116,8 +114,6 @@ use storage::{VectorStorage, CompactionResult, IntegrityReport};
 use operations::{VectorOperations, BatchOperations, ValidationOperations, CleanupOperations};
 use indexing::{IndexingSystem, IndexStats};
 use file_ops::{FileOperations, InitializationStatus, CleanupResult, BackupResult, RecoveryResult, FileSystemMetrics};
-use operations::{VectorOperations, BatchOperations, ValidationOperations, CleanupOperations};
-use indexing::{IndexingSystem, IndexStats};
 
 /// High-level vector database interface
 /// 
@@ -845,9 +841,6 @@ pub use indexing::IndexMetadata;
 pub use atomic::{
     AtomicConfig,
 };
-
-// Re-export additional operations types not already imported above
-pub use indexing::IndexMetadata;
 
 #[cfg(test)]
 mod tests {
