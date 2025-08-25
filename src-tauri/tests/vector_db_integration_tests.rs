@@ -30,7 +30,7 @@ impl TestConfigFactory {
             enable_checksums: false,
             auto_backup: false,
             max_backups: 0,
-            enable_metrics: false,
+            enable_metrics: true, // Enable metrics for testing
         };
         (config, _temp_dir)
     }
