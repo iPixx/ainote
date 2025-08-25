@@ -20,6 +20,7 @@ pub mod text_processing;
 pub mod embedding_generator;
 pub mod embedding_cache;
 pub mod vector_db;
+pub mod similarity_search;
 
 #[cfg(test)]
 pub mod ollama_integration_tests;
@@ -42,6 +43,9 @@ pub use embedding_generator::{
 };
 pub use embedding_cache::{
     EmbeddingCache, CacheError, CacheResult, CacheConfig, CacheMetrics
+};
+pub use similarity_search::{
+    SimilaritySearch, SimilarityError, SearchResult, SearchConfig
 };
 
 // Global Ollama client instance
