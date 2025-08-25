@@ -228,6 +228,7 @@ pub struct SearchResultCache {
     /// Maximum number of cached entries
     max_entries: usize,
     /// Default TTL for cache entries
+    #[allow(dead_code)]
     default_ttl: Duration,
 }
 
@@ -348,13 +349,19 @@ pub struct SearchEngine {
     cache: SearchResultCache,
 }
 
-impl SearchEngine {
-    /// Create a new search engine
-    pub fn new() -> Self {
+impl Default for SearchEngine {
+    fn default() -> Self {
         Self {
             vector_db: None,
             cache: SearchResultCache::new(1000, 300), // Cache 1000 entries for 5 minutes
         }
+    }
+}
+
+impl SearchEngine {
+    /// Create a new search engine
+    pub fn new() -> Self {
+        Self::default()
     }
     
     /// Set the vector database reference
@@ -428,7 +435,7 @@ impl SearchEngine {
         let all_embeddings = vector_db
             .retrieve_embeddings(&all_embedding_ids)
             .await
-            .map_err(|e| SearchCommandError::from(e))?;
+            .map_err(SearchCommandError::from)?;
         
         // Filter out excluded file if specified
         let filtered_embeddings: Vec<EmbeddingEntry> = if let Some(ref exclude_path) = config.exclude_file_path {
@@ -699,28 +706,32 @@ pub async fn batch_search_similar_notes(
 /// # Returns
 /// 
 /// Configured search configuration object
+
+#[derive(Debug, serde::Deserialize)]
+pub struct SimilaritySearchParams {
+    pub min_similarity: Option<f32>,
+    pub max_results: Option<usize>,
+    pub enable_caching: Option<bool>,
+    pub cache_ttl_seconds: Option<u64>,
+    pub timeout_ms: Option<u64>,
+    pub enable_early_termination: Option<bool>,
+    pub normalize_query: Option<bool>,
+    pub exclude_file_path: Option<String>,
+}
+
 #[tauri::command]
-pub async fn configure_similarity_search(
-    min_similarity: Option<f32>,
-    max_results: Option<usize>,
-    enable_caching: Option<bool>,
-    cache_ttl_seconds: Option<u64>,
-    timeout_ms: Option<u64>,
-    enable_early_termination: Option<bool>,
-    normalize_query: Option<bool>,
-    exclude_file_path: Option<String>,
-) -> Result<SimilaritySearchConfig, String> {
+pub async fn configure_similarity_search(params: SimilaritySearchParams) -> Result<SimilaritySearchConfig, String> {
     let default_config = SimilaritySearchConfig::default();
     
     let config = SimilaritySearchConfig {
-        min_similarity: min_similarity.unwrap_or(default_config.min_similarity),
-        max_results: max_results.unwrap_or(default_config.max_results),
-        enable_caching: enable_caching.unwrap_or(default_config.enable_caching),
-        cache_ttl_seconds: cache_ttl_seconds.unwrap_or(default_config.cache_ttl_seconds),
-        timeout_ms: timeout_ms.unwrap_or(default_config.timeout_ms),
-        enable_early_termination: enable_early_termination.unwrap_or(default_config.enable_early_termination),
-        normalize_query: normalize_query.unwrap_or(default_config.normalize_query),
-        exclude_file_path: exclude_file_path.or(default_config.exclude_file_path),
+        min_similarity: params.min_similarity.unwrap_or(default_config.min_similarity),
+        max_results: params.max_results.unwrap_or(default_config.max_results),
+        enable_caching: params.enable_caching.unwrap_or(default_config.enable_caching),
+        cache_ttl_seconds: params.cache_ttl_seconds.unwrap_or(default_config.cache_ttl_seconds),
+        timeout_ms: params.timeout_ms.unwrap_or(default_config.timeout_ms),
+        enable_early_termination: params.enable_early_termination.unwrap_or(default_config.enable_early_termination),
+        normalize_query: params.normalize_query.unwrap_or(default_config.normalize_query),
+        exclude_file_path: params.exclude_file_path.or(default_config.exclude_file_path),
     };
     
     // Validate the configuration

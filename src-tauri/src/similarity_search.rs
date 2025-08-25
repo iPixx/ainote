@@ -163,8 +163,8 @@ pub struct SearchMetrics {
     pub vectors_per_second: f64,
 }
 
-impl SearchMetrics {
-    pub fn new() -> Self {
+impl Default for SearchMetrics {
+    fn default() -> Self {
         Self {
             total_time_ms: 0.0,
             vectors_processed: 0,
@@ -174,6 +174,12 @@ impl SearchMetrics {
             estimated_memory_bytes: 0,
             vectors_per_second: 0.0,
         }
+    }
+}
+
+impl SearchMetrics {
+    pub fn new() -> Self {
+        Self::default()
     }
     
     pub fn calculate_throughput(&mut self) {
@@ -1010,9 +1016,7 @@ impl SimilaritySearch {
             rayon::ThreadPoolBuilder::new()
                 .num_threads(perf_config.num_threads)
                 .build_global()
-                .unwrap_or_else(|_| {
-                    // Thread pool already initialized, continue with existing pool
-                });
+                .unwrap_or(());
         }
         
         // Pre-normalize query vector if optimization is enabled
@@ -1024,7 +1028,7 @@ impl SimilaritySearch {
         
         // Determine optimal chunk size for parallel processing
         let num_threads = rayon::current_num_threads();
-        let chunk_size = (database_entries.len() + num_threads - 1) / num_threads;
+        let chunk_size = database_entries.len().div_ceil(num_threads);
         
         // Use Arc<Mutex<BinaryHeap>> to safely share results across threads
         let global_heap = Arc::new(Mutex::new(BinaryHeap::with_capacity(k)));
@@ -1329,7 +1333,7 @@ impl SimilaritySearch {
     fn estimate_memory_usage(results: &[SearchResult], _database_size: usize) -> usize {
         // Estimate memory usage in bytes
         // This is a rough estimation for monitoring purposes
-        let result_size = std::mem::size_of::<SearchResult>() * results.len();
+        let result_size = std::mem::size_of_val(results);
         let vector_size = results.first()
             .map(|r| r.entry.vector.len() * std::mem::size_of::<f32>())
             .unwrap_or(0) * results.len();
@@ -1360,7 +1364,15 @@ impl SimilaritySearch {
                 let standard_result = Self::k_nearest_neighbors(query_vector, database_entries, k, &config)?;
                 let standard_time = start.elapsed().as_secs_f64() * 1000.0;
                 
-                report.add_benchmark("standard_knn", k, query_idx, standard_time, standard_result.len(), false, false);
+                report.add_benchmark(BenchmarkParams {
+                    algorithm: "standard_knn".to_string(),
+                    k,
+                    query_idx,
+                    time_ms: standard_time,
+                    results_count: standard_result.len(),
+                    used_parallel: false,
+                    used_approximate: false,
+                });
                 
                 // Benchmark parallel k-NN (if dataset is large enough)
                 if database_entries.len() >= perf_config.parallel_threshold {
@@ -1370,8 +1382,15 @@ impl SimilaritySearch {
                     )?;
                     let parallel_time = start.elapsed().as_secs_f64() * 1000.0;
                     
-                    report.add_benchmark("parallel_knn", k, query_idx, parallel_time, 
-                        parallel_result.metrics.results_count, true, false);
+                    report.add_benchmark(BenchmarkParams {
+                        algorithm: "parallel_knn".to_string(),
+                        k,
+                        query_idx,
+                        time_ms: parallel_time,
+                        results_count: parallel_result.metrics.results_count,
+                        used_parallel: true,
+                        used_approximate: false,
+                    });
                 }
                 
                 // Benchmark approximate k-NN (if dataset is large enough)
@@ -1382,8 +1401,15 @@ impl SimilaritySearch {
                     )?;
                     let approx_time = start.elapsed().as_secs_f64() * 1000.0;
                     
-                    report.add_benchmark("approximate_knn", k, query_idx, approx_time,
-                        approx_result.metrics.results_count, false, true);
+                    report.add_benchmark(BenchmarkParams {
+                        algorithm: "approximate_knn".to_string(),
+                        k,
+                        query_idx,
+                        time_ms: approx_time,
+                        results_count: approx_result.metrics.results_count,
+                        used_parallel: false,
+                        used_approximate: true,
+                    });
                 }
             }
         }
@@ -1419,8 +1445,8 @@ pub struct BenchmarkSummary {
     pub recommendations: Vec<String>,
 }
 
-impl BenchmarkReport {
-    pub fn new() -> Self {
+impl Default for BenchmarkReport {
+    fn default() -> Self {
         Self {
             benchmarks: Vec::new(),
             summary: BenchmarkSummary {
@@ -1431,17 +1457,32 @@ impl BenchmarkReport {
             },
         }
     }
+}
+
+pub struct BenchmarkParams {
+    pub algorithm: String,
+    pub k: usize,
+    pub query_idx: usize,
+    pub time_ms: f64,
+    pub results_count: usize,
+    pub used_parallel: bool,
+    pub used_approximate: bool,
+}
+
+impl BenchmarkReport {
+    pub fn new() -> Self {
+        Self::default()
+    }
     
-    pub fn add_benchmark(&mut self, algorithm: &str, k: usize, query_idx: usize, 
-                        time_ms: f64, results_count: usize, used_parallel: bool, used_approximate: bool) {
+    pub fn add_benchmark(&mut self, params: BenchmarkParams) {
         self.benchmarks.push(BenchmarkEntry {
-            algorithm: algorithm.to_string(),
-            k_value: k,
-            query_index: query_idx,
-            time_ms,
-            results_count,
-            used_parallel,
-            used_approximate,
+            algorithm: params.algorithm,
+            k_value: params.k,
+            query_index: params.query_idx,
+            time_ms: params.time_ms,
+            results_count: params.results_count,
+            used_parallel: params.used_parallel,
+            used_approximate: params.used_approximate,
         });
     }
     
@@ -1451,7 +1492,7 @@ impl BenchmarkReport {
         
         for entry in &self.benchmarks {
             algorithm_times.entry(entry.algorithm.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(entry.time_ms);
         }
         
@@ -1574,8 +1615,7 @@ impl ConcurrentSearchManager {
         let result = tokio::task::spawn_blocking(move || {
             search_operation()
         }).await
-        .map_err(|_| SimilarityError::InvalidVector)? // Handle join error
-        .map_err(|e| e)?; // Handle search error
+        .map_err(|_| SimilarityError::InvalidVector)?; // Handle join error
         
         // Record completion time
         let elapsed_ms = start_time.elapsed().as_secs_f64() * 1000.0;
@@ -1586,7 +1626,7 @@ impl ConcurrentSearchManager {
         // Decrement active request counter
         self.active_requests.fetch_sub(1, AtomicOrdering::SeqCst);
         
-        Ok(result)
+        result
     }
     
     /// Execute multiple searches concurrently with optimized batching
@@ -1605,7 +1645,7 @@ impl ConcurrentSearchManager {
         // Split queries into optimal chunks based on available concurrency
         let max_concurrent = self.config.max_concurrent_requests;
         let chunk_size = if batch_size > max_concurrent {
-            (batch_size + max_concurrent - 1) / max_concurrent
+            batch_size.div_ceil(max_concurrent)
         } else {
             1
         };

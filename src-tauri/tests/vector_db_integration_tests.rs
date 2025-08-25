@@ -102,6 +102,7 @@ impl TestDataFactory {
         Self::create_test_batch(count, 768) // Larger embedding size for performance testing
     }
 
+    #[allow(dead_code)]
     fn create_corrupted_entry() -> EmbeddingEntry {
         let mut entry = Self::create_embedding(9999, "/corrupt/file.md", "Corrupted data", 100);
         // Simulate corruption by modifying internal data inconsistently

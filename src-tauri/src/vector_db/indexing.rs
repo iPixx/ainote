@@ -643,6 +643,7 @@ mod tests {
     use tempfile::TempDir;
     use crate::vector_db::types::{VectorStorageConfig, CompressionAlgorithm};
 
+    #[allow(dead_code)]
     fn create_test_config() -> VectorStorageConfig {
         let temp_dir = TempDir::new().unwrap();
         let storage_dir = temp_dir.path().to_string_lossy().to_string();

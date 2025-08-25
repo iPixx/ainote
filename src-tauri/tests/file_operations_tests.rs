@@ -59,6 +59,7 @@ impl TestEnv {
 
 // Test constants
 const TEST_CONTENT: &str = "# Test Content\n\nThis is test content.";
+#[allow(dead_code)]
 const UTF8_CONTENT: &str = "# UTF-8 Test\n\n✅ Checkmark\n🎉 Emoji\nÀccëntéd characters";
 
 #[test]

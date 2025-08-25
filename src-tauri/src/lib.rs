@@ -85,7 +85,6 @@ pub use similarity_search::{
 /// This function initializes the Tauri application with all necessary plugins,
 /// window setup, and command handlers. The commands are organized into focused
 /// modules in the `commands/` directory for better maintainability.
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()

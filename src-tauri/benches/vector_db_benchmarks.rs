@@ -506,7 +506,7 @@ fn bench_concurrent_operations(c: &mut Criterion) {
             
             // Spawn 10 concurrent write tasks
             let mut handles = vec![];
-            for i in 0..10 {
+            for _i in 0..10 {
                 let db_clone = std::sync::Arc::clone(&db);
                 let handle = tokio::spawn(async move {
                     let batch_data = BenchmarkData::create_batch(50, 384);

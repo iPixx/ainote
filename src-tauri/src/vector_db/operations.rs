@@ -38,6 +38,7 @@ pub struct VectorOperations {
     /// Underlying storage layer
     storage: Arc<VectorStorage>,
     /// Operation configuration
+    #[allow(dead_code)]
     config: VectorStorageConfig,
 }
 
@@ -533,20 +534,18 @@ impl CleanupOperations {
         if let Some(valid_paths) = valid_file_paths {
             // Remove entries for files that no longer exist
             for entry in all_entries {
-                if !valid_paths.contains(&entry.metadata.file_path) {
-                    if self.operations.delete_embedding(&entry.id).await? {
-                        orphaned_count += 1;
-                    }
+                if !valid_paths.contains(&entry.metadata.file_path)
+                    && self.operations.delete_embedding(&entry.id).await? {
+                    orphaned_count += 1;
                 }
             }
         } else {
             // Use file system to check if files exist
             for entry in all_entries {
                 let file_path = PathBuf::from(&entry.metadata.file_path);
-                if !file_path.exists() {
-                    if self.operations.delete_embedding(&entry.id).await? {
-                        orphaned_count += 1;
-                    }
+                if !file_path.exists()
+                    && self.operations.delete_embedding(&entry.id).await? {
+                    orphaned_count += 1;
                 }
             }
         }
@@ -578,10 +577,9 @@ impl CleanupOperations {
         let mut removed_count = 0;
         
         for entry in all_entries {
-            if entry.metadata.file_path == file_path {
-                if self.operations.delete_embedding(&entry.id).await? {
-                    removed_count += 1;
-                }
+            if entry.metadata.file_path == file_path
+                && self.operations.delete_embedding(&entry.id).await? {
+                removed_count += 1;
             }
         }
         
@@ -608,10 +606,9 @@ impl CleanupOperations {
         let mut removed_count = 0;
         
         for entry in all_entries {
-            if entry.created_at < before_timestamp {
-                if self.operations.delete_embedding(&entry.id).await? {
-                    removed_count += 1;
-                }
+            if entry.created_at < before_timestamp
+                && self.operations.delete_embedding(&entry.id).await? {
+                removed_count += 1;
             }
         }
         
