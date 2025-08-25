@@ -19,6 +19,7 @@ pub mod regression_detection;
 pub mod text_processing;
 pub mod embedding_generator;
 pub mod embedding_cache;
+pub mod vector_db;
 
 #[cfg(test)]
 pub mod ollama_integration_tests;
