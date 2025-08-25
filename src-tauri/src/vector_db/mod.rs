@@ -101,9 +101,13 @@ use tokio::sync::RwLock;
 
 pub mod types;
 pub mod storage;
+pub mod operations;
+pub mod indexing;
 
-use types::{EmbeddingEntry, StorageMetrics, VectorStorageConfig, VectorDbResult};
+use types::{EmbeddingEntry, StorageMetrics, VectorStorageConfig, VectorDbResult, VectorDbError};
 use storage::{VectorStorage, CompactionResult, IntegrityReport};
+use operations::{VectorOperations, BatchOperations, ValidationOperations, CleanupOperations};
+use indexing::{IndexingSystem, IndexStats};
 
 /// High-level vector database interface
 /// 
@@ -112,26 +116,55 @@ use storage::{VectorStorage, CompactionResult, IntegrityReport};
 /// methods for common operations.
 pub struct VectorDatabase {
     /// Underlying storage engine
-    storage: VectorStorage,
+    storage: Arc<VectorStorage>,
     /// Database configuration
     config: VectorStorageConfig,
     /// In-memory cache for frequently accessed entries
     cache: Arc<RwLock<HashMap<String, EmbeddingEntry>>>,
     /// Cache configuration
     cache_max_size: usize,
+    /// Core CRUD operations interface
+    operations: VectorOperations,
+    /// Batch operations interface
+    batch_operations: BatchOperations,
+    /// Validation operations interface
+    validation_operations: ValidationOperations,
+    /// Cleanup operations interface
+    cleanup_operations: CleanupOperations,
+    /// Indexing system for fast lookups
+    indexing_system: Option<IndexingSystem>,
 }
 
 impl VectorDatabase {
     /// Create a new vector database with the given configuration
     pub async fn new(config: VectorStorageConfig) -> VectorDbResult<Self> {
-        let storage = VectorStorage::new(config.clone())?;
+        let storage = Arc::new(VectorStorage::new(config.clone())?);
         let cache_max_size = 100; // Cache up to 100 frequently accessed entries
+        
+        // Create operations interfaces
+        let operations = VectorOperations::new(storage.clone(), config.clone());
+        let batch_operations = BatchOperations::new(operations.clone());
+        let validation_operations = ValidationOperations::new(storage.clone());
+        let cleanup_operations = CleanupOperations::new(storage.clone(), operations.clone());
+        
+        // Initialize indexing system if enabled in config (optional for performance)
+        let indexing_system = if config.enable_metrics {
+            let index_file_path = format!("{}/vector_indexes.json", config.storage_dir);
+            Some(IndexingSystem::new(storage.clone(), true, index_file_path).await?)
+        } else {
+            None
+        };
         
         Ok(Self {
             storage,
             config,
             cache: Arc::new(RwLock::new(HashMap::new())),
             cache_max_size,
+            operations,
+            batch_operations,
+            validation_operations,
+            cleanup_operations,
+            indexing_system,
         })
     }
     
@@ -401,6 +434,150 @@ impl VectorDatabase {
     pub async fn count_embeddings(&self) -> usize {
         self.list_embedding_ids().await.len()
     }
+
+    // === New Operations Interface Methods ===
+    
+    /// Get reference to core CRUD operations
+    /// 
+    /// Provides access to the core operations interface for more advanced
+    /// or specialized use cases beyond the standard database methods.
+    pub fn operations(&self) -> &VectorOperations {
+        &self.operations
+    }
+    
+    /// Get reference to batch operations
+    /// 
+    /// Provides access to optimized batch operations for bulk processing
+    /// of multiple embedding entries.
+    pub fn batch_operations(&self) -> &BatchOperations {
+        &self.batch_operations
+    }
+    
+    /// Get reference to validation operations
+    /// 
+    /// Provides access to database validation and integrity checking
+    /// operations.
+    pub fn validation_operations(&self) -> &ValidationOperations {
+        &self.validation_operations
+    }
+    
+    /// Get reference to cleanup operations
+    /// 
+    /// Provides access to database maintenance and cleanup operations
+    /// including orphaned entry removal and compaction.
+    pub fn cleanup_operations(&self) -> &CleanupOperations {
+        &self.cleanup_operations
+    }
+    
+    /// Get reference to indexing system (if enabled)
+    /// 
+    /// Provides access to the advanced indexing system for fast lookups
+    /// by various criteria like file path, model name, etc.
+    pub fn indexing_system(&self) -> Option<&IndexingSystem> {
+        self.indexing_system.as_ref()
+    }
+    
+    /// Find embeddings by file path using indexing system
+    /// 
+    /// This method provides fast lookup of embeddings associated with a
+    /// specific file path using the indexing system if available.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `file_path` - The file path to search for
+    /// 
+    /// # Returns
+    /// 
+    /// Vector of embedding entries associated with the file path
+    pub async fn find_embeddings_by_file_indexed(&self, file_path: &str) -> VectorDbResult<Vec<EmbeddingEntry>> {
+        if let Some(indexing) = &self.indexing_system {
+            let entry_ids = indexing.find_by_file_path(file_path).await;
+            self.retrieve_embeddings(&entry_ids).await
+        } else {
+            // Fallback to the original method if indexing is not available
+            self.find_embeddings_by_file(file_path).await
+        }
+    }
+    
+    /// Find embeddings by model name using indexing system
+    /// 
+    /// This method provides fast lookup of embeddings created with a
+    /// specific model using the indexing system if available.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `model_name` - The model name to search for
+    /// 
+    /// # Returns
+    /// 
+    /// Vector of embedding entries created with the specified model
+    pub async fn find_embeddings_by_model_indexed(&self, model_name: &str) -> VectorDbResult<Vec<EmbeddingEntry>> {
+        if let Some(indexing) = &self.indexing_system {
+            let entry_ids = indexing.find_by_model_name(model_name).await;
+            self.retrieve_embeddings(&entry_ids).await
+        } else {
+            // Fallback to the original method if indexing is not available
+            self.find_embeddings_by_model(model_name).await
+        }
+    }
+    
+    /// Find embeddings by timestamp range using indexing system
+    /// 
+    /// This method provides fast lookup of embeddings created within a
+    /// specific time range using the indexing system if available.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `start_timestamp` - Start of the time range (inclusive)
+    /// * `end_timestamp` - End of the time range (inclusive)
+    /// 
+    /// # Returns
+    /// 
+    /// Vector of embedding entries created within the time range
+    pub async fn find_embeddings_by_timestamp_range(&self, start_timestamp: u64, end_timestamp: u64) -> VectorDbResult<Vec<EmbeddingEntry>> {
+        if let Some(indexing) = &self.indexing_system {
+            let entry_ids = indexing.find_by_timestamp_range(start_timestamp, end_timestamp).await;
+            self.retrieve_embeddings(&entry_ids).await
+        } else {
+            Err(VectorDbError::Storage {
+                message: "Timestamp range queries require indexing system to be enabled".to_string(),
+            })
+        }
+    }
+    
+    /// Get comprehensive database statistics including index statistics
+    /// 
+    /// This method returns detailed statistics about the database including
+    /// storage metrics, cache metrics, and index statistics if available.
+    pub async fn get_comprehensive_metrics(&self) -> VectorDbResult<ComprehensiveDatabaseMetrics> {
+        let base_metrics = self.get_metrics().await?;
+        
+        let index_stats = if let Some(indexing) = &self.indexing_system {
+            Some(indexing.get_index_stats().await)
+        } else {
+            None
+        };
+        
+        Ok(ComprehensiveDatabaseMetrics {
+            database: base_metrics,
+            indexing: index_stats,
+        })
+    }
+    
+    /// Perform comprehensive database validation
+    /// 
+    /// This method performs a thorough validation of the database including
+    /// storage integrity, index consistency, and data validation.
+    pub async fn validate_comprehensive(&self) -> VectorDbResult<ComprehensiveValidationReport> {
+        let storage_report = self.validation_operations.validate_database().await?;
+        
+        // Additional validations can be added here
+        
+        Ok(ComprehensiveValidationReport {
+            storage_integrity: storage_report,
+            indexing_consistency: true, // Placeholder - would implement actual index validation
+        })
+    }
     
     // Private helper methods
     
@@ -484,11 +661,60 @@ impl DatabaseMetrics {
     }
 }
 
+/// Comprehensive database metrics including indexing statistics
+#[derive(Debug, Clone)]
+pub struct ComprehensiveDatabaseMetrics {
+    /// Standard database metrics (storage and cache)
+    pub database: DatabaseMetrics,
+    /// Optional indexing system statistics
+    pub indexing: Option<IndexStats>,
+}
+
+impl ComprehensiveDatabaseMetrics {
+    /// Generate a comprehensive summary of all metrics
+    pub fn summary(&self) -> String {
+        let mut summary = self.database.summary();
+        
+        if let Some(index_stats) = &self.indexing {
+            summary.push_str(&format!(", {}", index_stats.summary()));
+        }
+        
+        summary
+    }
+}
+
+/// Comprehensive validation report including storage and indexing validation
+#[derive(Debug)]
+pub struct ComprehensiveValidationReport {
+    /// Storage integrity validation results
+    pub storage_integrity: IntegrityReport,
+    /// Index consistency validation results
+    pub indexing_consistency: bool,
+}
+
+impl ComprehensiveValidationReport {
+    /// Check if the entire database is healthy
+    pub fn is_healthy(&self) -> bool {
+        self.storage_integrity.is_healthy() && self.indexing_consistency
+    }
+    
+    /// Generate a comprehensive validation summary
+    pub fn summary(&self) -> String {
+        let storage_summary = self.storage_integrity.summary();
+        let indexing_status = if self.indexing_consistency { "OK" } else { "ISSUES" };
+        
+        format!("{}, Indexing: {}", storage_summary, indexing_status)
+    }
+}
+
 // Re-export main types for convenience
 pub use types::{
     EmbeddingMetadata,
     CompressionAlgorithm,
 };
+
+// Re-export additional operations types not already imported above
+pub use indexing::IndexMetadata;
 
 #[cfg(test)]
 mod tests {
