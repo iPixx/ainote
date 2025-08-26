@@ -43,6 +43,7 @@ pub mod embedding_generator;    // Embedding generation engine
 pub mod embedding_cache;        // Embedding cache management
 pub mod vector_db;             // Vector database storage and operations
 pub mod similarity_search;     // Similarity search algorithms
+pub mod text_chunker;          // Text chunking algorithms and infrastructure
 
 // Performance and benchmarking modules
 pub mod benchmarks;
@@ -78,6 +79,9 @@ pub use embedding_cache::{EmbeddingCache, CacheError, CacheResult, CacheConfig, 
 pub use similarity_search::{
     SimilaritySearch, SimilarityError, SearchResult, SearchConfig, SearchMetrics, PerformanceConfig,
     EnhancedSearchResult, BenchmarkReport, ConcurrentSearchManager, GlobalSearchMetrics
+};
+pub use text_chunker::{
+    ChunkProcessor, ChunkConfig, ChunkingStrategy, TextChunk, ChunkMetadata, ChunkError, ChunkResult
 };
 
 /// Main application entry point and Tauri app configuration.
