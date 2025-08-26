@@ -94,6 +94,10 @@ pub mod search_commands;
 // Handles: incremental update system, file change monitoring, and automatic embedding updates
 pub mod incremental_commands;
 
+// Maintenance Commands Module
+// Handles: maintenance operations, orphaned embedding cleanup, index compaction, and storage optimization
+pub mod maintenance_commands;
+
 // Re-export all command functions for easy access in lib.rs
 pub use file_operations::*;
 pub use vault_operations::*;
@@ -104,3 +108,4 @@ pub use embedding_commands::*;
 pub use performance_commands::*;
 pub use search_commands::*;
 pub use incremental_commands::*;
+pub use maintenance_commands::*;
