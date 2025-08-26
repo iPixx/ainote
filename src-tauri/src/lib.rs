@@ -205,7 +205,18 @@ pub fn run() {
             commands::maintenance_commands::get_maintenance_statistics,
             commands::maintenance_commands::get_maintenance_status,
             commands::maintenance_commands::configure_maintenance_vault_paths,
-            commands::maintenance_commands::reset_maintenance_statistics
+            commands::maintenance_commands::reset_maintenance_statistics,
+            
+            // Index Rebuilding and Health Check Operations
+            commands::rebuilding_commands::enable_index_rebuilding,
+            commands::rebuilding_commands::enable_health_checks,
+            commands::rebuilding_commands::rebuild_index_complete,
+            commands::rebuilding_commands::cancel_index_rebuild,
+            commands::rebuilding_commands::perform_comprehensive_health_check,
+            commands::rebuilding_commands::perform_quick_health_check,
+            commands::rebuilding_commands::detect_index_corruption,
+            commands::rebuilding_commands::get_rebuilding_health_status,
+            commands::rebuilding_commands::recover_from_corruption
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

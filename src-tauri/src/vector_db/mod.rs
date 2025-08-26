@@ -107,6 +107,7 @@ pub mod incremental;
 pub mod atomic;
 pub mod file_ops;
 pub mod maintenance;
+pub mod rebuilding;
 
 #[cfg(test)]
 mod atomic_performance_test;
@@ -121,6 +122,7 @@ use indexing::{IndexingSystem, IndexStats};
 use incremental::{IncrementalUpdateManager, IncrementalConfig, UpdateStats};
 use file_ops::{FileOperations, InitializationStatus, CleanupResult, BackupResult, RecoveryResult, FileSystemMetrics};
 use maintenance::{MaintenanceManager, MaintenanceConfig, MaintenanceStats};
+use rebuilding::{IndexRebuilder, HealthChecker, RebuildingConfig, HealthCheckConfig, RebuildResult, HealthCheckResult, RebuildProgress};
 
 /// High-level vector database interface
 /// 
@@ -152,6 +154,10 @@ pub struct VectorDatabase {
     incremental_manager: Option<IncrementalUpdateManager>,
     /// Maintenance manager for cleanup and optimization operations
     maintenance_manager: Option<MaintenanceManager>,
+    /// Index rebuilder for full index rebuilding operations
+    index_rebuilder: Option<IndexRebuilder>,
+    /// Health checker for index validation and health monitoring
+    health_checker: Option<HealthChecker>,
 }
 
 impl VectorDatabase {
@@ -188,6 +194,8 @@ impl VectorDatabase {
             indexing_system,
             incremental_manager: None, // Initialized on demand via enable_incremental_updates
             maintenance_manager: None, // Initialized on demand via enable_maintenance
+            index_rebuilder: None, // Initialized on demand via enable_index_rebuilding
+            health_checker: None, // Initialized on demand via enable_health_checks
         })
     }
     
@@ -901,6 +909,234 @@ impl VectorDatabase {
         self.maintenance_manager.as_ref().map(|m| m.get_config())
     }
     
+    // === Index Rebuilding System Methods ===
+    
+    /// Enable index rebuilding capabilities for the database
+    /// 
+    /// This method initializes the index rebuilder that provides full index rebuilding
+    /// capabilities with progress tracking and parallel processing support.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `config` - Configuration for the index rebuilding system
+    /// 
+    /// # Returns
+    /// 
+    /// Result indicating success or failure of initialization
+    pub async fn enable_index_rebuilding(&mut self, config: RebuildingConfig) -> VectorDbResult<()> {
+        let operations = VectorOperations::new(self.storage.clone(), self.config.clone());
+        let index_rebuilder = IndexRebuilder::new(
+            self.storage.clone(),
+            operations,
+            config,
+        );
+        
+        self.index_rebuilder = Some(index_rebuilder);
+        
+        eprintln!("✅ Index rebuilding system enabled");
+        Ok(())
+    }
+    
+    /// Perform a complete index rebuild with progress tracking
+    /// 
+    /// This method performs a full reconstruction of the vector database index
+    /// with optional parallel processing, progress reporting, and health validation.
+    /// 
+    /// # Returns
+    /// 
+    /// Detailed results of the rebuild operation including performance metrics
+    pub async fn rebuild_index_full(&self) -> VectorDbResult<RebuildResult> {
+        if let Some(ref rebuilder) = self.index_rebuilder {
+            rebuilder.rebuild_index().await
+        } else {
+            Err(VectorDbError::Storage {
+                message: "Index rebuilding system not enabled. Call enable_index_rebuilding first.".to_string(),
+            })
+        }
+    }
+    
+    /// Set a progress callback for index rebuilding operations
+    /// 
+    /// This method allows the frontend to receive real-time progress updates
+    /// during index rebuilding operations.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `callback` - Callback function to receive progress updates
+    pub async fn set_rebuild_progress_callback(&mut self, callback: Arc<dyn Fn(RebuildProgress) + Send + Sync>) -> VectorDbResult<()> {
+        if let Some(ref mut rebuilder) = self.index_rebuilder {
+            rebuilder.set_progress_callback(callback);
+            Ok(())
+        } else {
+            Err(VectorDbError::Storage {
+                message: "Index rebuilding system not enabled.".to_string(),
+            })
+        }
+    }
+    
+    /// Cancel any currently running index rebuild operation
+    /// 
+    /// This method allows graceful cancellation of long-running rebuild operations.
+    pub async fn cancel_index_rebuild(&self) {
+        if let Some(ref rebuilder) = self.index_rebuilder {
+            rebuilder.cancel();
+        }
+    }
+    
+    // === Health Check System Methods ===
+    
+    /// Enable health check capabilities for the database
+    /// 
+    /// This method initializes the health checker that provides comprehensive
+    /// index integrity validation, performance testing, and corruption detection.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `config` - Configuration for the health check system
+    /// 
+    /// # Returns
+    /// 
+    /// Result indicating success or failure of initialization
+    pub async fn enable_health_checks(&mut self, config: HealthCheckConfig) -> VectorDbResult<()> {
+        let operations = VectorOperations::new(self.storage.clone(), self.config.clone());
+        let health_checker = HealthChecker::new(
+            self.storage.clone(),
+            operations,
+            config,
+        );
+        
+        self.health_checker = Some(health_checker);
+        
+        eprintln!("✅ Health check system enabled");
+        Ok(())
+    }
+    
+    /// Perform a comprehensive health check of the index
+    /// 
+    /// This method performs integrity validation, performance testing, and corruption
+    /// detection to assess the overall health of the vector database index.
+    /// 
+    /// # Returns
+    /// 
+    /// Detailed health check results with recommendations
+    pub async fn perform_health_check(&self) -> VectorDbResult<HealthCheckResult> {
+        if let Some(ref health_checker) = self.health_checker {
+            health_checker.perform_health_check().await
+        } else {
+            Err(VectorDbError::Storage {
+                message: "Health check system not enabled. Call enable_health_checks first.".to_string(),
+            })
+        }
+    }
+    
+    /// Perform a quick health check focused on performance validation
+    /// 
+    /// This method performs a faster health check that focuses primarily on
+    /// performance validation to meet the <1 second target requirement.
+    /// 
+    /// # Returns
+    /// 
+    /// Health check results with emphasis on performance metrics
+    pub async fn perform_quick_health_check(&self) -> VectorDbResult<HealthCheckResult> {
+        if let Some(ref health_checker) = self.health_checker {
+            // Create a performance-focused config for quick checks
+            let quick_config = HealthCheckConfig {
+                enable_integrity_validation: false,
+                enable_performance_validation: true,
+                enable_corruption_detection: false,
+                performance_sample_percentage: 0.05, // 5% sample for speed
+                target_check_time_seconds: 1,
+                enable_detailed_reporting: false,
+            };
+            
+            let quick_checker = HealthChecker::new(
+                self.storage.clone(),
+                VectorOperations::new(self.storage.clone(), self.config.clone()),
+                quick_config,
+            );
+            
+            quick_checker.perform_health_check().await
+        } else {
+            Err(VectorDbError::Storage {
+                message: "Health check system not enabled. Call enable_health_checks first.".to_string(),
+            })
+        }
+    }
+    
+    /// Detect and report potential index corruption
+    /// 
+    /// This method performs focused corruption detection to identify data integrity
+    /// issues that may require index rebuilding or recovery.
+    /// 
+    /// # Returns
+    /// 
+    /// Health check results focused on corruption detection
+    pub async fn detect_index_corruption(&self) -> VectorDbResult<HealthCheckResult> {
+        if let Some(ref health_checker) = self.health_checker {
+            // Create a corruption-focused config
+            let corruption_config = HealthCheckConfig {
+                enable_integrity_validation: true,
+                enable_performance_validation: false,
+                enable_corruption_detection: true,
+                performance_sample_percentage: 0.1, // 10% sample for thoroughness
+                target_check_time_seconds: 5, // Allow more time for corruption detection
+                enable_detailed_reporting: true,
+            };
+            
+            let corruption_checker = HealthChecker::new(
+                self.storage.clone(),
+                VectorOperations::new(self.storage.clone(), self.config.clone()),
+                corruption_config,
+            );
+            
+            corruption_checker.perform_health_check().await
+        } else {
+            Err(VectorDbError::Storage {
+                message: "Health check system not enabled. Call enable_health_checks first.".to_string(),
+            })
+        }
+    }
+    
+    /// Get the configuration of the index rebuilding system
+    /// 
+    /// # Returns
+    /// 
+    /// Current rebuilding configuration, or None if not enabled
+    pub fn get_rebuilding_config(&self) -> Option<&RebuildingConfig> {
+        // Note: We would need to store the config in IndexRebuilder to return it
+        // For now, return None as a placeholder
+        None
+    }
+    
+    /// Get the configuration of the health check system
+    /// 
+    /// # Returns
+    /// 
+    /// Current health check configuration, or None if not enabled
+    pub fn get_health_check_config(&self) -> Option<&HealthCheckConfig> {
+        // Note: We would need to store the config in HealthChecker to return it
+        // For now, return None as a placeholder
+        None
+    }
+    
+    /// Check if index rebuilding system is enabled
+    /// 
+    /// # Returns
+    /// 
+    /// True if rebuilding system is enabled, false otherwise
+    pub fn is_rebuilding_enabled(&self) -> bool {
+        self.index_rebuilder.is_some()
+    }
+    
+    /// Check if health check system is enabled
+    /// 
+    /// # Returns
+    /// 
+    /// True if health check system is enabled, false otherwise
+    pub fn is_health_checks_enabled(&self) -> bool {
+        self.health_checker.is_some()
+    }
+    
     // Private helper methods
     
     /// Update the in-memory cache with an entry
@@ -1098,6 +1334,18 @@ pub use incremental::{
 // Re-export atomic operations types
 pub use atomic::{
     AtomicConfig,
+};
+
+// Re-export rebuilding and health check types
+pub use rebuilding::{
+    RebuildPhase,
+    HealthStatus,
+    RebuildMetrics,
+    HealthIssue,
+    HealthIssueType,
+    IssueSeverity,
+    CorruptionType,
+    CorruptionSeverity,
 };
 
 
