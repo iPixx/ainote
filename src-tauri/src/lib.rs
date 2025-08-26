@@ -195,7 +195,17 @@ pub fn run() {
             similarity_search_commands::get_active_search_count,
             similarity_search_commands::benchmark_search_performance,
             similarity_search_commands::configure_search_performance,
-            similarity_search_commands::test_search_functionality
+            similarity_search_commands::test_search_functionality,
+            
+            // Maintenance Operations
+            commands::maintenance_commands::enable_database_maintenance,
+            commands::maintenance_commands::start_automatic_maintenance,
+            commands::maintenance_commands::stop_automatic_maintenance,
+            commands::maintenance_commands::run_manual_maintenance_cycle,
+            commands::maintenance_commands::get_maintenance_statistics,
+            commands::maintenance_commands::get_maintenance_status,
+            commands::maintenance_commands::configure_maintenance_vault_paths,
+            commands::maintenance_commands::reset_maintenance_statistics
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

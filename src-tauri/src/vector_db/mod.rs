@@ -106,6 +106,7 @@ pub mod indexing;
 pub mod incremental;
 pub mod atomic;
 pub mod file_ops;
+pub mod maintenance;
 
 #[cfg(test)]
 mod atomic_performance_test;
@@ -119,6 +120,7 @@ use operations::{VectorOperations, BatchOperations, ValidationOperations, Cleanu
 use indexing::{IndexingSystem, IndexStats};
 use incremental::{IncrementalUpdateManager, IncrementalConfig, UpdateStats};
 use file_ops::{FileOperations, InitializationStatus, CleanupResult, BackupResult, RecoveryResult, FileSystemMetrics};
+use maintenance::{MaintenanceManager, MaintenanceConfig, MaintenanceStats};
 
 /// High-level vector database interface
 /// 
@@ -148,6 +150,8 @@ pub struct VectorDatabase {
     indexing_system: Option<IndexingSystem>,
     /// Incremental update manager for file change monitoring
     incremental_manager: Option<IncrementalUpdateManager>,
+    /// Maintenance manager for cleanup and optimization operations
+    maintenance_manager: Option<MaintenanceManager>,
 }
 
 impl VectorDatabase {
@@ -183,6 +187,7 @@ impl VectorDatabase {
             cleanup_operations,
             indexing_system,
             incremental_manager: None, // Initialized on demand via enable_incremental_updates
+            maintenance_manager: None, // Initialized on demand via enable_maintenance
         })
     }
     
@@ -780,6 +785,120 @@ impl VectorDatabase {
     /// Current incremental update configuration, or None if not enabled
     pub fn get_incremental_config(&self) -> Option<&IncrementalConfig> {
         self.incremental_manager.as_ref().map(|m| m.get_config())
+    }
+    
+    // === Maintenance System Methods ===
+    
+    /// Enable maintenance operations for the database
+    /// 
+    /// This method initializes the maintenance manager that provides comprehensive
+    /// index maintenance including orphaned embedding detection, automatic cleanup,
+    /// index compaction, and storage optimization.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `config` - Configuration for the maintenance system
+    /// 
+    /// # Returns
+    /// 
+    /// Result indicating success or failure of initialization
+    pub async fn enable_maintenance(&mut self, config: MaintenanceConfig) -> VectorDbResult<()> {
+        let maintenance_manager = MaintenanceManager::new(
+            self.storage.clone(),
+            self.operations.clone(),
+            config,
+        ).await?;
+        
+        self.maintenance_manager = Some(maintenance_manager);
+        
+        eprintln!("✅ Maintenance system enabled");
+        Ok(())
+    }
+    
+    /// Start automatic maintenance operations
+    /// 
+    /// This method begins automatic maintenance cycles that run in the background
+    /// to keep the database optimized and clean up orphaned data.
+    /// 
+    /// # Returns
+    /// 
+    /// Result indicating success or failure
+    pub async fn start_maintenance(&self) -> VectorDbResult<()> {
+        if let Some(ref manager) = self.maintenance_manager {
+            manager.start_maintenance().await?;
+            Ok(())
+        } else {
+            Err(VectorDbError::Storage {
+                message: "Maintenance system not enabled. Call enable_maintenance first.".to_string(),
+            })
+        }
+    }
+    
+    /// Stop automatic maintenance operations
+    /// 
+    /// This method stops the automatic maintenance cycles.
+    pub async fn stop_maintenance(&self) {
+        if let Some(ref manager) = self.maintenance_manager {
+            manager.stop_maintenance().await;
+        }
+    }
+    
+    /// Run a manual maintenance cycle
+    /// 
+    /// This method performs a complete maintenance cycle including orphaned
+    /// embedding cleanup, index compaction, and storage optimization.
+    /// 
+    /// # Returns
+    /// 
+    /// Maintenance statistics from the cycle
+    pub async fn run_maintenance_cycle(&self) -> VectorDbResult<MaintenanceStats> {
+        if let Some(ref manager) = self.maintenance_manager {
+            manager.run_maintenance_cycle().await
+        } else {
+            Err(VectorDbError::Storage {
+                message: "Maintenance system not enabled. Call enable_maintenance first.".to_string(),
+            })
+        }
+    }
+    
+    /// Get maintenance statistics
+    /// 
+    /// Returns comprehensive statistics about maintenance operations including
+    /// cleanup counts, performance metrics, and operation history.
+    /// 
+    /// # Returns
+    /// 
+    /// Current maintenance statistics
+    pub async fn get_maintenance_stats(&self) -> VectorDbResult<MaintenanceStats> {
+        if let Some(ref manager) = self.maintenance_manager {
+            Ok(manager.get_maintenance_stats().await)
+        } else {
+            Err(VectorDbError::Storage {
+                message: "Maintenance system not enabled.".to_string(),
+            })
+        }
+    }
+    
+    /// Check if automatic maintenance is currently running
+    /// 
+    /// # Returns
+    /// 
+    /// True if maintenance is running, false otherwise
+    pub async fn is_maintenance_running(&self) -> bool {
+        if let Some(ref manager) = self.maintenance_manager {
+            manager.is_maintenance_running().await
+        } else {
+            false
+        }
+    }
+    
+    /// Get maintenance system configuration
+    /// 
+    /// # Returns
+    /// 
+    /// Current maintenance configuration, or None if not enabled
+    pub fn get_maintenance_config(&self) -> Option<&MaintenanceConfig> {
+        self.maintenance_manager.as_ref().map(|m| m.get_config())
     }
     
     // Private helper methods
