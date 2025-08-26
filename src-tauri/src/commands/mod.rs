@@ -98,6 +98,10 @@ pub mod incremental_commands;
 // Handles: maintenance operations, orphaned embedding cleanup, index compaction, and storage optimization
 pub mod maintenance_commands;
 
+// Rebuilding Commands Module
+// Handles: index rebuilding operations, health checks, corruption detection, and recovery systems
+pub mod rebuilding_commands;
+
 // Re-export all command functions for easy access in lib.rs
 pub use file_operations::*;
 pub use vault_operations::*;
@@ -109,3 +113,4 @@ pub use performance_commands::*;
 pub use search_commands::*;
 pub use incremental_commands::*;
 pub use maintenance_commands::*;
+pub use rebuilding_commands::*;
