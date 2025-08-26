@@ -24,18 +24,16 @@
 //! - `RecoveryManager`: Automatic recovery from corruption
 //! - `RebuildMetrics`: Performance monitoring and reporting
 
-use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::collections::HashSet;
+use std::path::PathBuf;
 use std::sync::{Arc, atomic::{AtomicUsize, AtomicBool, Ordering}};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tokio::sync::{RwLock, Mutex, Semaphore, mpsc};
+use std::time::{Duration, Instant};
+use tokio::sync::{RwLock, Semaphore, mpsc};
 use tokio::task::JoinHandle;
 use serde::{Serialize, Deserialize};
 
-use crate::vector_db::types::{
-    EmbeddingEntry, VectorStorageConfig, VectorDbError, VectorDbResult
-};
-use crate::vector_db::storage::{VectorStorage, IntegrityReport};
+use crate::vector_db::types::{VectorDbError, VectorDbResult};
+use crate::vector_db::storage::VectorStorage;
 use crate::vector_db::operations::VectorOperations;
 
 /// Configuration for index rebuilding operations
@@ -775,9 +773,9 @@ impl IndexRebuilder {
             let error_count = error_count.clone();
             let error_tx = error_tx.clone();
             let cancelled = self.cancelled.clone();
-            let storage = self.storage.clone();
+            let _storage = self.storage.clone();
             let operations = self.operations.clone();
-            let progress = self.progress.clone();
+            let _progress = self.progress.clone();
             let enable_debug = self.config.enable_debug_logging;
             
             let task = tokio::spawn(async move {
@@ -802,7 +800,7 @@ impl IndexRebuilder {
                 
                 // Update progress for this batch
                 let current_processed = processed_count.load(Ordering::Relaxed);
-                let elapsed = start_time.elapsed().as_secs();
+                let _elapsed = start_time.elapsed().as_secs();
                 
                 if enable_debug && batch_index % 10 == 0 {
                     eprintln!("🔄 Batch {} completed, {} embeddings processed", batch_index, current_processed);
@@ -1477,7 +1475,7 @@ mod tests {
         let storage = Arc::new(VectorStorage::new(storage_config.clone()).unwrap());
         let operations = VectorOperations::new(storage.clone(), storage_config);
         
-        let health_checker = HealthChecker::new(storage, operations, health_config.clone());
+        let _health_checker = HealthChecker::new(storage, operations, health_config.clone());
         
         assert!(health_config.enable_integrity_validation);
         assert!(health_config.enable_performance_validation);

@@ -3,18 +3,17 @@
 //! This module provides comprehensive integration tests for the index rebuilding
 //! and health check functionality, including performance validation and error scenarios.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::time::timeout;
 
 use ainote_lib::vector_db::{
-    VectorDatabase, VectorStorageConfig, 
+    VectorDatabase,
     rebuilding::{RebuildingConfig, HealthCheckConfig, RebuildProgress},
-    RebuildPhase, HealthStatus, CorruptionSeverity,
-    EmbeddingEntry
+    RebuildPhase, HealthStatus, CorruptionSeverity
 };
+use ainote_lib::vector_db::types::VectorStorageConfig;
 
 /// Helper function to create a test configuration
 fn create_test_config() -> VectorStorageConfig {
