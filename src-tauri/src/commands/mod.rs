@@ -102,6 +102,10 @@ pub mod maintenance_commands;
 // Handles: index rebuilding operations, health checks, corruption detection, and recovery systems
 pub mod rebuilding_commands;
 
+// Monitoring Commands Module
+// Handles: performance monitoring, metrics collection, real-time monitoring, and alerting
+pub mod monitoring_commands;
+
 // Re-export all command functions for easy access in lib.rs
 pub use file_operations::*;
 pub use vault_operations::*;
@@ -114,3 +118,4 @@ pub use search_commands::*;
 pub use incremental_commands::*;
 pub use maintenance_commands::*;
 pub use rebuilding_commands::*;
+pub use monitoring_commands::*;

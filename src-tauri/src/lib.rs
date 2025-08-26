@@ -216,7 +216,22 @@ pub fn run() {
             commands::rebuilding_commands::perform_quick_health_check,
             commands::rebuilding_commands::detect_index_corruption,
             commands::rebuilding_commands::get_rebuilding_health_status,
-            commands::rebuilding_commands::recover_from_corruption
+            commands::rebuilding_commands::recover_from_corruption,
+            
+            // Performance Monitoring and Metrics
+            commands::monitoring_commands::start_performance_monitoring,
+            commands::monitoring_commands::stop_performance_monitoring,
+            commands::monitoring_commands::get_monitoring_status,
+            commands::monitoring_commands::update_monitoring_config,
+            commands::monitoring_commands::get_current_performance_metrics,
+            commands::monitoring_commands::generate_performance_report,
+            commands::monitoring_commands::get_active_alerts,
+            commands::monitoring_commands::acknowledge_alert,
+            commands::monitoring_commands::monitor_incremental_operation,
+            commands::monitoring_commands::complete_incremental_operation_monitoring,
+            commands::monitoring_commands::complete_maintenance_operation_monitoring,
+            commands::monitoring_commands::complete_rebuilding_operation_monitoring,
+            commands::monitoring_commands::get_resource_utilization
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

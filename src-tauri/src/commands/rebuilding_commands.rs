@@ -3,12 +3,11 @@
 //! This module provides Tauri commands for managing index rebuilding operations,
 //! health checks, corruption detection, and recovery systems.
 
-use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 
 use crate::vector_db::{
-    rebuilding::{RebuildingConfig, HealthCheckConfig, RebuildResult, HealthCheckResult, RebuildProgress},
-    RebuildPhase, HealthStatus, RebuildMetrics
+    rebuilding::{RebuildingConfig, HealthCheckConfig, RebuildResult, HealthCheckResult},
+    HealthStatus
 };
 use crate::globals::VECTOR_DATABASE;
 

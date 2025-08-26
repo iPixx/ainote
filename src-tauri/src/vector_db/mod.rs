@@ -108,6 +108,7 @@ pub mod atomic;
 pub mod file_ops;
 pub mod maintenance;
 pub mod rebuilding;
+pub mod performance_monitor;
 
 #[cfg(test)]
 mod atomic_performance_test;

@@ -417,7 +417,7 @@ pub struct UpdateProcessor {
     /// Batch operations for efficiency
     batch_operations: BatchOperations,
     /// Storage backend
-    storage: Arc<VectorStorage>,
+    _storage: Arc<VectorStorage>,
     /// Configuration
     config: IncrementalConfig,
 }
@@ -433,7 +433,7 @@ impl UpdateProcessor {
         Self {
             operations,
             batch_operations,
-            storage,
+            _storage: storage,
             config,
         }
     }
@@ -833,7 +833,7 @@ mod tests {
     use super::*;
     
     /// Create a test configuration for incremental updates
-    fn create_test_incremental_config() -> IncrementalConfig {
+    fn _create_test_incremental_config() -> IncrementalConfig {
         IncrementalConfig {
             batch_timeout_ms: 100,
             max_batch_size: 10,
