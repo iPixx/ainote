@@ -95,7 +95,7 @@
 //! ```
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -103,6 +103,7 @@ pub mod types;
 pub mod storage;
 pub mod operations;
 pub mod indexing;
+pub mod incremental;
 pub mod atomic;
 pub mod file_ops;
 
@@ -116,6 +117,7 @@ use types::{EmbeddingEntry, StorageMetrics, VectorStorageConfig, VectorDbResult,
 use storage::{VectorStorage, CompactionResult, IntegrityReport};
 use operations::{VectorOperations, BatchOperations, ValidationOperations, CleanupOperations};
 use indexing::{IndexingSystem, IndexStats};
+use incremental::{IncrementalUpdateManager, IncrementalConfig, UpdateStats};
 use file_ops::{FileOperations, InitializationStatus, CleanupResult, BackupResult, RecoveryResult, FileSystemMetrics};
 
 /// High-level vector database interface
@@ -144,6 +146,8 @@ pub struct VectorDatabase {
     cleanup_operations: CleanupOperations,
     /// Indexing system for fast lookups
     indexing_system: Option<IndexingSystem>,
+    /// Incremental update manager for file change monitoring
+    incremental_manager: Option<IncrementalUpdateManager>,
 }
 
 impl VectorDatabase {
@@ -178,6 +182,7 @@ impl VectorDatabase {
             validation_operations,
             cleanup_operations,
             indexing_system,
+            incremental_manager: None, // Initialized on demand via enable_incremental_updates
         })
     }
     
@@ -651,6 +656,132 @@ impl VectorDatabase {
         })
     }
     
+    // === Incremental Update System Methods ===
+    
+    /// Enable incremental updates for the database
+    /// 
+    /// This method initializes the incremental update manager that monitors
+    /// file system changes and automatically updates embeddings when files
+    /// are created, modified, or deleted.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `config` - Configuration for the incremental update system
+    /// 
+    /// # Returns
+    /// 
+    /// Result indicating success or failure of initialization
+    pub async fn enable_incremental_updates(&mut self, config: IncrementalConfig) -> VectorDbResult<()> {
+        let incremental_manager = IncrementalUpdateManager::new(
+            self.storage.clone(),
+            self.config.clone(),
+            config,
+        ).await?;
+        
+        self.incremental_manager = Some(incremental_manager);
+        
+        eprintln!("✅ Incremental update system enabled");
+        Ok(())
+    }
+    
+    /// Start monitoring a vault path for incremental updates
+    /// 
+    /// This method begins monitoring a specific directory for file changes.
+    /// The incremental update system must be enabled first.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `vault_path` - Path to the vault directory to monitor
+    /// 
+    /// # Returns
+    /// 
+    /// Result indicating success or failure
+    pub async fn start_incremental_monitoring(&mut self, vault_path: &Path) -> VectorDbResult<()> {
+        if let Some(ref mut manager) = self.incremental_manager {
+            manager.start_monitoring(vault_path).await?;
+            Ok(())
+        } else {
+            Err(VectorDbError::Storage {
+                message: "Incremental update system not enabled. Call enable_incremental_updates first.".to_string(),
+            })
+        }
+    }
+    
+    /// Stop monitoring a vault path for incremental updates
+    /// 
+    /// This method stops monitoring a specific directory for file changes.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `vault_path` - Path to the vault directory to stop monitoring
+    /// 
+    /// # Returns
+    /// 
+    /// Result indicating success or failure
+    pub async fn stop_incremental_monitoring(&mut self, vault_path: &Path) -> VectorDbResult<()> {
+        if let Some(ref mut manager) = self.incremental_manager {
+            manager.stop_monitoring(vault_path).await?;
+            Ok(())
+        } else {
+            Err(VectorDbError::Storage {
+                message: "Incremental update system not enabled.".to_string(),
+            })
+        }
+    }
+    
+    /// Process pending incremental updates
+    /// 
+    /// This method should be called periodically to process any pending
+    /// file changes detected by the incremental update system.
+    /// 
+    /// # Returns
+    /// 
+    /// Optional update statistics if changes were processed, None if no changes
+    pub async fn process_incremental_updates(&self) -> VectorDbResult<Option<UpdateStats>> {
+        if let Some(ref manager) = self.incremental_manager {
+            manager.process_pending_changes().await
+        } else {
+            Ok(None) // No incremental manager, no updates to process
+        }
+    }
+    
+    /// Get incremental update statistics
+    /// 
+    /// Returns recent update history from the incremental update system.
+    /// 
+    /// # Returns
+    /// 
+    /// Vector of update statistics from recent operations
+    pub async fn get_incremental_update_history(&self) -> Vec<UpdateStats> {
+        if let Some(ref manager) = self.incremental_manager {
+            manager.get_update_history().await
+        } else {
+            Vec::new()
+        }
+    }
+    
+    /// Check if incremental updates are currently being processed
+    /// 
+    /// # Returns
+    /// 
+    /// True if updates are currently being processed, false otherwise
+    pub async fn is_processing_incremental_updates(&self) -> bool {
+        if let Some(ref manager) = self.incremental_manager {
+            manager.is_processing().await
+        } else {
+            false
+        }
+    }
+    
+    /// Get incremental update system configuration
+    /// 
+    /// # Returns
+    /// 
+    /// Current incremental update configuration, or None if not enabled
+    pub fn get_incremental_config(&self) -> Option<&IncrementalConfig> {
+        self.incremental_manager.as_ref().map(|m| m.get_config())
+    }
+    
     // Private helper methods
     
     /// Update the in-memory cache with an entry
@@ -839,6 +970,11 @@ pub use types::{
 
 // Re-export additional operations types not already imported above
 pub use indexing::IndexMetadata;
+
+// Re-export incremental update system types
+pub use incremental::{
+    ChangeType,
+};
 
 // Re-export atomic operations types
 pub use atomic::{
