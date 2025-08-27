@@ -19,8 +19,7 @@ use tokio::sync::{RwLock, Mutex};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::vector_db::types::{EmbeddingEntry, VectorDbError, VectorDbResult};
-use crate::embedding_cache::{EmbeddingCache, CacheConfig};
+use crate::vector_db::types::EmbeddingEntry;
 
 /// Errors that can occur during lazy loading operations
 #[derive(Error, Debug)]

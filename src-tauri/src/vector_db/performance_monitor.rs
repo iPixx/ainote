@@ -495,7 +495,7 @@ impl IndexPerformanceMonitor {
         
         for metrics in operations.values() {
             type_metrics.entry(metrics.operation_type.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(metrics);
         }
 
@@ -536,7 +536,7 @@ impl IndexPerformanceMonitor {
         for op in &period_operations {
             *operations_by_type.entry(op.operation_type.clone()).or_insert(0) += 1;
             type_groups.entry(op.operation_type.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(op);
         }
 
@@ -749,7 +749,7 @@ impl IndexPerformanceMonitor {
             for op in operations {
                 if op.started_at >= current_time && op.started_at < bucket_end {
                     type_groups.entry(op.operation_type.clone())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(op);
                 }
             }
@@ -922,7 +922,7 @@ impl IndexPerformanceMonitor {
             }
         }
 
-        score.max(0.0).min(1.0)
+        score.clamp(0.0, 1.0)
     }
 
     /// Persist metrics to file

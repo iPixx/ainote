@@ -545,7 +545,7 @@ pub async fn complete_incremental_operation_monitoring(
         ).await.map_err(|e| format!("Failed to complete operation monitoring: {}", e))?;
 
         // Convert update stats to operation metrics for historical tracking
-        let _operation_metrics = IncrementalUpdateMonitoring::to_operation_metrics(&*monitor, &update_stats);
+        let _operation_metrics = IncrementalUpdateMonitoring::to_operation_metrics(monitor, &update_stats);
         
         Ok(format!("Incremental operation {} monitoring completed", operation_id))
     } else {
@@ -586,7 +586,7 @@ pub async fn complete_maintenance_operation_monitoring(
         ).await.map_err(|e| format!("Failed to complete operation monitoring: {}", e))?;
 
         // Convert maintenance stats to operation metrics for historical tracking
-        let _operation_metrics = MaintenanceMonitoring::to_operation_metrics(&*monitor, &maintenance_stats);
+        let _operation_metrics = MaintenanceMonitoring::to_operation_metrics(monitor, &maintenance_stats);
         
         Ok(format!("Maintenance operation {} monitoring completed", operation_id))
     } else {
@@ -627,7 +627,7 @@ pub async fn complete_rebuilding_operation_monitoring(
         ).await.map_err(|e| format!("Failed to complete operation monitoring: {}", e))?;
 
         // Convert rebuild metrics to operation metrics for historical tracking
-        let _operation_metrics = RebuildingMonitoring::to_operation_metrics(&*monitor, &rebuild_metrics);
+        let _operation_metrics = RebuildingMonitoring::to_operation_metrics(monitor, &rebuild_metrics);
         
         Ok(format!("Rebuilding operation {} monitoring completed", operation_id))
     } else {

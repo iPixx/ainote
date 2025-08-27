@@ -14,7 +14,7 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -423,7 +423,7 @@ impl AutoCleanupManager {
                 continue;
             }
             
-            let task_start = Instant::now();
+            let _task_start = Instant::now();
             let mut _task_result = true;
             let mut _items_processed = 0;
             
@@ -685,7 +685,7 @@ struct TaskResult {
 
 impl Drop for AutoCleanupManager {
     fn drop(&mut self) {
-        let _ = tokio::runtime::Handle::current().block_on(async {
+        tokio::runtime::Handle::current().block_on(async {
             self.stop().await;
         });
     }

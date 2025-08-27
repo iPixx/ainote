@@ -12,15 +12,15 @@
 //! - **Memory Management**: Adaptive cache sizing based on available memory
 //! - **Performance Monitoring**: Detailed cache performance metrics
 
-use std::collections::{HashMap, VecDeque, BTreeMap};
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH, Instant, Duration};
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::vector_db::types::{EmbeddingEntry, VectorDbError, VectorDbResult};
-use crate::embedding_cache::{EmbeddingCache, CacheConfig, CacheMetrics};
+use crate::vector_db::types::EmbeddingEntry;
+use crate::embedding_cache::CacheConfig;
 
 /// Errors that can occur during enhanced cache operations
 #[derive(Error, Debug)]
@@ -292,6 +292,7 @@ impl AccessPattern {
     }
     
     /// Predict next access time for an entry
+    #[allow(dead_code)]
     fn predict_next_access(&self, entry_id: &str) -> Option<Instant> {
         // Use average access interval if available
         if let Some(intervals) = self.access_intervals.get(entry_id) {
@@ -642,7 +643,7 @@ impl EnhancedCache {
         
         while l1_cache.len() >= self.config.l1_config.max_entries {
             // Find entry to evict based on policy
-            if let Some((evict_id, _)) = self.find_eviction_candidate(&*l1_cache).await {
+            if let Some((evict_id, _)) = self.find_eviction_candidate(&l1_cache).await {
                 let evicted_entry = l1_cache.remove(&evict_id);
                 
                 // Demote to L2 instead of discarding
@@ -667,7 +668,7 @@ impl EnhancedCache {
         let mut l2_cache = self.l2_cache.write().await;
         
         while l2_cache.len() >= self.config.l2_config.max_entries {
-            if let Some((evict_id, _)) = self.find_eviction_candidate(&*l2_cache).await {
+            if let Some((evict_id, _)) = self.find_eviction_candidate(&l2_cache).await {
                 l2_cache.remove(&evict_id);
                 
                 let mut stats = self.stats.write().await;

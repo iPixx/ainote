@@ -19,8 +19,8 @@ use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 
-use crate::vector_db::types::{EmbeddingEntry, EmbeddingMetadata, VectorDbError, VectorDbResult};
-use crate::vector_db::compression::{VectorCompressor, CompressedVector};
+use crate::vector_db::types::{EmbeddingEntry, EmbeddingMetadata};
+use crate::vector_db::compression::VectorCompressor;
 
 /// Errors that can occur during optimized storage operations
 #[derive(Error, Debug)]
@@ -142,18 +142,18 @@ impl From<EmbeddingMetadata> for CompactEmbeddingMetadata {
     }
 }
 
-impl Into<EmbeddingMetadata> for CompactEmbeddingMetadata {
-    fn into(self) -> EmbeddingMetadata {
+impl From<CompactEmbeddingMetadata> for EmbeddingMetadata {
+    fn from(val: CompactEmbeddingMetadata) -> Self {
         EmbeddingMetadata {
-            file_path: self.file_path,
-            chunk_id: self.chunk_id,
-            created_at: self.created_at,
-            updated_at: self.updated_at,
-            content_preview: self.content_preview.unwrap_or_default(),
-            text_length: self.text_length,
-            model_name: self.model_name,
-            text_hash: self.text_hash,
-            custom_metadata: self.custom_metadata,
+            file_path: val.file_path,
+            chunk_id: val.chunk_id,
+            created_at: val.created_at,
+            updated_at: val.updated_at,
+            content_preview: val.content_preview.unwrap_or_default(),
+            text_length: val.text_length,
+            model_name: val.model_name,
+            text_hash: val.text_hash,
+            custom_metadata: val.custom_metadata,
         }
     }
 }
@@ -507,8 +507,7 @@ impl OptimizedStorageEngine {
         
         // Check for similar vectors for delta encoding
         if let Some(_compressor) = &mut self.vector_compressor {
-            if let Ok(best_reference) = self.find_best_reference_vector(vector) {
-                if let Some((ref_id, ref_vector)) = best_reference {
+            if let Ok(Some((ref_id, ref_vector))) = self.find_best_reference_vector(vector) {
                     let delta: Vec<f32> = vector
                         .iter()
                         .zip(ref_vector.iter())
@@ -519,7 +518,6 @@ impl OptimizedStorageEngine {
                         reference_id: ref_id,
                         delta,
                     });
-                }
             }
         }
         

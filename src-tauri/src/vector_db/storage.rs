@@ -15,9 +15,6 @@ use crate::vector_db::types::{
     EmbeddingEntry, VectorStorageConfig, StorageFileHeader, StorageMetrics,
     CompressionAlgorithm, VectorDbError, VectorDbResult,
 };
-use crate::vector_db::compression::{
-    VectorCompressor, VectorCompressionConfig, VectorCompressionAlgorithm, CompressedVector,
-};
 
 /// Container for a batch of embedding entries with metadata
 #[derive(Debug, Serialize, Deserialize)]

@@ -1,5 +1,5 @@
 //! Comprehensive Performance Benchmarks for Vector Database
-//! 
+//!
 //! This module provides detailed performance benchmarks for all vector database
 //! operations to validate performance requirements and identify optimization
 //! opportunities.
@@ -10,8 +10,8 @@ use tempfile::TempDir;
 use tokio::runtime::Runtime;
 
 use ainote_lib::vector_db::{
+    types::{CompressionAlgorithm, EmbeddingEntry, VectorStorageConfig},
     VectorDatabase,
-    types::{EmbeddingEntry, VectorStorageConfig, CompressionAlgorithm},
 };
 
 /// Benchmark configuration factory
@@ -26,9 +26,14 @@ impl BenchmarkConfig {
             compression_algorithm: CompressionAlgorithm::None,
             max_entries_per_file: 1000,
             enable_checksums: false, // Disabled for pure performance
-            auto_backup: false, // Disabled for pure performance
+            auto_backup: false,      // Disabled for pure performance
             max_backups: 0,
             enable_metrics: true, // Keep for validation
+            enable_vector_compression: false,
+            vector_compression_algorithm:
+                ainote_lib::vector_db::types::VectorCompressionAlgorithm::None,
+            enable_lazy_loading: false,
+            lazy_loading_threshold: 1000,
         };
         (config, temp_dir)
     }
@@ -44,6 +49,11 @@ impl BenchmarkConfig {
             auto_backup: false,
             max_backups: 0,
             enable_metrics: true,
+            enable_vector_compression: false,
+            vector_compression_algorithm:
+                ainote_lib::vector_db::types::VectorCompressionAlgorithm::None,
+            enable_lazy_loading: false,
+            lazy_loading_threshold: 1000,
         };
         (config, temp_dir)
     }
@@ -54,7 +64,9 @@ struct BenchmarkData;
 
 impl BenchmarkData {
     fn create_embedding(id: usize, vector_size: usize) -> EmbeddingEntry {
-        let vector = (0..vector_size).map(|i| ((i + id) as f32) * 0.001).collect();
+        let vector = (0..vector_size)
+            .map(|i| ((i + id) as f32) * 0.001)
+            .collect();
         EmbeddingEntry::new(
             vector,
             format!("/benchmark/file_{}.md", id % 100),
@@ -75,23 +87,25 @@ impl BenchmarkData {
 fn bench_crud_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let mut group = c.benchmark_group("crud_operations");
-    
+
     // Benchmark single embedding storage
     group.bench_function("store_single_embedding", |b| {
         b.to_async(&rt).iter(|| async {
             let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
             let db = VectorDatabase::new(config).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             let entry = BenchmarkData::create_embedding(1, 384);
-            let result = db.store_embedding(
-                black_box(entry.vector.clone()),
-                entry.metadata.file_path.clone(),
-                entry.metadata.chunk_id.clone(),
-                "Benchmark test content",
-                entry.metadata.model_name.clone(),
-            ).await;
-            
+            let result = db
+                .store_embedding(
+                    black_box(entry.vector.clone()),
+                    entry.metadata.file_path.clone(),
+                    entry.metadata.chunk_id.clone(),
+                    "Benchmark test content",
+                    entry.metadata.model_name.clone(),
+                )
+                .await;
+
             black_box(result.unwrap());
         });
     });
@@ -102,16 +116,19 @@ fn bench_crud_operations(c: &mut Criterion) {
         let setup_db = rt.block_on(async {
             let db = VectorDatabase::new(config).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             let entry = BenchmarkData::create_embedding(1, 384);
-            let stored_id = db.store_embedding(
-                entry.vector.clone(),
-                entry.metadata.file_path.clone(),
-                entry.metadata.chunk_id.clone(),
-                "Benchmark test content",
-                entry.metadata.model_name.clone(),
-            ).await.unwrap();
-            
+            let stored_id = db
+                .store_embedding(
+                    entry.vector.clone(),
+                    entry.metadata.file_path.clone(),
+                    entry.metadata.chunk_id.clone(),
+                    "Benchmark test content",
+                    entry.metadata.model_name.clone(),
+                )
+                .await
+                .unwrap();
+
             (db, stored_id)
         });
 
@@ -127,22 +144,28 @@ fn bench_crud_operations(c: &mut Criterion) {
         let setup_db = rt.block_on(async {
             let db = VectorDatabase::new(config).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             let entry = BenchmarkData::create_embedding(1, 384);
-            let stored_id = db.store_embedding(
-                entry.vector.clone(),
-                entry.metadata.file_path.clone(),
-                entry.metadata.chunk_id.clone(),
-                "Benchmark test content",
-                entry.metadata.model_name.clone(),
-            ).await.unwrap();
-            
+            let stored_id = db
+                .store_embedding(
+                    entry.vector.clone(),
+                    entry.metadata.file_path.clone(),
+                    entry.metadata.chunk_id.clone(),
+                    "Benchmark test content",
+                    entry.metadata.model_name.clone(),
+                )
+                .await
+                .unwrap();
+
             (db, stored_id)
         });
 
         b.to_async(&rt).iter(|| async {
             let new_vector = vec![0.99; 384];
-            let result = setup_db.0.update_embedding(black_box(&setup_db.1), black_box(new_vector)).await;
+            let result = setup_db
+                .0
+                .update_embedding(black_box(&setup_db.1), black_box(new_vector))
+                .await;
             black_box(result.unwrap());
         });
     });
@@ -155,16 +178,19 @@ fn bench_crud_operations(c: &mut Criterion) {
                     let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
                     let db = VectorDatabase::new(config).await.unwrap();
                     db.initialize().await.unwrap();
-                    
+
                     let entry = BenchmarkData::create_embedding(1, 384);
-                    let stored_id = db.store_embedding(
-                        entry.vector.clone(),
-                        entry.metadata.file_path.clone(),
-                        entry.metadata.chunk_id.clone(),
-                        "Benchmark test content",
-                        entry.metadata.model_name.clone(),
-                    ).await.unwrap();
-                    
+                    let stored_id = db
+                        .store_embedding(
+                            entry.vector.clone(),
+                            entry.metadata.file_path.clone(),
+                            entry.metadata.chunk_id.clone(),
+                            "Benchmark test content",
+                            entry.metadata.model_name.clone(),
+                        )
+                        .await
+                        .unwrap();
+
                     (db, stored_id)
                 })
             },
@@ -183,10 +209,10 @@ fn bench_crud_operations(c: &mut Criterion) {
 fn bench_batch_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let mut group = c.benchmark_group("batch_operations");
-    
+
     // Test different batch sizes
     let batch_sizes = vec![10, 50, 100, 500, 1000];
-    
+
     for batch_size in batch_sizes {
         // Batch store benchmark
         group.throughput(Throughput::Elements(batch_size as u64));
@@ -198,7 +224,7 @@ fn bench_batch_operations(c: &mut Criterion) {
                     let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
                     let db = VectorDatabase::new(config).await.unwrap();
                     db.initialize().await.unwrap();
-                    
+
                     let batch_data = BenchmarkData::create_batch(batch_size, 384);
                     let result = db.store_embeddings_batch(black_box(batch_data)).await;
                     black_box(result.unwrap());
@@ -216,15 +242,18 @@ fn bench_batch_operations(c: &mut Criterion) {
                     let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
                     let db = VectorDatabase::new(config).await.unwrap();
                     db.initialize().await.unwrap();
-                    
+
                     let batch_data = BenchmarkData::create_batch(batch_size, 384);
                     let stored_ids = db.store_embeddings_batch(batch_data).await.unwrap();
-                    
+
                     (db, stored_ids)
                 });
 
                 b.to_async(&rt).iter(|| async {
-                    let result = setup_data.0.retrieve_embeddings(black_box(&setup_data.1)).await;
+                    let result = setup_data
+                        .0
+                        .retrieve_embeddings(black_box(&setup_data.1))
+                        .await;
                     black_box(result.unwrap());
                 });
             },
@@ -238,10 +267,10 @@ fn bench_batch_operations(c: &mut Criterion) {
 fn bench_vector_sizes(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let mut group = c.benchmark_group("vector_sizes");
-    
+
     // Test different vector dimensions
     let vector_sizes = vec![128, 256, 384, 512, 768, 1024, 1536, 2048, 4096];
-    
+
     for vector_size in vector_sizes {
         group.throughput(Throughput::Elements(vector_size as u64));
         group.bench_with_input(
@@ -252,16 +281,18 @@ fn bench_vector_sizes(c: &mut Criterion) {
                     let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
                     let db = VectorDatabase::new(config).await.unwrap();
                     db.initialize().await.unwrap();
-                    
+
                     let entry = BenchmarkData::create_embedding(1, vector_size);
-                    let result = db.store_embedding(
-                        black_box(entry.vector.clone()),
-                        entry.metadata.file_path.clone(),
-                        entry.metadata.chunk_id.clone(),
-                        "Vector size benchmark",
-                        entry.metadata.model_name.clone(),
-                    ).await;
-                    
+                    let result = db
+                        .store_embedding(
+                            black_box(entry.vector.clone()),
+                            entry.metadata.file_path.clone(),
+                            entry.metadata.chunk_id.clone(),
+                            "Vector size benchmark",
+                            entry.metadata.model_name.clone(),
+                        )
+                        .await;
+
                     black_box(result.unwrap());
                 });
             },
@@ -275,21 +306,27 @@ fn bench_vector_sizes(c: &mut Criterion) {
                     let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
                     let db = VectorDatabase::new(config).await.unwrap();
                     db.initialize().await.unwrap();
-                    
+
                     let entry = BenchmarkData::create_embedding(1, vector_size);
-                    let stored_id = db.store_embedding(
-                        entry.vector.clone(),
-                        entry.metadata.file_path.clone(),
-                        entry.metadata.chunk_id.clone(),
-                        "Vector size benchmark",
-                        entry.metadata.model_name.clone(),
-                    ).await.unwrap();
-                    
+                    let stored_id = db
+                        .store_embedding(
+                            entry.vector.clone(),
+                            entry.metadata.file_path.clone(),
+                            entry.metadata.chunk_id.clone(),
+                            "Vector size benchmark",
+                            entry.metadata.model_name.clone(),
+                        )
+                        .await
+                        .unwrap();
+
                     (db, stored_id)
                 });
 
                 b.to_async(&rt).iter(|| async {
-                    let result = setup_data.0.retrieve_embedding(black_box(&setup_data.1)).await;
+                    let result = setup_data
+                        .0
+                        .retrieve_embedding(black_box(&setup_data.1))
+                        .await;
                     black_box(result.unwrap());
                 });
             },
@@ -303,14 +340,14 @@ fn bench_vector_sizes(c: &mut Criterion) {
 fn bench_compression_impact(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let mut group = c.benchmark_group("compression_impact");
-    
+
     // Benchmark without compression
     group.bench_function("store_batch_no_compression", |b| {
         b.to_async(&rt).iter(|| async {
             let (config, _temp_dir) = BenchmarkConfig::performance_optimized(); // No compression
             let db = VectorDatabase::new(config).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             let batch_data = BenchmarkData::create_batch(100, 768);
             let result = db.store_embeddings_batch(black_box(batch_data)).await;
             black_box(result.unwrap());
@@ -323,7 +360,7 @@ fn bench_compression_impact(c: &mut Criterion) {
             let (config, _temp_dir) = BenchmarkConfig::compression_enabled(); // With compression
             let db = VectorDatabase::new(config).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             let batch_data = BenchmarkData::create_batch(100, 768);
             let result = db.store_embeddings_batch(black_box(batch_data)).await;
             black_box(result.unwrap());
@@ -336,15 +373,18 @@ fn bench_compression_impact(c: &mut Criterion) {
             let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
             let db = VectorDatabase::new(config).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             let batch_data = BenchmarkData::create_batch(100, 768);
             let stored_ids = db.store_embeddings_batch(batch_data).await.unwrap();
-            
+
             (db, stored_ids)
         });
 
         b.to_async(&rt).iter(|| async {
-            let result = setup_data.0.retrieve_embeddings(black_box(&setup_data.1)).await;
+            let result = setup_data
+                .0
+                .retrieve_embeddings(black_box(&setup_data.1))
+                .await;
             black_box(result.unwrap());
         });
     });
@@ -355,15 +395,18 @@ fn bench_compression_impact(c: &mut Criterion) {
             let (config, _temp_dir) = BenchmarkConfig::compression_enabled();
             let db = VectorDatabase::new(config).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             let batch_data = BenchmarkData::create_batch(100, 768);
             let stored_ids = db.store_embeddings_batch(batch_data).await.unwrap();
-            
+
             (db, stored_ids)
         });
 
         b.to_async(&rt).iter(|| async {
-            let result = setup_data.0.retrieve_embeddings(black_box(&setup_data.1)).await;
+            let result = setup_data
+                .0
+                .retrieve_embeddings(black_box(&setup_data.1))
+                .await;
             black_box(result.unwrap());
         });
     });
@@ -380,7 +423,7 @@ fn bench_database_scale(c: &mut Criterion) {
 
     // Benchmark database startup time with existing data
     let database_sizes = vec![100, 500, 1000, 2000];
-    
+
     for db_size in database_sizes {
         group.bench_with_input(
             BenchmarkId::new("startup_time", db_size),
@@ -391,7 +434,7 @@ fn bench_database_scale(c: &mut Criterion) {
                 let populated_config = rt.block_on(async {
                     let db = VectorDatabase::new(config.clone()).await.unwrap();
                     db.initialize().await.unwrap();
-                    
+
                     // Store data in batches to simulate realistic usage
                     let batch_size = 100;
                     for i in (0..db_size).step_by(batch_size) {
@@ -399,13 +442,15 @@ fn bench_database_scale(c: &mut Criterion) {
                         let batch_data = BenchmarkData::create_batch(remaining, 384);
                         let _ = db.store_embeddings_batch(batch_data).await.unwrap();
                     }
-                    
+
                     config
                 });
 
                 b.to_async(&rt).iter(|| async {
                     // Measure startup time of new database instance with existing data
-                    let db = VectorDatabase::new(black_box(populated_config.clone())).await.unwrap();
+                    let db = VectorDatabase::new(black_box(populated_config.clone()))
+                        .await
+                        .unwrap();
                     let init_result = db.initialize().await;
                     black_box(init_result.unwrap());
                 });
@@ -419,16 +464,18 @@ fn bench_database_scale(c: &mut Criterion) {
             let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
             let db = VectorDatabase::new(config).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             // Pre-populate with 1000 entries across different files
             let batch_data = BenchmarkData::create_batch(1000, 384);
             let _ = db.store_embeddings_batch(batch_data).await.unwrap();
-            
+
             db
         });
 
         b.to_async(&rt).iter(|| async {
-            let result = setup_db.find_embeddings_by_file(black_box("/benchmark/file_50.md")).await;
+            let result = setup_db
+                .find_embeddings_by_file(black_box("/benchmark/file_50.md"))
+                .await;
             black_box(result.unwrap());
         });
     });
@@ -440,29 +487,33 @@ fn bench_database_scale(c: &mut Criterion) {
 fn bench_memory_efficiency(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let mut group = c.benchmark_group("memory_efficiency");
-    
+
     // Benchmark memory usage with different cache sizes
     group.bench_function("memory_usage_1000_entries", |b| {
         b.to_async(&rt).iter(|| async {
             let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
             let db = VectorDatabase::new(config).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             // Store 1000 entries and measure memory footprint
             let batch_data = BenchmarkData::create_batch(1000, 384);
             let stored_ids = db.store_embeddings_batch(batch_data).await.unwrap();
-            
+
             // Access some entries to populate cache
             let sample_ids = &stored_ids[0..50];
             let _retrieved = db.retrieve_embeddings(sample_ids).await.unwrap();
-            
+
             // Get metrics to measure memory usage
             let metrics = db.get_metrics().await.unwrap();
-            
+
             // Ensure memory usage is within requirements (<50MB for 1000 notes)
             let memory_mb = metrics.cache.memory_usage_bytes as f64 / (1024.0 * 1024.0);
-            assert!(memory_mb < 50.0, "Memory usage {:.2}MB exceeds 50MB limit", memory_mb);
-            
+            assert!(
+                memory_mb < 50.0,
+                "Memory usage {:.2}MB exceeds 50MB limit",
+                memory_mb
+            );
+
             black_box(metrics);
         });
     });
@@ -473,17 +524,21 @@ fn bench_memory_efficiency(c: &mut Criterion) {
             let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
             let db = VectorDatabase::new(config).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             // Store 1000 entries and measure disk usage
             let batch_data = BenchmarkData::create_batch(1000, 384);
             let _stored_ids = db.store_embeddings_batch(batch_data).await.unwrap();
-            
+
             let file_metrics = db.get_file_metrics().await.unwrap();
-            
+
             // Ensure disk usage is within requirements (<10MB per 1000 embeddings)
             let disk_mb = file_metrics.total_size_bytes as f64 / (1024.0 * 1024.0);
-            assert!(disk_mb < 10.0, "Disk usage {:.2}MB exceeds 10MB limit", disk_mb);
-            
+            assert!(
+                disk_mb < 10.0,
+                "Disk usage {:.2}MB exceeds 10MB limit",
+                disk_mb
+            );
+
             black_box(file_metrics);
         });
     });
@@ -496,14 +551,14 @@ fn bench_concurrent_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let mut group = c.benchmark_group("concurrent_operations");
     group.sample_size(20); // Fewer samples due to complexity
-    
+
     // Benchmark concurrent write operations
     group.bench_function("concurrent_writes", |b| {
         b.to_async(&rt).iter(|| async {
             let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
             let db = std::sync::Arc::new(VectorDatabase::new(config).await.unwrap());
             db.initialize().await.unwrap();
-            
+
             // Spawn 10 concurrent write tasks
             let mut handles = vec![];
             for _i in 0..10 {
@@ -514,7 +569,7 @@ fn bench_concurrent_operations(c: &mut Criterion) {
                 });
                 handles.push(handle);
             }
-            
+
             // Wait for all writes to complete
             for handle in handles {
                 let result = handle.await.unwrap();
@@ -529,11 +584,11 @@ fn bench_concurrent_operations(c: &mut Criterion) {
             let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
             let db = std::sync::Arc::new(VectorDatabase::new(config).await.unwrap());
             db.initialize().await.unwrap();
-            
+
             // Pre-populate with data
             let batch_data = BenchmarkData::create_batch(500, 384);
             let stored_ids = db.store_embeddings_batch(batch_data).await.unwrap();
-            
+
             (db, stored_ids)
         });
 
@@ -543,13 +598,12 @@ fn bench_concurrent_operations(c: &mut Criterion) {
             for i in 0..10 {
                 let db_clone = std::sync::Arc::clone(&setup_db.0);
                 let ids_to_read = setup_db.1[(i * 10)..((i + 1) * 10)].to_vec();
-                
-                let handle = tokio::spawn(async move {
-                    db_clone.retrieve_embeddings(&ids_to_read).await
-                });
+
+                let handle =
+                    tokio::spawn(async move { db_clone.retrieve_embeddings(&ids_to_read).await });
                 handles.push(handle);
             }
-            
+
             // Wait for all reads to complete
             for handle in handles {
                 let result = handle.await.unwrap();
@@ -566,22 +620,26 @@ fn bench_performance_requirements(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let mut group = c.benchmark_group("performance_requirements");
     group.sample_size(30);
-    
+
     // Requirement 1: Store 1000 embeddings <5 seconds
     group.bench_function("requirement_store_1000_under_5s", |b| {
         b.to_async(&rt).iter(|| async {
             let start = std::time::Instant::now();
-            
+
             let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
             let db = VectorDatabase::new(config).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             let batch_data = BenchmarkData::create_batch(1000, 384);
             let result = db.store_embeddings_batch(batch_data).await.unwrap();
-            
+
             let duration = start.elapsed();
-            assert!(duration.as_secs() < 5, "Store 1000 embeddings took {:?} (requirement: <5s)", duration);
-            
+            assert!(
+                duration.as_secs() < 5,
+                "Store 1000 embeddings took {:?} (requirement: <5s)",
+                duration
+            );
+
             black_box((result, duration));
         });
     });
@@ -592,25 +650,36 @@ fn bench_performance_requirements(c: &mut Criterion) {
             let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
             let db = VectorDatabase::new(config).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             let entry = BenchmarkData::create_embedding(1, 384);
-            let stored_id = db.store_embedding(
-                entry.vector.clone(),
-                entry.metadata.file_path.clone(),
-                entry.metadata.chunk_id.clone(),
-                "Performance test",
-                entry.metadata.model_name.clone(),
-            ).await.unwrap();
-            
+            let stored_id = db
+                .store_embedding(
+                    entry.vector.clone(),
+                    entry.metadata.file_path.clone(),
+                    entry.metadata.chunk_id.clone(),
+                    "Performance test",
+                    entry.metadata.model_name.clone(),
+                )
+                .await
+                .unwrap();
+
             (db, stored_id)
         });
 
         b.to_async(&rt).iter(|| async {
             let start = std::time::Instant::now();
-            let result = setup_data.0.retrieve_embedding(&setup_data.1).await.unwrap();
+            let result = setup_data
+                .0
+                .retrieve_embedding(&setup_data.1)
+                .await
+                .unwrap();
             let duration = start.elapsed();
-            
-            assert!(duration.as_millis() < 1, "Single retrieve took {:?} (requirement: <1ms)", duration);
+
+            assert!(
+                duration.as_millis() < 1,
+                "Single retrieve took {:?} (requirement: <1ms)",
+                duration
+            );
             black_box((result, duration));
         });
     });
@@ -622,23 +691,27 @@ fn bench_performance_requirements(c: &mut Criterion) {
             let (config, _temp_dir) = BenchmarkConfig::performance_optimized();
             let db = VectorDatabase::new(config.clone()).await.unwrap();
             db.initialize().await.unwrap();
-            
+
             // Store moderate amount of data
             let batch_data = BenchmarkData::create_batch(500, 384);
             let _ = db.store_embeddings_batch(batch_data).await.unwrap();
-            
+
             config
         });
 
         b.to_async(&rt).iter(|| async {
             let start = std::time::Instant::now();
-            
+
             let db = VectorDatabase::new(config.clone()).await.unwrap();
             let init_result = db.initialize().await.unwrap();
-            
+
             let duration = start.elapsed();
-            assert!(duration.as_secs() < 2, "Database startup took {:?} (requirement: <2s)", duration);
-            
+            assert!(
+                duration.as_secs() < 2,
+                "Database startup took {:?} (requirement: <2s)",
+                duration
+            );
+
             black_box((init_result, duration));
         });
     });

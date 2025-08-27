@@ -746,7 +746,7 @@ impl IndexRebuilder {
     /// Process embeddings in parallel
     async fn process_embeddings_parallel(&self, embedding_ids: &[String]) -> VectorDbResult<(usize, Vec<String>)> {
         let worker_count = if self.config.parallel_workers == 0 {
-            num_cpus::get().min(8).max(2) // Use 2-8 workers based on CPU cores
+            num_cpus::get().clamp(2, 8) // Use 2-8 workers based on CPU cores
         } else {
             self.config.parallel_workers
         };
@@ -817,8 +817,6 @@ impl IndexRebuilder {
             let cancelled = self.cancelled.clone();
             let progress_interval = Duration::from_millis(self.config.progress_report_interval_ms);
             let enable_reporting = self.config.enable_progress_reporting;
-            let total_items = total_items;
-            let start_time = start_time;
             
             tokio::spawn(async move {
                 if !enable_reporting {
@@ -943,7 +941,7 @@ impl IndexRebuilder {
         
         let worker_count = if self.config.enable_parallel_processing {
             if self.config.parallel_workers == 0 {
-                num_cpus::get().min(8).max(2)
+                num_cpus::get().clamp(2, 8)
             } else {
                 self.config.parallel_workers
             }
@@ -1137,7 +1135,7 @@ impl HealthChecker {
         }
         
         // Sample-based validation of individual entries
-        let sample_size = (all_ids.len() as f64 * 0.1).max(10.0).min(100.0) as usize;
+        let sample_size = (all_ids.len() as f64 * 0.1).clamp(10.0, 100.0) as usize;
         let sample_ids = if all_ids.len() <= sample_size {
             all_ids
         } else {
@@ -1180,7 +1178,7 @@ impl HealthChecker {
         eprintln!("⚡ Performing performance validation...");
         
         let all_ids = self.operations.list_embedding_ids().await;
-        let sample_size = ((all_ids.len() as f64 * self.config.performance_sample_percentage).max(5.0).min(50.0)) as usize;
+        let sample_size = (all_ids.len() as f64 * self.config.performance_sample_percentage).clamp(5.0, 50.0) as usize;
         
         let sample_ids = if all_ids.len() <= sample_size {
             all_ids
@@ -1260,7 +1258,7 @@ impl HealthChecker {
         
         // Sample-based corruption detection
         let all_ids = self.operations.list_embedding_ids().await;
-        let sample_size = (all_ids.len() as f64 * 0.05).max(5.0).min(25.0) as usize; // 5% sample
+        let sample_size = (all_ids.len() as f64 * 0.05).clamp(5.0, 25.0) as usize; // 5% sample
         
         let sample_ids = if all_ids.len() <= sample_size {
             all_ids
