@@ -350,6 +350,14 @@ pub struct VectorStorageConfig {
     pub max_backups: usize,
     /// Enable detailed storage metrics
     pub enable_metrics: bool,
+    /// Enable advanced vector compression
+    pub enable_vector_compression: bool,
+    /// Vector compression algorithm (8-bit, 16-bit, delta, etc.)
+    pub vector_compression_algorithm: VectorCompressionAlgorithm,
+    /// Enable lazy loading for large indices
+    pub enable_lazy_loading: bool,
+    /// Batch size threshold for lazy loading
+    pub lazy_loading_threshold: usize,
 }
 
 impl Default for VectorStorageConfig {
@@ -363,6 +371,10 @@ impl Default for VectorStorageConfig {
             auto_backup: true,
             max_backups: 5,
             enable_metrics: true,
+            enable_vector_compression: true,
+            vector_compression_algorithm: VectorCompressionAlgorithm::Quantized8Bit,
+            enable_lazy_loading: true,
+            lazy_loading_threshold: 1000,
         }
     }
 }
@@ -376,6 +388,21 @@ pub enum CompressionAlgorithm {
     Gzip,
     /// LZ4 compression (faster, lower compression ratio)
     Lz4,
+}
+
+/// Advanced vector compression algorithms (re-exported from compression module)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum VectorCompressionAlgorithm {
+    /// No compression (32-bit floats)
+    None,
+    /// 8-bit quantization (75% size reduction)
+    Quantized8Bit,
+    /// 16-bit quantization (50% size reduction)
+    Quantized16Bit,
+    /// Delta compression with quantization
+    DeltaQuantized,
+    /// Product quantization for large vectors
+    ProductQuantization,
 }
 
 impl CompressionAlgorithm {
