@@ -117,6 +117,7 @@ pub mod enhanced_cache;
 pub mod automatic_cleanup;
 pub mod metrics_collector;
 pub mod monitored_search;
+pub mod optimization_scheduler;
 
 #[cfg(test)]
 pub mod compression_tests;
