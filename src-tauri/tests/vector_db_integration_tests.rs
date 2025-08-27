@@ -31,6 +31,10 @@ impl TestConfigFactory {
             auto_backup: false,
             max_backups: 0,
             enable_metrics: true, // Enable metrics for testing
+            enable_vector_compression: false,
+            vector_compression_algorithm: ainote_lib::vector_db::types::VectorCompressionAlgorithm::None,
+            enable_lazy_loading: false,
+            lazy_loading_threshold: 1000,
         };
         (config, _temp_dir)
     }
@@ -46,6 +50,10 @@ impl TestConfigFactory {
             auto_backup: true,
             max_backups: 5,
             enable_metrics: true,
+            enable_vector_compression: false,
+            vector_compression_algorithm: ainote_lib::vector_db::types::VectorCompressionAlgorithm::None,
+            enable_lazy_loading: false,
+            lazy_loading_threshold: 1000,
         };
         (config, _temp_dir)
     }
@@ -61,6 +69,10 @@ impl TestConfigFactory {
             auto_backup: false, // Disabled for performance
             max_backups: 0,
             enable_metrics: true, // Keep metrics for validation
+            enable_vector_compression: false,
+            vector_compression_algorithm: ainote_lib::vector_db::types::VectorCompressionAlgorithm::None,
+            enable_lazy_loading: false,
+            lazy_loading_threshold: 1000,
         };
         (config, _temp_dir)
     }

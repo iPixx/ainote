@@ -1336,6 +1336,10 @@ mod tests {
             auto_backup: false,
             max_backups: 0,
             enable_metrics: true,
+            enable_vector_compression: false,
+            vector_compression_algorithm: crate::vector_db::types::VectorCompressionAlgorithm::None,
+            enable_lazy_loading: false,
+            lazy_loading_threshold: 1000,
         }
     }
 
