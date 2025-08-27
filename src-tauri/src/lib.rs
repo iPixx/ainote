@@ -44,6 +44,7 @@ pub mod embedding_cache;        // Embedding cache management
 pub mod vector_db;             // Vector database storage and operations
 pub mod similarity_search;     // Similarity search algorithms
 pub mod text_chunker;          // Text chunking algorithms and infrastructure
+pub mod indexing_pipeline;     // Automated vault indexing pipeline with worker threads
 
 // Performance and benchmarking modules
 pub mod benchmarks;
@@ -82,6 +83,10 @@ pub use similarity_search::{
 };
 pub use text_chunker::{
     ChunkProcessor, ChunkConfig, ChunkingStrategy, TextChunk, ChunkMetadata, ChunkError, ChunkResult
+};
+pub use indexing_pipeline::{
+    IndexingPipeline, PipelineConfig, IndexingRequest, IndexingPriority, IndexingStatus, 
+    IndexingProgress, CancellationToken, IndexingError, IndexingResult
 };
 
 /// Main application entry point and Tauri app configuration.
