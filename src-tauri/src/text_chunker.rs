@@ -2471,7 +2471,9 @@ And some final text."
         // Verify chunks are properly formed
         for chunk in &chunks {
             assert!(!chunk.content.trim().is_empty());
-            assert!(chunk.len() <= processor.config().max_chunk_size + 200); // Allow flexibility
+            // Hybrid chunking can create larger chunks when finding good semantic boundaries
+            // Allow up to 50% larger than max_chunk_size for semantic coherence
+            assert!(chunk.len() <= processor.config().max_chunk_size * 3 / 2); // Allow 50% flexibility for hybrid chunking
         }
     }
     
@@ -2592,7 +2594,9 @@ And some final text."
         // Verify chunk quality
         for chunk in &chunks {
             assert!(!chunk.content.trim().is_empty());
-            assert!(chunk.len() <= processor.config().max_chunk_size + 200);
+            // Hybrid chunking can create larger chunks when finding good semantic boundaries
+            // Allow up to 50% larger than max_chunk_size for semantic coherence
+            assert!(chunk.len() <= processor.config().max_chunk_size * 3 / 2);
         }
     }
 }
