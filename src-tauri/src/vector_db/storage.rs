@@ -631,7 +631,7 @@ impl VectorStorage {
 }
 
 /// Result of storage compaction operation
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct CompactionResult {
     /// Number of files removed (empty files)
     pub files_removed: usize,

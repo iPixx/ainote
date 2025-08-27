@@ -109,6 +109,7 @@ pub mod file_ops;
 pub mod maintenance;
 pub mod rebuilding;
 pub mod performance_monitor;
+pub mod deduplication;
 
 #[cfg(test)]
 mod atomic_performance_test;
@@ -1138,6 +1139,259 @@ impl VectorDatabase {
         self.health_checker.is_some()
     }
     
+    // === Deduplication System Methods ===
+    
+    /// Perform embedding deduplication with similarity-based duplicate detection
+    /// 
+    /// This method identifies and merges near-identical embeddings based on cosine
+    /// similarity, maintaining reference tracking for backward compatibility.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `config` - Deduplication configuration (similarity thresholds, strategies)
+    /// 
+    /// # Returns
+    /// 
+    /// Comprehensive deduplication results including clusters, reference mappings, and metrics
+    /// 
+    /// # Performance
+    /// 
+    /// - Target: <10 seconds per 1000 embeddings
+    /// - Memory: Efficient batch processing for large datasets
+    /// - Index reduction: 10-30% typical reduction through deduplication
+    pub async fn deduplicate_embeddings(
+        &self,
+        config: deduplication::DeduplicationConfig,
+    ) -> VectorDbResult<deduplication::DeduplicationResult_> {
+        use deduplication::EmbeddingDeduplicator;
+        
+        // Get all current embeddings
+        let all_ids = self.list_embedding_ids().await;
+        let all_embeddings = self.retrieve_embeddings(&all_ids).await?;
+        
+        eprintln!("🔧 Starting deduplication of {} embeddings", all_embeddings.len());
+        
+        // Perform deduplication
+        let deduplication_result = EmbeddingDeduplicator::deduplicate_embeddings(
+            all_embeddings,
+            &config,
+        ).map_err(|e| VectorDbError::Storage {
+            message: format!("Deduplication failed: {}", e),
+        })?;
+        
+        eprintln!("✅ Deduplication completed: {} -> {} embeddings ({:.1}% reduction)",
+                  deduplication_result.metrics.embeddings_processed,
+                  deduplication_result.deduplicated_embeddings.len(),
+                  deduplication_result.metrics.index_size_reduction_percentage);
+        
+        Ok(deduplication_result)
+    }
+    
+    /// Apply deduplication results to the database
+    /// 
+    /// This method updates the database with deduplicated embeddings and maintains
+    /// reference mappings for backward compatibility.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `deduplication_result` - Results from deduplication operation
+    /// * `create_backup` - Whether to create a backup before applying changes
+    /// 
+    /// # Returns
+    /// 
+    /// Success status and operation metrics
+    pub async fn apply_deduplication_results(
+        &self,
+        deduplication_result: &deduplication::DeduplicationResult_,
+        create_backup: bool,
+    ) -> VectorDbResult<ApplyDeduplicationStats> {
+        use std::time::Instant;
+        
+        let start_time = Instant::now();
+        
+        if create_backup {
+            eprintln!("💾 Creating backup before applying deduplication...");
+            self.create_backup().await?;
+        }
+        
+        // Clear current cache to avoid inconsistencies
+        {
+            let mut cache = self.cache.write().await;
+            cache.clear();
+        }
+        
+        // Store deduplicated embeddings
+        let deduplicated_ids = self.store_embeddings_batch(
+            deduplication_result.deduplicated_embeddings.clone()
+        ).await?;
+        
+        // Remove duplicates from storage (logical deletion through index)
+        let mut removed_count = 0;
+        for original_id in deduplication_result.reference_mapping.mapping.keys() {
+            if self.delete_embedding(original_id).await? {
+                removed_count += 1;
+            }
+        }
+        
+        // Trigger compaction to physically remove deleted entries
+        let compaction_result = self.compact().await?;
+        
+        let total_time_ms = start_time.elapsed().as_secs_f64() * 1000.0;
+        
+        let stats = ApplyDeduplicationStats {
+            deduplicated_embeddings_stored: deduplicated_ids.len(),
+            duplicate_embeddings_removed: removed_count,
+            compaction_result: Some(compaction_result),
+            total_apply_time_ms: total_time_ms,
+            backup_created: create_backup,
+        };
+        
+        eprintln!("🎯 Applied deduplication: stored {} representatives, removed {} duplicates in {:.2}ms",
+                  stats.deduplicated_embeddings_stored,
+                  stats.duplicate_embeddings_removed,
+                  stats.total_apply_time_ms);
+        
+        Ok(stats)
+    }
+    
+    /// Resolve an embedding ID through deduplication reference mapping
+    /// 
+    /// This method resolves embedding IDs that may have been merged during
+    /// deduplication, providing backward compatibility.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `embedding_id` - Original embedding ID to resolve
+    /// * `reference_mapping` - Reference mapping from deduplication
+    /// 
+    /// # Returns
+    /// 
+    /// The representative embedding ID (original ID if not deduplicated)
+    pub fn resolve_embedding_reference(
+        &self,
+        embedding_id: &str,
+        reference_mapping: &deduplication::ReferenceMapping,
+    ) -> String {
+        deduplication::EmbeddingDeduplicator::resolve_embedding_reference(
+            embedding_id,
+            reference_mapping,
+        )
+    }
+    
+    /// Check if an embedding was affected by deduplication
+    /// 
+    /// # Arguments
+    /// 
+    /// * `embedding_id` - Embedding ID to check
+    /// * `reference_mapping` - Reference mapping from deduplication
+    /// 
+    /// # Returns
+    /// 
+    /// True if the embedding was merged into a representative
+    pub fn was_deduplicated(
+        &self,
+        embedding_id: &str,
+        reference_mapping: &deduplication::ReferenceMapping,
+    ) -> bool {
+        deduplication::EmbeddingDeduplicator::was_deduplicated(
+            embedding_id,
+            reference_mapping,
+        )
+    }
+    
+    /// Get comprehensive deduplication statistics
+    /// 
+    /// This method analyzes the current database state and provides metrics
+    /// about potential deduplication benefits.
+    /// 
+    /// # Returns
+    /// 
+    /// Statistics about duplicate potential and recommended actions
+    pub async fn analyze_duplication_potential(
+        &self,
+        config: &deduplication::DeduplicationConfig,
+    ) -> VectorDbResult<DuplicationAnalysis> {
+        use std::time::Instant;
+        
+        let start_time = Instant::now();
+        let all_ids = self.list_embedding_ids().await;
+        
+        if all_ids.len() < 2 {
+            return Ok(DuplicationAnalysis {
+                total_embeddings: all_ids.len(),
+                estimated_duplicates: 0,
+                estimated_reduction_percentage: 0.0,
+                recommended_threshold: config.similarity_threshold,
+                analysis_time_ms: start_time.elapsed().as_secs_f64() * 1000.0,
+                sample_size: all_ids.len(),
+            });
+        }
+        
+        // Sample-based analysis for large datasets
+        let sample_size = if all_ids.len() > 1000 { 100 } else { all_ids.len() };
+        let sample_ids = if all_ids.len() > sample_size {
+            all_ids.into_iter().take(sample_size).collect()
+        } else {
+            all_ids
+        };
+        
+        let sample_embeddings = self.retrieve_embeddings(&sample_ids).await?;
+        let mut duplicate_count = 0;
+        let mut similarity_sum = 0.0;
+        let mut comparisons = 0;
+        
+        // Quick similarity analysis on sample
+        for i in 0..sample_embeddings.len() {
+            for j in (i + 1)..sample_embeddings.len() {
+                if let Ok(similarity) = crate::similarity_search::SimilaritySearch::cosine_similarity(
+                    &sample_embeddings[i].vector,
+                    &sample_embeddings[j].vector,
+                ) {
+                    similarity_sum += similarity;
+                    comparisons += 1;
+                    
+                    if similarity >= config.similarity_threshold {
+                        duplicate_count += 1;
+                    }
+                }
+            }
+        }
+        
+        let avg_similarity = if comparisons > 0 { similarity_sum / comparisons as f32 } else { 0.0 };
+        let sample_duplicate_rate = if sample_embeddings.len() > 0 {
+            duplicate_count as f32 / sample_embeddings.len() as f32
+        } else {
+            0.0
+        };
+        
+        // Extrapolate to full database
+        let total_embeddings = self.count_embeddings().await;
+        let estimated_duplicates = (total_embeddings as f32 * sample_duplicate_rate) as usize;
+        let estimated_reduction_percentage = if total_embeddings > 0 {
+            (estimated_duplicates as f32 / total_embeddings as f32) * 100.0
+        } else {
+            0.0
+        };
+        
+        // Recommend threshold based on analysis
+        let recommended_threshold = if avg_similarity > 0.9 {
+            0.98 // High similarity dataset - use stricter threshold
+        } else if avg_similarity > 0.7 {
+            0.95 // Medium similarity - use default
+        } else {
+            0.90 // Lower similarity - use more lenient threshold
+        };
+        
+        Ok(DuplicationAnalysis {
+            total_embeddings,
+            estimated_duplicates,
+            estimated_reduction_percentage,
+            recommended_threshold,
+            analysis_time_ms: start_time.elapsed().as_secs_f64() * 1000.0,
+            sample_size: sample_embeddings.len(),
+        })
+    }
+    
     // Private helper methods
     
     /// Update the in-memory cache with an entry
@@ -1318,6 +1572,56 @@ impl ComprehensiveValidationReport {
     }
 }
 
+/// Statistics for applying deduplication results to the database
+#[derive(Debug, Clone)]
+pub struct ApplyDeduplicationStats {
+    /// Number of deduplicated (representative) embeddings stored
+    pub deduplicated_embeddings_stored: usize,
+    /// Number of duplicate embeddings removed
+    pub duplicate_embeddings_removed: usize,
+    /// Results from storage compaction
+    pub compaction_result: Option<storage::CompactionResult>,
+    /// Total time to apply deduplication changes
+    pub total_apply_time_ms: f64,
+    /// Whether a backup was created before applying changes
+    pub backup_created: bool,
+}
+
+/// Analysis of duplication potential in the database
+#[derive(Debug, Clone)]
+pub struct DuplicationAnalysis {
+    /// Total number of embeddings in the database
+    pub total_embeddings: usize,
+    /// Estimated number of duplicates that could be found
+    pub estimated_duplicates: usize,
+    /// Estimated reduction percentage if deduplication were applied
+    pub estimated_reduction_percentage: f32,
+    /// Recommended similarity threshold based on analysis
+    pub recommended_threshold: f32,
+    /// Time taken for the analysis in milliseconds
+    pub analysis_time_ms: f64,
+    /// Size of the sample used for analysis
+    pub sample_size: usize,
+}
+
+impl DuplicationAnalysis {
+    /// Get a human-readable summary of the analysis
+    pub fn summary(&self) -> String {
+        format!(
+            "Duplication Analysis: {} embeddings, ~{} duplicates ({:.1}% reduction potential), recommended threshold: {:.3}",
+            self.total_embeddings,
+            self.estimated_duplicates,
+            self.estimated_reduction_percentage,
+            self.recommended_threshold
+        )
+    }
+    
+    /// Check if deduplication would be beneficial
+    pub fn is_deduplication_beneficial(&self) -> bool {
+        self.estimated_reduction_percentage > 5.0 // More than 5% reduction
+    }
+}
+
 // Re-export main types for convenience
 pub use types::{
     EmbeddingMetadata,
@@ -1347,6 +1651,18 @@ pub use rebuilding::{
     IssueSeverity,
     CorruptionType,
     CorruptionSeverity,
+};
+
+// Re-export deduplication types
+pub use deduplication::{
+    DeduplicationConfig,
+    RepresentativeSelectionStrategy,
+    DeduplicationResult_,
+    DeduplicationMetrics,
+    DuplicateCluster,
+    ReferenceMapping,
+    ReferenceMappingStats,
+    EmbeddingDeduplicator,
 };
 
 
