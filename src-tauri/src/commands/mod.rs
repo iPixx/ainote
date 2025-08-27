@@ -106,6 +106,10 @@ pub mod rebuilding_commands;
 // Handles: performance monitoring, metrics collection, real-time monitoring, and alerting
 pub mod monitoring_commands;
 
+// Indexing Commands Module  
+// Handles: automated vault indexing pipeline, progress tracking, cancellation, and file monitoring integration
+pub mod indexing_commands;
+
 // Re-export all command functions for easy access in lib.rs
 pub use file_operations::*;
 pub use vault_operations::*;
@@ -119,3 +123,4 @@ pub use incremental_commands::*;
 pub use maintenance_commands::*;
 pub use rebuilding_commands::*;
 pub use monitoring_commands::*;
+pub use indexing_commands::*;

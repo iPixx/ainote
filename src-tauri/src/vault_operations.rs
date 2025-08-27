@@ -4,7 +4,7 @@ use crate::errors::{FileSystemError, FileSystemResult};
 use crate::validation;
 use crate::types::FileInfo;
 use crate::performance::{time_operation, PerformanceTracker};
-use notify::{Watcher, RecursiveMode, Event, Result as NotifyResult};
+// File monitoring is now handled by the enhanced file_monitor module
 
 /// Chunked scanning for very large vaults to avoid UI blocking
 pub fn scan_vault_files_chunked_internal(
@@ -225,6 +225,9 @@ pub fn load_vault_internal(vault_path: &str) -> FileSystemResult<Vec<FileInfo>> 
 }
 
 /// Internal watch vault function for file system change notifications
+/// 
+/// This function now integrates with the enhanced file monitoring system that
+/// automatically connects to the indexing pipeline for real-time updates.
 pub fn watch_vault_internal(vault_path: &str) -> FileSystemResult<()> {
     time_operation!({
         let vault_path = Path::new(vault_path);
@@ -233,48 +236,32 @@ pub fn watch_vault_internal(vault_path: &str) -> FileSystemResult<()> {
         validation::validate_path_exists(vault_path)?;
         validation::validate_is_directory(vault_path)?;
 
-        // Set up file watcher
-        let (tx, rx) = std::sync::mpsc::channel();
+        // Use the enhanced file monitoring system with indexing integration
+        // This will be called asynchronously since Tauri commands can be async
+        // For now, we create a basic runtime to handle the async call
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                return Err(FileSystemError::IOError {
+                    message: format!("Failed to create async runtime: {}", e)
+                });
+            }
+        };
         
-        let mut watcher = notify::recommended_watcher(move |res: NotifyResult<Event>| {
-            match res {
-                Ok(event) => {
-                    // Filter for relevant events (create, modify, delete, rename)
-                    match event.kind {
-                        notify::EventKind::Create(_) |
-                        notify::EventKind::Modify(_) |
-                        notify::EventKind::Remove(_) => {
-                            if let Err(e) = tx.send(event) {
-                                eprintln!("Error sending file event: {}", e);
-                            }
-                        }
-                        _ => {} // Ignore other event types
-                    }
+        rt.block_on(async {
+            // Import the file monitor here to avoid circular dependencies
+            match crate::file_monitor::get_file_monitor().start_watching(vault_path.to_str().unwrap()).await {
+                Ok(()) => {
+                    log::info!("✅ Enhanced file monitoring started for vault: {:?}", vault_path);
+                    Ok(())
                 }
-                Err(e) => eprintln!("File watch error: {}", e),
+                Err(e) => {
+                    Err(FileSystemError::IOError {
+                        message: format!("Failed to start enhanced file monitoring: {}", e)
+                    })
+                }
             }
         })
-        .map_err(|e| FileSystemError::IOError {
-            message: format!("Failed to create file watcher: {}", e)
-        })?;
-
-        // Start watching the vault directory
-        watcher
-            .watch(vault_path, RecursiveMode::Recursive)
-            .map_err(|e| FileSystemError::IOError {
-                message: format!("Failed to start watching vault {}: {}", vault_path.display(), e)
-            })?;
-
-        // For now, we'll start the watcher but not block
-        // In a full implementation, this would likely be managed differently
-        // (perhaps with a background thread or async runtime)
-        
-        // Store the watcher in a static or application state so it doesn't get dropped
-        // For this implementation, we'll just return success to indicate the watcher was created
-        std::mem::forget(watcher); // Prevent watcher from being dropped
-        std::mem::forget(rx); // Prevent receiver from being dropped
-        
-        Ok(())
     }, &format!("watch_vault({})", vault_path))
 }
 

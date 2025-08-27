@@ -45,6 +45,7 @@ pub mod vector_db;             // Vector database storage and operations
 pub mod similarity_search;     // Similarity search algorithms
 pub mod text_chunker;          // Text chunking algorithms and infrastructure
 pub mod indexing_pipeline;     // Automated vault indexing pipeline with worker threads
+pub mod file_monitor;          // File system monitoring for real-time indexing integration
 
 // Performance and benchmarking modules
 pub mod benchmarks;
@@ -240,7 +241,16 @@ pub fn run() {
             commands::monitoring_commands::complete_incremental_operation_monitoring,
             commands::monitoring_commands::complete_maintenance_operation_monitoring,
             commands::monitoring_commands::complete_rebuilding_operation_monitoring,
-            commands::monitoring_commands::get_resource_utilization
+            commands::monitoring_commands::get_resource_utilization,
+            
+            // Indexing Pipeline Management
+            commands::indexing_commands::index_vault_notes,
+            commands::indexing_commands::get_indexing_progress,
+            commands::indexing_commands::cancel_indexing,
+            commands::indexing_commands::get_indexing_status,
+            commands::indexing_commands::start_indexing_pipeline,
+            commands::indexing_commands::stop_indexing_pipeline,
+            commands::indexing_commands::process_file_changes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
