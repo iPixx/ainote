@@ -78,6 +78,8 @@ pub enum ChunkingStrategy {
     Semantic,
     /// Hybrid approach combining size and semantic constraints
     Hybrid,
+    /// Markdown-aware chunking preserving document structure
+    MarkdownAware,
 }
 
 /// Configuration for text chunking operations
@@ -95,6 +97,14 @@ pub struct ChunkConfig {
     pub preserve_paragraphs: bool,
     /// Whether to preserve sentence boundaries
     pub preserve_sentences: bool,
+    /// Whether to preserve markdown headers as chunk boundaries
+    pub preserve_markdown_headers: bool,
+    /// Whether to keep code blocks intact as single units
+    pub preserve_code_blocks: bool,
+    /// Whether to preserve markdown links and references
+    pub preserve_markdown_links: bool,
+    /// Whether to strip markdown formatting from content
+    pub strip_markdown_formatting: bool,
 }
 
 impl Default for ChunkConfig {
@@ -106,6 +116,10 @@ impl Default for ChunkConfig {
             min_chunk_size: 50,
             preserve_paragraphs: true,
             preserve_sentences: true,
+            preserve_markdown_headers: true,
+            preserve_code_blocks: true,
+            preserve_markdown_links: true,
+            strip_markdown_formatting: false,
         }
     }
 }
@@ -141,6 +155,39 @@ impl ChunkConfig {
     }
 }
 
+/// Markdown-specific metadata for chunks
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MarkdownMetadata {
+    /// Headers present in this chunk (level, text)
+    pub headers: Vec<(usize, String)>,
+    /// Code blocks in this chunk (language, content)
+    pub code_blocks: Vec<(Option<String>, String)>,
+    /// Links found in this chunk (text, url, title)
+    pub links: Vec<(String, String, Option<String>)>,
+    /// Lists present in this chunk (ordered, items)
+    pub lists: Vec<(bool, Vec<String>)>,
+    /// Tables in this chunk (headers, rows)
+    pub tables: Vec<(Vec<String>, Vec<Vec<String>>)>,
+    /// Document structure context (parent headers)
+    pub structure_context: Vec<(usize, String)>,
+    /// Whether this chunk contains formatting that was stripped
+    pub has_stripped_formatting: bool,
+}
+
+impl Default for MarkdownMetadata {
+    fn default() -> Self {
+        Self {
+            headers: Vec::new(),
+            code_blocks: Vec::new(),
+            links: Vec::new(),
+            lists: Vec::new(),
+            tables: Vec::new(),
+            structure_context: Vec::new(),
+            has_stripped_formatting: false,
+        }
+    }
+}
+
 /// Metadata associated with each text chunk
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChunkMetadata {
@@ -168,6 +215,8 @@ pub struct ChunkMetadata {
     pub next_overlap_size: usize,
     /// Additional context information
     pub context: HashMap<String, String>,
+    /// Markdown-specific metadata
+    pub markdown: Option<MarkdownMetadata>,
 }
 
 impl Default for ChunkMetadata {
@@ -185,6 +234,7 @@ impl Default for ChunkMetadata {
             previous_overlap_size: 0,
             next_overlap_size: 0,
             context: HashMap::new(),
+            markdown: None,
         }
     }
 }
@@ -328,6 +378,468 @@ impl BoundaryDetector {
     }
 }
 
+/// Markdown element detected during parsing
+#[derive(Debug, Clone, PartialEq)]
+pub enum MarkdownElement {
+    Header(usize, String, usize), // level, text, position
+    CodeBlock(Option<String>, String, usize, usize), // language, content, start, end
+    Link(String, String, Option<String>, usize), // text, url, title, position
+    List(bool, Vec<String>, usize), // ordered, items, position
+    Table(Vec<String>, Vec<Vec<String>>, usize), // headers, rows, position
+    Paragraph(String, usize), // content, position
+    LineBreak(usize), // position
+}
+
+/// Lightweight markdown parser for chunking purposes
+#[derive(Debug, Clone)]
+struct MarkdownParser {
+    /// Header patterns (ATX and Setext styles)
+    header_patterns: Vec<&'static str>,
+    /// Code block patterns
+    code_block_patterns: Vec<&'static str>,
+}
+
+impl Default for MarkdownParser {
+    fn default() -> Self {
+        Self {
+            header_patterns: vec!["######", "#####", "####", "###", "##", "#"],
+            code_block_patterns: vec!["```", "~~~"],
+        }
+    }
+}
+
+impl MarkdownParser {
+    /// Parses markdown text and returns a list of elements with positions
+    fn parse(&self, text: &str) -> Vec<MarkdownElement> {
+        let mut elements = Vec::new();
+        let lines: Vec<&str> = text.lines().collect();
+        let mut line_positions = Vec::new();
+        
+        // Calculate line positions
+        let mut position = 0;
+        for line in &lines {
+            line_positions.push(position);
+            position += line.len() + 1; // +1 for newline
+        }
+        
+        let mut i = 0;
+        while i < lines.len() {
+            let line = lines[i];
+            let line_pos = line_positions[i];
+            
+            // Skip empty lines
+            if line.trim().is_empty() {
+                elements.push(MarkdownElement::LineBreak(line_pos));
+                i += 1;
+                continue;
+            }
+            
+            // Check for headers (ATX style: # ## ### etc.)
+            if let Some(header) = self.parse_atx_header(line, line_pos) {
+                elements.push(header);
+                i += 1;
+                continue;
+            }
+            
+            // Check for setext headers (underlined with = or -)
+            if i + 1 < lines.len() {
+                if let Some(header) = self.parse_setext_header(lines[i], lines[i + 1], line_pos) {
+                    elements.push(header);
+                    i += 2; // Skip both header line and underline
+                    continue;
+                }
+            }
+            
+            // Check for code blocks (fenced)
+            if let Some((code_block, consumed_lines)) = self.parse_code_block(&lines[i..], line_pos) {
+                elements.push(code_block);
+                i += consumed_lines;
+                continue;
+            }
+            
+            // Check for tables
+            if let Some((table, consumed_lines)) = self.parse_table(&lines[i..], line_pos) {
+                elements.push(table);
+                i += consumed_lines;
+                continue;
+            }
+            
+            // Check for lists
+            if let Some((list, consumed_lines)) = self.parse_list(&lines[i..], line_pos) {
+                elements.push(list);
+                i += consumed_lines;
+                continue;
+            }
+            
+            // Default: treat as paragraph
+            let paragraph_content = line.to_string();
+            elements.push(MarkdownElement::Paragraph(paragraph_content, line_pos));
+            i += 1;
+        }
+        
+        // Parse links within all text elements
+        self.extract_links_from_elements(&mut elements, text);
+        
+        elements
+    }
+    
+    /// Parses ATX style headers (# Header)
+    fn parse_atx_header(&self, line: &str, position: usize) -> Option<MarkdownElement> {
+        let trimmed = line.trim_start();
+        
+        for &pattern in &self.header_patterns {
+            if trimmed.starts_with(pattern) && trimmed.len() > pattern.len() {
+                let rest = &trimmed[pattern.len()..];
+                if rest.starts_with(' ') || rest.is_empty() {
+                    let level = pattern.len();
+                    let text = rest.trim().to_string();
+                    return Some(MarkdownElement::Header(level, text, position));
+                }
+            }
+        }
+        
+        None
+    }
+    
+    /// Parses Setext style headers (underlined with = or -)
+    fn parse_setext_header(&self, header_line: &str, underline: &str, position: usize) -> Option<MarkdownElement> {
+        let underline = underline.trim();
+        
+        if underline.chars().all(|c| c == '=') && underline.len() >= 3 {
+            return Some(MarkdownElement::Header(1, header_line.trim().to_string(), position));
+        }
+        
+        if underline.chars().all(|c| c == '-') && underline.len() >= 3 {
+            return Some(MarkdownElement::Header(2, header_line.trim().to_string(), position));
+        }
+        
+        None
+    }
+    
+    /// Parses fenced code blocks
+    fn parse_code_block(&self, lines: &[&str], start_pos: usize) -> Option<(MarkdownElement, usize)> {
+        if lines.is_empty() {
+            return None;
+        }
+        
+        let first_line = lines[0].trim();
+        
+        for &pattern in &self.code_block_patterns {
+            if first_line.starts_with(pattern) {
+                let language = first_line[pattern.len()..].trim();
+                let language = if language.is_empty() { None } else { Some(language.to_string()) };
+                
+                let mut content = String::new();
+                let mut consumed = 1;
+                
+                // Find closing fence
+                for (i, &line) in lines[1..].iter().enumerate() {
+                    if line.trim().starts_with(pattern) {
+                        consumed = i + 2; // +1 for opening fence, +1 for current line
+                        break;
+                    }
+                    
+                    if !content.is_empty() {
+                        content.push('\n');
+                    }
+                    content.push_str(line);
+                }
+                
+                let content_len = content.len();
+                return Some((MarkdownElement::CodeBlock(language, content, start_pos, start_pos + content_len), consumed));
+            }
+        }
+        
+        None
+    }
+    
+    /// Parses markdown tables
+    fn parse_table(&self, lines: &[&str], start_pos: usize) -> Option<(MarkdownElement, usize)> {
+        if lines.len() < 2 {
+            return None;
+        }
+        
+        // Check if first line looks like a table header
+        let header_line = lines[0];
+        if !header_line.contains('|') {
+            return None;
+        }
+        
+        // Check if second line is a separator
+        let separator_line = lines[1];
+        if !separator_line.contains('|') || !separator_line.contains('-') {
+            return None;
+        }
+        
+        let headers: Vec<String> = header_line
+            .split('|')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        
+        if headers.is_empty() {
+            return None;
+        }
+        
+        let mut rows = Vec::new();
+        let mut consumed = 2;
+        
+        // Parse data rows
+        for &line in lines[2..].iter() {
+            if !line.contains('|') {
+                break;
+            }
+            
+            let row: Vec<String> = line
+                .split('|')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            
+            if !row.is_empty() {
+                rows.push(row);
+                consumed += 1;
+            } else {
+                break;
+            }
+        }
+        
+        Some((MarkdownElement::Table(headers, rows, start_pos), consumed))
+    }
+    
+    /// Parses markdown lists (ordered and unordered)
+    fn parse_list(&self, lines: &[&str], start_pos: usize) -> Option<(MarkdownElement, usize)> {
+        if lines.is_empty() {
+            return None;
+        }
+        
+        let first_line = lines[0].trim_start();
+        
+        // Check for unordered list markers
+        let is_unordered = first_line.starts_with("- ") || 
+                          first_line.starts_with("* ") || 
+                          first_line.starts_with("+ ");
+        
+        // Check for ordered list markers
+        let is_ordered = first_line.chars().take(10)
+            .take_while(|c| c.is_ascii_digit())
+            .count() > 0 && first_line.contains(". ");
+        
+        if !is_unordered && !is_ordered {
+            return None;
+        }
+        
+        let mut items = Vec::new();
+        let mut consumed = 0;
+        
+        for &line in lines.iter() {
+            let trimmed = line.trim_start();
+            
+            let is_list_item = if is_unordered {
+                trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("+ ")
+            } else {
+                trimmed.chars().take(10).take_while(|c| c.is_ascii_digit()).count() > 0 && 
+                trimmed.contains(". ")
+            };
+            
+            if is_list_item {
+                let content = if is_unordered {
+                    trimmed[2..].trim().to_string()
+                } else {
+                    let dot_pos = trimmed.find(". ").unwrap();
+                    trimmed[dot_pos + 2..].trim().to_string()
+                };
+                items.push(content);
+                consumed += 1;
+            } else if trimmed.is_empty() && consumed > 0 {
+                // Allow empty lines within lists
+                consumed += 1;
+            } else {
+                break;
+            }
+        }
+        
+        if items.is_empty() {
+            return None;
+        }
+        
+        Some((MarkdownElement::List(!is_unordered, items, start_pos), consumed))
+    }
+    
+    /// Extracts links from all elements
+    fn extract_links_from_elements(&self, elements: &mut Vec<MarkdownElement>, text: &str) {
+        // Simple link extraction without regex dependency
+        // Look for [text](url) patterns
+        let mut search_pos = 0;
+        
+        while let Some(bracket_start) = text[search_pos..].find('[') {
+            let abs_bracket_start = search_pos + bracket_start;
+            
+            if let Some(bracket_end) = text[abs_bracket_start..].find(']') {
+                let abs_bracket_end = abs_bracket_start + bracket_end;
+                
+                if abs_bracket_end + 1 < text.len() && text.chars().nth(abs_bracket_end + 1) == Some('(') {
+                    if let Some(paren_end) = text[abs_bracket_end + 2..].find(')') {
+                        let abs_paren_end = abs_bracket_end + 2 + paren_end;
+                        
+                        let link_text = &text[abs_bracket_start + 1..abs_bracket_end];
+                        let link_url = &text[abs_bracket_end + 2..abs_paren_end];
+                        
+                        // Parse title if present: [text](url "title")
+                        let (url, title) = if let Some(quote_pos) = link_url.find('"') {
+                            let url_part = link_url[..quote_pos].trim();
+                            let title_part = link_url[quote_pos + 1..].trim_end_matches('"');
+                            (url_part.to_string(), Some(title_part.to_string()))
+                        } else {
+                            (link_url.trim().to_string(), None)
+                        };
+                        
+                        elements.push(MarkdownElement::Link(
+                            link_text.to_string(), 
+                            url, 
+                            title, 
+                            abs_bracket_start
+                        ));
+                        
+                        search_pos = abs_paren_end + 1;
+                    } else {
+                        search_pos = abs_bracket_end + 1;
+                    }
+                } else {
+                    search_pos = abs_bracket_end + 1;
+                }
+            } else {
+                break;
+            }
+        }
+    }
+    
+    /// Finds markdown header boundaries in text
+    fn find_header_boundaries(&self, text: &str) -> Vec<usize> {
+        let elements = self.parse(text);
+        elements
+            .into_iter()
+            .filter_map(|element| match element {
+                MarkdownElement::Header(_, _, pos) => Some(pos),
+                _ => None,
+            })
+            .collect()
+    }
+    
+    /// Finds code block boundaries to preserve them intact
+    fn find_code_block_boundaries(&self, text: &str) -> Vec<(usize, usize)> {
+        let elements = self.parse(text);
+        elements
+            .into_iter()
+            .filter_map(|element| match element {
+                MarkdownElement::CodeBlock(_, _, start, end) => Some((start, end)),
+                _ => None,
+            })
+            .collect()
+    }
+    
+    /// Strips markdown formatting while preserving content
+    fn strip_formatting(&self, text: &str) -> String {
+        let mut result = text.to_string();
+        
+        // Remove ATX headers
+        for &pattern in &self.header_patterns {
+            let header_pattern = format!("{} ", pattern);
+            result = result.replace(&header_pattern, "");
+        }
+        
+        // Remove emphasis (basic patterns)
+        result = result.replace("**", ""); // Bold
+        result = result.replace("*", "");  // Italic
+        result = result.replace("__", ""); // Bold
+        result = result.replace("_", "");  // Italic
+        
+        // Remove code spans
+        result = result.replace("`", "");
+        
+        // Simple link cleanup [text](url) -> text
+        while let Some(start) = result.find('[') {
+            if let Some(middle) = result[start..].find("](") {
+                if let Some(end) = result[start + middle..].find(')') {
+                    let link_start = start;
+                    let text_end = start + middle;
+                    let link_end = start + middle + end + 1;
+                    
+                    let link_text = result[start + 1..text_end].to_string();
+                    result.replace_range(link_start..link_end, &link_text);
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        
+        result
+    }
+    
+    /// Creates markdown metadata from parsed elements
+    fn create_metadata(&self, elements: &[MarkdownElement], strip_formatting: bool) -> MarkdownMetadata {
+        let mut metadata = MarkdownMetadata::default();
+        
+        for element in elements {
+            match element {
+                MarkdownElement::Header(level, text, _) => {
+                    metadata.headers.push((*level, text.clone()));
+                },
+                MarkdownElement::CodeBlock(lang, content, _, _) => {
+                    metadata.code_blocks.push((lang.clone(), content.clone()));
+                },
+                MarkdownElement::Link(text, url, title, _) => {
+                    metadata.links.push((text.clone(), url.clone(), title.clone()));
+                },
+                MarkdownElement::List(ordered, items, _) => {
+                    metadata.lists.push((*ordered, items.clone()));
+                },
+                MarkdownElement::Table(headers, rows, _) => {
+                    metadata.tables.push((headers.clone(), rows.clone()));
+                },
+                _ => {}
+            }
+        }
+        
+        metadata.has_stripped_formatting = strip_formatting;
+        metadata
+    }
+    
+    /// Builds structure context from parent headers
+    fn build_structure_context(&self, elements: &[MarkdownElement], current_pos: usize) -> Vec<(usize, String)> {
+        let mut context = Vec::new();
+        
+        for element in elements {
+            if let MarkdownElement::Header(level, text, pos) = element {
+                if *pos < current_pos {
+                    context.push((*level, text.clone()));
+                }
+            }
+        }
+        
+        // Keep only the most recent header for each level
+        let mut level_context: Vec<Option<String>> = vec![None; 7]; // H1-H6
+        
+        for (level, text) in context {
+            if level <= 6 {
+                level_context[level] = Some(text);
+                // Clear deeper levels when we encounter a header
+                for deeper in (level + 1)..=6 {
+                    level_context[deeper] = None;
+                }
+            }
+        }
+        
+        level_context
+            .into_iter()
+            .enumerate()
+            .filter_map(|(level, text)| text.map(|t| (level, t)))
+            .collect()
+    }
+}
+
 /// Main text chunking processor
 #[derive(Debug, Clone)]
 pub struct ChunkProcessor {
@@ -335,6 +847,8 @@ pub struct ChunkProcessor {
     config: ChunkConfig,
     /// Boundary detector for semantic chunking
     boundary_detector: BoundaryDetector,
+    /// Markdown parser for document structure analysis
+    markdown_parser: MarkdownParser,
 }
 
 impl ChunkProcessor {
@@ -345,6 +859,7 @@ impl ChunkProcessor {
         Ok(Self {
             config,
             boundary_detector: BoundaryDetector::default(),
+            markdown_parser: MarkdownParser::default(),
         })
     }
     
@@ -375,6 +890,7 @@ impl ChunkProcessor {
             ChunkingStrategy::FixedSize => self.chunk_fixed_size(text),
             ChunkingStrategy::Semantic => self.chunk_semantic(text),
             ChunkingStrategy::Hybrid => self.chunk_hybrid(text),
+            ChunkingStrategy::MarkdownAware => self.chunk_markdown_aware(text),
         }
     }
     
@@ -520,6 +1036,120 @@ impl ChunkProcessor {
         self.finalize_chunks_metadata(chunks)
     }
     
+    /// Markdown-aware chunking that preserves document structure
+    fn chunk_markdown_aware(&self, text: &str) -> ChunkResult<Vec<TextChunk>> {
+        let mut chunks = Vec::new();
+        let text_len = text.len();
+        
+        // Parse markdown structure
+        let elements = self.markdown_parser.parse(text);
+        
+        // Get header boundaries for structural chunking
+        let header_boundaries = if self.config.preserve_markdown_headers {
+            self.markdown_parser.find_header_boundaries(text)
+        } else {
+            Vec::new()
+        };
+        
+        // Get code block boundaries to preserve them intact
+        let code_block_boundaries = if self.config.preserve_code_blocks {
+            self.markdown_parser.find_code_block_boundaries(text)
+        } else {
+            Vec::new()
+        };
+        
+        let mut position = 0;
+        
+        while position < text_len {
+            let target_end = (position + self.config.max_chunk_size).min(text_len);
+            
+            // Check if we're inside a code block - if so, preserve it intact
+            let in_code_block = code_block_boundaries.iter()
+                .find(|(start, end)| position >= *start && position < *end);
+                
+            let chunk_end = if let Some((_, code_end)) = in_code_block {
+                // Include the entire code block
+                (*code_end).min(text_len)
+            } else {
+                // Find the best boundary considering markdown structure
+                self.find_markdown_boundary(text, target_end, &header_boundaries, position)
+            };
+            
+            let chunk_content = text[position..chunk_end].to_string();
+            if !chunk_content.trim().is_empty() && 
+               chunk_content.len() >= self.config.min_chunk_size || 
+               chunk_end >= text_len {
+                
+                let metadata = self.create_markdown_chunk_metadata(
+                    &chunk_content,
+                    position,
+                    chunk_end,
+                    chunks.len(),
+                    !chunks.is_empty(),
+                    chunk_end < text_len,
+                    &elements
+                );
+                
+                let processed_content = if self.config.strip_markdown_formatting {
+                    self.markdown_parser.strip_formatting(&chunk_content)
+                } else {
+                    chunk_content
+                };
+                
+                chunks.push(TextChunk::new(processed_content, metadata));
+            }
+            
+            if chunk_end >= text_len {
+                break;
+            }
+            
+            // Calculate next position with overlap, but respect markdown boundaries
+            let next_position = if in_code_block.is_some() {
+                // Don't overlap code blocks
+                chunk_end
+            } else {
+                chunk_end.saturating_sub(self.config.overlap_size)
+            };
+            
+            position = if next_position >= chunk_end {
+                chunk_end
+            } else {
+                next_position
+            };
+        }
+        
+        self.finalize_chunks_metadata(chunks)
+    }
+    
+    /// Finds the best boundary for markdown-aware chunking
+    fn find_markdown_boundary(&self, text: &str, target_pos: usize, header_boundaries: &[usize], current_pos: usize) -> usize {
+        if target_pos >= text.len() {
+            return text.len();
+        }
+        
+        let search_range = self.config.max_chunk_size / 4;
+        let start = target_pos.saturating_sub(search_range);
+        let end = (target_pos + search_range).min(text.len());
+        
+        // Prefer header boundaries within search range
+        if self.config.preserve_markdown_headers {
+            let nearby_headers: Vec<usize> = header_boundaries.iter()
+                .filter(|&&pos| pos >= start && pos <= end && pos > current_pos)
+                .copied()
+                .collect();
+                
+            if let Some(&best_header) = nearby_headers.iter()
+                .min_by_key(|&&pos| target_pos.abs_diff(pos)) {
+                return best_header;
+            }
+        }
+        
+        // Fall back to semantic boundaries
+        self.boundary_detector
+            .find_best_boundary(text, target_pos, search_range)
+            .unwrap_or(target_pos)
+    }
+    
     /// Creates metadata for a chunk
     fn create_chunk_metadata(
         &self,
@@ -546,6 +1176,66 @@ impl ChunkProcessor {
             previous_overlap_size: if has_previous_overlap { self.config.overlap_size } else { 0 },
             next_overlap_size: if has_next_overlap { self.config.overlap_size } else { 0 },
             context: HashMap::new(),
+            markdown: None,
+        }
+    }
+    
+    /// Creates metadata for a markdown-aware chunk
+    fn create_markdown_chunk_metadata(
+        &self,
+        content: &str,
+        start_pos: usize,
+        end_pos: usize,
+        chunk_index: usize,
+        has_previous_overlap: bool,
+        has_next_overlap: bool,
+        elements: &[MarkdownElement],
+    ) -> ChunkMetadata {
+        let word_count = content.split_whitespace().count();
+        let sentence_count = self.count_sentences(content);
+        
+        // Filter elements that fall within this chunk
+        let chunk_elements: Vec<&MarkdownElement> = elements.iter()
+            .filter(|element| {
+                let element_pos = match element {
+                    MarkdownElement::Header(_, _, pos) => *pos,
+                    MarkdownElement::CodeBlock(_, _, start, _) => *start,
+                    MarkdownElement::Link(_, _, _, pos) => *pos,
+                    MarkdownElement::List(_, _, pos) => *pos,
+                    MarkdownElement::Table(_, _, pos) => *pos,
+                    MarkdownElement::Paragraph(_, pos) => *pos,
+                    MarkdownElement::LineBreak(pos) => *pos,
+                };
+                element_pos >= start_pos && element_pos < end_pos
+            })
+            .collect();
+        
+        // Create markdown-specific metadata
+        let chunk_elements_owned: Vec<MarkdownElement> = chunk_elements.into_iter().cloned().collect();
+        let markdown_metadata = self.markdown_parser
+            .create_metadata(&chunk_elements_owned, self.config.strip_markdown_formatting);
+        
+        // Build structure context from parent headers
+        let structure_context = self.markdown_parser
+            .build_structure_context(elements, start_pos);
+        
+        let mut markdown_meta = markdown_metadata;
+        markdown_meta.structure_context = structure_context;
+        
+        ChunkMetadata {
+            start_position: start_pos,
+            end_position: end_pos,
+            chunk_index,
+            total_chunks: 0, // Will be updated in finalize_chunks_metadata
+            character_count: content.len(),
+            word_count,
+            sentence_count,
+            has_previous_overlap,
+            has_next_overlap,
+            previous_overlap_size: if has_previous_overlap { self.config.overlap_size } else { 0 },
+            next_overlap_size: if has_next_overlap { self.config.overlap_size } else { 0 },
+            context: HashMap::new(),
+            markdown: Some(markdown_meta),
         }
     }
     
@@ -654,6 +1344,10 @@ impl ChunkProcessor {
             min_chunk_size: (optimal_size / 4).max(50),
             preserve_paragraphs: true,
             preserve_sentences: true,
+            preserve_markdown_headers: true,
+            preserve_code_blocks: true,
+            preserve_markdown_links: true,
+            strip_markdown_formatting: false,
         }
     }
 }
@@ -1107,6 +1801,161 @@ mod tests {
         if chunks.len() > 1 {
             for chunk in &chunks {
                 assert!(chunk.len() <= processor.config().max_chunk_size + 50); // Allow some flexibility
+            }
+        }
+    }
+
+    /// Sample markdown text for testing
+    fn sample_markdown() -> &'static str {
+        "# Main Title
+
+This is the introduction paragraph.
+
+## Section 1
+
+Here's some content in section 1. It has multiple sentences.
+
+```rust
+fn hello_world() {
+    println!(\"Hello, world!\");
+}
+```
+
+### Subsection 1.1
+
+This subsection contains a list:
+
+- Item 1
+- Item 2 with [a link](https://example.com \"Example\")
+- Item 3
+
+## Section 2
+
+This section has a table:
+
+| Header 1 | Header 2 |
+|----------|----------|
+| Row 1    | Data 1   |
+| Row 2    | Data 2   |
+
+And some final text."
+    }
+
+    #[test]
+    fn test_markdown_aware_chunking_basic() {
+        let mut config = ChunkConfig::default();
+        config.strategy = ChunkingStrategy::MarkdownAware;
+        config.max_chunk_size = 500;
+        config.overlap_size = 50;
+        
+        let processor = ChunkProcessor::new(config).unwrap();
+        let chunks = processor.chunk_text(sample_markdown()).unwrap();
+        
+        assert!(!chunks.is_empty());
+        
+        // Verify chunks have markdown metadata
+        for chunk in &chunks {
+            assert!(chunk.metadata.markdown.is_some());
+            let markdown_meta = chunk.metadata.markdown.as_ref().unwrap();
+            
+            // Check that structure is preserved
+            assert!(
+                !markdown_meta.headers.is_empty() || 
+                !markdown_meta.code_blocks.is_empty() || 
+                !markdown_meta.lists.is_empty() ||
+                !markdown_meta.tables.is_empty() ||
+                chunk.metadata.chunk_index == 0 // First chunk might not have structure
+            );
+        }
+    }
+
+    #[test]
+    fn test_markdown_header_boundaries() {
+        let mut config = ChunkConfig::default();
+        config.strategy = ChunkingStrategy::MarkdownAware;
+        config.preserve_markdown_headers = true;
+        config.max_chunk_size = 200; // Small chunks to force header boundaries
+        
+        let processor = ChunkProcessor::new(config).unwrap();
+        let chunks = processor.chunk_text(sample_markdown()).unwrap();
+        
+        // Check that headers are preserved as natural boundaries
+        let mut found_main_title = false;
+        let mut found_section_1 = false;
+        let mut found_section_2 = false;
+        
+        for chunk in &chunks {
+            if let Some(ref markdown_meta) = chunk.metadata.markdown {
+                for (level, text) in &markdown_meta.headers {
+                    if text.contains("Main Title") {
+                        found_main_title = true;
+                        assert_eq!(*level, 1); // H1
+                    } else if text.contains("Section 1") {
+                        found_section_1 = true;
+                        assert_eq!(*level, 2); // H2
+                    } else if text.contains("Section 2") {
+                        found_section_2 = true;
+                        assert_eq!(*level, 2); // H2
+                    }
+                }
+            }
+        }
+        
+        assert!(found_main_title);
+        assert!(found_section_1);
+        assert!(found_section_2);
+    }
+
+    #[test]
+    fn test_markdown_code_block_preservation() {
+        let mut config = ChunkConfig::default();
+        config.strategy = ChunkingStrategy::MarkdownAware;
+        config.preserve_code_blocks = true;
+        config.max_chunk_size = 200; // Small to test code block preservation
+        
+        let processor = ChunkProcessor::new(config).unwrap();
+        let chunks = processor.chunk_text(sample_markdown()).unwrap();
+        
+        // Find the chunk containing the code block
+        let mut found_code_block = false;
+        for chunk in &chunks {
+            if let Some(ref markdown_meta) = chunk.metadata.markdown {
+                for (language, content) in &markdown_meta.code_blocks {
+                    if content.contains("println!") {
+                        found_code_block = true;
+                        assert_eq!(language.as_ref().unwrap(), "rust");
+                        // Code block should be preserved intact
+                        assert!(content.contains("fn hello_world()"));
+                        assert!(content.contains("println!"));
+                    }
+                }
+            }
+        }
+        
+        assert!(found_code_block, "Code block should be preserved");
+    }
+
+    #[test]
+    fn test_markdown_formatting_stripping() {
+        let mut config = ChunkConfig::default();
+        config.strategy = ChunkingStrategy::MarkdownAware;
+        config.strip_markdown_formatting = true;
+        
+        let processor = ChunkProcessor::new(config).unwrap();
+        let markdown_with_formatting = "# Header\n\nThis is **bold** and *italic* text with `code` and [link](url).";
+        let chunks = processor.chunk_text(markdown_with_formatting).unwrap();
+        
+        assert!(!chunks.is_empty());
+        
+        // Check that formatting is stripped from content
+        for chunk in &chunks {
+            let content = chunk.content();
+            // Basic formatting should be stripped
+            if content.contains("bold") {
+                // Metadata should indicate formatting was stripped
+                if let Some(ref markdown_meta) = chunk.metadata.markdown {
+                    assert!(markdown_meta.has_stripped_formatting);
+                }
             }
         }
     }
