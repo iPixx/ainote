@@ -27,6 +27,13 @@
 //! - `monitor_incremental_operation`: Monitor an incremental update operation
 //! - `monitor_maintenance_operation`: Monitor a maintenance operation  
 //! - `monitor_rebuilding_operation`: Monitor a rebuilding operation
+//!
+//! ### Enhanced Metrics Commands (Issue #146)
+//! - `get_search_operation_metrics`: Get search operation performance metrics
+//! - `get_index_health_metrics`: Get comprehensive index health monitoring data
+//! - `get_detailed_memory_metrics`: Get detailed memory usage breakdown
+//! - `get_optimization_recommendations`: Get AI-powered optimization suggestions
+//! - `start_enhanced_metrics_collection`: Start enhanced metrics collection system
 
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
@@ -41,13 +48,25 @@ use crate::vector_db::performance_monitor::{
 use crate::vector_db::incremental::UpdateStats;
 use crate::vector_db::maintenance::MaintenanceStats;
 use crate::vector_db::rebuilding::RebuildMetrics;
+use crate::vector_db::metrics_collector::{
+    EnhancedMetricsCollector, MetricsCollectorConfig, SearchOperationMetrics,
+    IndexHealthMetrics, DetailedMemoryMetrics, OptimizationRecommendation
+};
 
 /// Global performance monitor instance
 static PERFORMANCE_MONITOR: OnceLock<Arc<RwLock<Option<IndexPerformanceMonitor>>>> = OnceLock::new();
 
+/// Global enhanced metrics collector instance
+static ENHANCED_METRICS_COLLECTOR: OnceLock<Arc<RwLock<Option<EnhancedMetricsCollector>>>> = OnceLock::new();
+
 /// Get or initialize the global performance monitor
 fn get_monitor() -> &'static Arc<RwLock<Option<IndexPerformanceMonitor>>> {
     PERFORMANCE_MONITOR.get_or_init(|| Arc::new(RwLock::new(None)))
+}
+
+/// Get or initialize the global enhanced metrics collector
+fn get_enhanced_metrics_collector() -> &'static Arc<RwLock<Option<EnhancedMetricsCollector>>> {
+    ENHANCED_METRICS_COLLECTOR.get_or_init(|| Arc::new(RwLock::new(None)))
 }
 
 /// Request structure for starting performance monitoring
@@ -677,4 +696,303 @@ pub async fn get_resource_utilization() -> Result<ResourceMetrics, String> {
     } else {
         Err("Performance monitoring is not currently running".to_string())
     }
+}
+
+// ======= Enhanced Metrics Collection Commands (Issue #146) =======
+
+/// Request structure for enhanced metrics collection configuration
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EnhancedMetricsRequest {
+    /// Enhanced metrics configuration (optional, uses defaults if not provided)
+    pub config: Option<MetricsCollectorConfig>,
+    /// Vector storage directory path for monitoring
+    pub storage_dir: String,
+}
+
+/// Start the enhanced metrics collection system
+///
+/// Initializes and starts the enhanced metrics collection system that provides
+/// comprehensive monitoring of search operations, index health, memory usage,
+/// and optimization recommendations as specified in issue #146.
+///
+/// # Arguments
+/// * `request` - Configuration for enhanced metrics collection
+///
+/// # Returns
+/// * `Ok(String)` - Success confirmation message
+/// * `Err(String)` - Error message if startup fails
+///
+/// # Example Usage (from frontend)
+/// ```javascript
+/// const result = await invoke('start_enhanced_metrics_collection', {
+///     request: {
+///         config: {
+///             enable_search_metrics: true,
+///             enable_index_health_monitoring: true,
+///             enable_memory_tracking: true,
+///             enable_optimization_recommendations: true
+///         },
+///         storage_dir: '/path/to/vector/storage'
+///     }
+/// });
+/// console.log('Enhanced metrics started:', result);
+/// ```
+#[tauri::command]
+pub async fn start_enhanced_metrics_collection(
+    request: EnhancedMetricsRequest,
+) -> Result<String, String> {
+    let collector_lock = get_enhanced_metrics_collector();
+    let mut collector_guard = collector_lock.write().await;
+
+    if collector_guard.is_some() {
+        return Err("Enhanced metrics collection is already running".to_string());
+    }
+
+    // Create a mock storage instance for now - in real implementation would get from global state
+    let config = crate::vector_db::types::VectorStorageConfig {
+        storage_dir: request.storage_dir.clone(),
+        ..crate::vector_db::types::VectorStorageConfig::default()
+    };
+    
+    let storage = match crate::vector_db::storage::VectorStorage::new(config) {
+        Ok(storage) => Arc::new(storage),
+        Err(e) => return Err(format!("Failed to initialize storage for metrics: {}", e)),
+    };
+
+    let metrics_config = request.config.unwrap_or_default();
+    let mut collector = EnhancedMetricsCollector::new(metrics_config, storage);
+    
+    collector.start().await
+        .map_err(|e| format!("Failed to start enhanced metrics collection: {}", e))?;
+
+    *collector_guard = Some(collector);
+    
+    Ok("Enhanced metrics collection started successfully".to_string())
+}
+
+/// Stop the enhanced metrics collection system
+///
+/// Stops the enhanced metrics collection system and persists any collected metrics
+/// if persistence is configured.
+///
+/// # Returns
+/// * `Ok(String)` - Confirmation message
+/// * `Err(String)` - Error message if stopping fails
+#[tauri::command]
+pub async fn stop_enhanced_metrics_collection() -> Result<String, String> {
+    let collector_lock = get_enhanced_metrics_collector();
+    let mut collector_guard = collector_lock.write().await;
+
+    if let Some(mut collector) = collector_guard.take() {
+        collector.stop().await
+            .map_err(|e| format!("Failed to stop enhanced metrics collection: {}", e))?;
+        
+        Ok("Enhanced metrics collection stopped successfully".to_string())
+    } else {
+        Err("Enhanced metrics collection is not currently running".to_string())
+    }
+}
+
+/// Get search operation performance metrics
+///
+/// Returns historical performance metrics for search operations including
+/// latency, efficiency, accuracy, and throughput statistics.
+///
+/// # Arguments
+/// * `limit` - Optional limit on number of metrics to return (default: 100)
+///
+/// # Returns
+/// * `Ok(Vec<SearchOperationMetrics>)` - Search operation metrics history
+/// * `Err(String)` - Error message if retrieval fails
+///
+/// # Example Usage (from frontend)
+/// ```javascript
+/// const metrics = await invoke('get_search_operation_metrics', { limit: 50 });
+/// 
+/// metrics.forEach(metric => {
+///     console.log(`Search ${metric.operation_type}:`);
+///     console.log(`  Duration: ${metric.duration_ms}ms`);
+///     console.log(`  Vectors searched: ${metric.vectors_searched}`);
+///     console.log(`  Results returned: ${metric.results_returned}`);
+///     console.log(`  Efficiency: ${metric.efficiency_score}`);
+///     console.log(`  Performance target met: ${metric.performance_target_met}`);
+/// });
+/// ```
+#[tauri::command]
+pub async fn get_search_operation_metrics(limit: Option<usize>) -> Result<Vec<SearchOperationMetrics>, String> {
+    let collector_lock = get_enhanced_metrics_collector();
+    let collector_guard = collector_lock.read().await;
+
+    if let Some(collector) = collector_guard.as_ref() {
+        let metrics = collector.get_search_metrics_history(limit).await;
+        Ok(metrics)
+    } else {
+        Err("Enhanced metrics collection is not currently running".to_string())
+    }
+}
+
+/// Get comprehensive index health metrics
+///
+/// Returns detailed index health monitoring data including fragmentation,
+/// efficiency, storage statistics, and health recommendations.
+///
+/// # Returns
+/// * `Ok(IndexHealthMetrics)` - Current index health metrics
+/// * `Err(String)` - Error message if retrieval fails
+///
+/// # Example Usage (from frontend)
+/// ```javascript
+/// const health = await invoke('get_index_health_metrics');
+/// 
+/// console.log('Index Health Status:', health.health_status);
+/// console.log('Total Embeddings:', health.total_embeddings);
+/// console.log('Index Size:', health.index_size_bytes, 'bytes');
+/// console.log('Fragmentation:', health.fragmentation_percentage + '%');
+/// console.log('Efficiency Score:', health.efficiency_score);
+/// console.log('Health Issues:', health.health_issues.length);
+/// console.log('Recommended Actions:', health.recommended_actions);
+/// ```
+#[tauri::command]
+pub async fn get_index_health_metrics() -> Result<IndexHealthMetrics, String> {
+    let collector_lock = get_enhanced_metrics_collector();
+    let collector_guard = collector_lock.read().await;
+
+    if let Some(collector) = collector_guard.as_ref() {
+        collector.get_current_index_health().await
+            .map_err(|e| format!("Failed to get index health metrics: {}", e))
+    } else {
+        Err("Enhanced metrics collection is not currently running".to_string())
+    }
+}
+
+/// Get index health history
+///
+/// Returns historical index health metrics for trend analysis.
+///
+/// # Arguments
+/// * `limit` - Optional limit on number of metrics to return (default: 24)
+///
+/// # Returns
+/// * `Ok(Vec<IndexHealthMetrics>)` - Index health metrics history
+/// * `Err(String)` - Error message if retrieval fails
+#[tauri::command]
+pub async fn get_index_health_history(limit: Option<usize>) -> Result<Vec<IndexHealthMetrics>, String> {
+    let collector_lock = get_enhanced_metrics_collector();
+    let collector_guard = collector_lock.read().await;
+
+    if let Some(collector) = collector_guard.as_ref() {
+        let metrics = collector.get_index_health_history(limit).await;
+        Ok(metrics)
+    } else {
+        Err("Enhanced metrics collection is not currently running".to_string())
+    }
+}
+
+/// Get detailed memory usage metrics
+///
+/// Returns comprehensive memory usage breakdown including vector storage,
+/// cache usage, potential leaks, and memory efficiency analysis.
+///
+/// # Returns
+/// * `Ok(DetailedMemoryMetrics)` - Detailed memory usage metrics
+/// * `Err(String)` - Error message if retrieval fails
+///
+/// # Example Usage (from frontend)
+/// ```javascript
+/// const memory = await invoke('get_detailed_memory_metrics');
+/// 
+/// console.log('Total Memory Usage:', memory.total_memory_mb + 'MB');
+/// console.log('Vector Storage Memory:', memory.vector_storage_mb + 'MB');
+/// console.log('Cache Memory:', memory.cache_memory_mb + 'MB');
+/// console.log('Index Memory:', memory.index_memory_mb + 'MB');
+/// console.log('Available Memory:', memory.available_memory_mb + 'MB');
+/// console.log('Memory Pressure:', memory.memory_pressure);
+/// console.log('Efficiency Score:', memory.efficiency_score);
+/// console.log('Potential Leaks:', memory.potential_leaks.length);
+/// ```
+#[tauri::command]
+pub async fn get_detailed_memory_metrics() -> Result<DetailedMemoryMetrics, String> {
+    let collector_lock = get_enhanced_metrics_collector();
+    let collector_guard = collector_lock.read().await;
+
+    if let Some(collector) = collector_guard.as_ref() {
+        collector.get_current_memory_metrics().await
+            .map_err(|e| format!("Failed to get detailed memory metrics: {}", e))
+    } else {
+        Err("Enhanced metrics collection is not currently running".to_string())
+    }
+}
+
+/// Get memory usage history
+///
+/// Returns historical memory usage metrics for trend analysis and leak detection.
+///
+/// # Arguments
+/// * `limit` - Optional limit on number of metrics to return (default: 100)
+///
+/// # Returns
+/// * `Ok(Vec<DetailedMemoryMetrics>)` - Memory usage metrics history
+/// * `Err(String)` - Error message if retrieval fails
+#[tauri::command]
+pub async fn get_memory_metrics_history(limit: Option<usize>) -> Result<Vec<DetailedMemoryMetrics>, String> {
+    let collector_lock = get_enhanced_metrics_collector();
+    let collector_guard = collector_lock.read().await;
+
+    if let Some(collector) = collector_guard.as_ref() {
+        let metrics = collector.get_memory_metrics_history(limit).await;
+        Ok(metrics)
+    } else {
+        Err("Enhanced metrics collection is not currently running".to_string())
+    }
+}
+
+/// Get AI-powered optimization recommendations
+///
+/// Returns intelligent optimization recommendations based on performance analysis,
+/// index health monitoring, and memory usage patterns.
+///
+/// # Returns
+/// * `Ok(Vec<OptimizationRecommendation>)` - List of optimization recommendations
+/// * `Err(String)` - Error message if retrieval fails
+///
+/// # Example Usage (from frontend)
+/// ```javascript
+/// const recommendations = await invoke('get_optimization_recommendations');
+/// 
+/// recommendations.forEach(rec => {
+///     console.log(`Recommendation: ${rec.title}`);
+///     console.log(`Category: ${rec.category}`);
+///     console.log(`Priority: ${rec.priority}`);
+///     console.log(`Description: ${rec.description}`);
+///     console.log(`Expected Improvement: ${rec.expected_improvement.overall_improvement_percent}%`);
+///     console.log(`Difficulty: ${rec.difficulty}`);
+///     console.log(`Estimated Time: ${rec.estimated_time_hours} hours`);
+///     console.log(`Implementation Steps:`, rec.implementation_steps);
+/// });
+/// ```
+#[tauri::command]
+pub async fn get_optimization_recommendations() -> Result<Vec<OptimizationRecommendation>, String> {
+    let collector_lock = get_enhanced_metrics_collector();
+    let collector_guard = collector_lock.read().await;
+
+    if let Some(collector) = collector_guard.as_ref() {
+        let recommendations = collector.get_optimization_recommendations().await;
+        Ok(recommendations)
+    } else {
+        Err("Enhanced metrics collection is not currently running".to_string())
+    }
+}
+
+/// Check if enhanced metrics collection is active
+///
+/// Returns the current status of the enhanced metrics collection system.
+///
+/// # Returns
+/// * `Ok(bool)` - True if enhanced metrics collection is active
+/// * `Err(String)` - Error message if status check fails
+#[tauri::command]
+pub async fn is_enhanced_metrics_active() -> Result<bool, String> {
+    let collector_lock = get_enhanced_metrics_collector();
+    let collector_guard = collector_lock.read().await;
+    Ok(collector_guard.is_some())
 }

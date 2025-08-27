@@ -115,9 +115,14 @@ pub mod optimized_storage;
 pub mod lazy_loading;
 pub mod enhanced_cache;
 pub mod automatic_cleanup;
+pub mod metrics_collector;
+pub mod monitored_search;
 
 #[cfg(test)]
 pub mod compression_tests;
+
+#[cfg(test)]
+mod metrics_collector_tests;
 
 #[cfg(test)]
 mod atomic_performance_test;
