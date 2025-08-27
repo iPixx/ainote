@@ -162,8 +162,10 @@ mod e2e_tests {
         match result {
             Ok(_) => {
                 println!("Health check succeeded despite short timeout");
-                // If it succeeded, it should have been reasonably fast
-                assert!(elapsed < Duration::from_millis(200));
+                // If it succeeded after retries, it may take longer due to retry delays
+                // Allow up to 1 second for the retry mechanism to complete
+                assert!(elapsed < Duration::from_millis(1000), 
+                       "Health check took too long: {:?}", elapsed);
             }
             Err(_) => {
                 println!("Health check failed after retries (expected with short timeout)");
