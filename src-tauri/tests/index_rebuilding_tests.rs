@@ -30,6 +30,10 @@ fn create_test_config() -> VectorStorageConfig {
         auto_backup: true,
         max_backups: 3,
         enable_metrics: true,
+        enable_vector_compression: false,
+        vector_compression_algorithm: ainote_lib::vector_db::types::VectorCompressionAlgorithm::None,
+        enable_lazy_loading: false,
+        lazy_loading_threshold: 1000,
     }
 }
 

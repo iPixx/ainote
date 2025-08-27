@@ -29,6 +29,10 @@ fn create_test_config() -> (VectorStorageConfig, TempDir) {
         auto_backup: false,
         max_backups: 0,
         enable_metrics: true,
+        enable_vector_compression: false,
+        vector_compression_algorithm: types::VectorCompressionAlgorithm::None,
+        enable_lazy_loading: false,
+        lazy_loading_threshold: 1000,
     };
     (config, temp_dir)
 }

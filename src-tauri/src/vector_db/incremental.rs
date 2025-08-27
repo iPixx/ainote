@@ -175,6 +175,12 @@ pub struct UpdateStats {
     pub completed_at: u64,
 }
 
+impl Default for UpdateStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UpdateStats {
     /// Create new update stats
     pub fn new() -> Self {
@@ -821,11 +827,12 @@ mod uuid {
         counter: u64,
     }
     
-    impl UuidValue {
-        pub fn to_string(&self) -> String {
-            format!("{:016x}-{:08x}", self.timestamp, self.counter)
+    impl std::fmt::Display for UuidValue {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{:016x}-{:08x}", self.timestamp, self.counter)
         }
     }
+
 }
 
 #[cfg(test)]

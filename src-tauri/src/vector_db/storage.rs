@@ -689,6 +689,10 @@ mod tests {
             auto_backup: false, // Disable for faster testing
             max_backups: 0,
             enable_metrics: false, // Disable for faster testing
+            enable_vector_compression: false, // Disable for testing
+            vector_compression_algorithm: crate::vector_db::types::VectorCompressionAlgorithm::None,
+            enable_lazy_loading: false, // Disable for testing
+            lazy_loading_threshold: 1000,
         }
     }
     
@@ -714,6 +718,10 @@ mod tests {
             auto_backup: false,
             max_backups: 0,
             enable_metrics: false,
+            enable_vector_compression: false,
+            vector_compression_algorithm: crate::vector_db::types::VectorCompressionAlgorithm::None,
+            enable_lazy_loading: false,
+            lazy_loading_threshold: 1000,
         };
         
         let storage = VectorStorage::new(config).unwrap();
@@ -739,6 +747,10 @@ mod tests {
             auto_backup: false,
             max_backups: 0,
             enable_metrics: false,
+            enable_vector_compression: false,
+            vector_compression_algorithm: crate::vector_db::types::VectorCompressionAlgorithm::None,
+            enable_lazy_loading: false,
+            lazy_loading_threshold: 1000,
         };
         
         let _storage = VectorStorage::new(config).unwrap();
@@ -767,6 +779,10 @@ mod tests {
             auto_backup: false,
             max_backups: 0,
             enable_metrics: false,
+            enable_vector_compression: false,
+            vector_compression_algorithm: crate::vector_db::types::VectorCompressionAlgorithm::None,
+            enable_lazy_loading: false,
+            lazy_loading_threshold: 1000,
         };
         
         let _storage = VectorStorage::new(config).unwrap();

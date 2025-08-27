@@ -110,6 +110,14 @@ pub mod maintenance;
 pub mod rebuilding;
 pub mod performance_monitor;
 pub mod deduplication;
+pub mod compression;
+pub mod optimized_storage;
+pub mod lazy_loading;
+pub mod enhanced_cache;
+pub mod automatic_cleanup;
+
+#[cfg(test)]
+pub mod compression_tests;
 
 #[cfg(test)]
 mod atomic_performance_test;
@@ -1040,7 +1048,7 @@ impl VectorDatabase {
     /// 
     /// Health check results with emphasis on performance metrics
     pub async fn perform_quick_health_check(&self) -> VectorDbResult<HealthCheckResult> {
-        if let Some(ref health_checker) = self.health_checker {
+        if let Some(ref _health_checker) = self.health_checker {
             // Create a performance-focused config for quick checks
             let quick_config = HealthCheckConfig {
                 enable_integrity_validation: false,
@@ -1074,7 +1082,7 @@ impl VectorDatabase {
     /// 
     /// Health check results focused on corruption detection
     pub async fn detect_index_corruption(&self) -> VectorDbResult<HealthCheckResult> {
-        if let Some(ref health_checker) = self.health_checker {
+        if let Some(ref _health_checker) = self.health_checker {
             // Create a corruption-focused config
             let corruption_config = HealthCheckConfig {
                 enable_integrity_validation: true,
@@ -1358,7 +1366,7 @@ impl VectorDatabase {
         }
         
         let avg_similarity = if comparisons > 0 { similarity_sum / comparisons as f32 } else { 0.0 };
-        let sample_duplicate_rate = if sample_embeddings.len() > 0 {
+        let sample_duplicate_rate = if !sample_embeddings.is_empty() {
             duplicate_count as f32 / sample_embeddings.len() as f32
         } else {
             0.0

@@ -239,7 +239,7 @@ impl ChunkConfig {
 }
 
 /// Markdown-specific metadata for chunks
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct MarkdownMetadata {
     /// Headers present in this chunk (level, text)
     pub headers: Vec<(usize, String)>,
@@ -257,19 +257,6 @@ pub struct MarkdownMetadata {
     pub has_stripped_formatting: bool,
 }
 
-impl Default for MarkdownMetadata {
-    fn default() -> Self {
-        Self {
-            headers: Vec::new(),
-            code_blocks: Vec::new(),
-            links: Vec::new(),
-            lists: Vec::new(),
-            tables: Vec::new(),
-            structure_context: Vec::new(),
-            has_stripped_formatting: false,
-        }
-    }
-}
 
 /// Metadata associated with each text chunk
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -581,13 +568,7 @@ impl BoundaryDetector {
         }
         
         // Search forwards for whitespace
-        for i in target..bytes.len() {
-            if bytes[i].is_ascii_whitespace() {
-                return Some(i);
-            }
-        }
-        
-        None
+        (target..bytes.len()).find(|&i| bytes[i].is_ascii_whitespace())
     }
 }
 
@@ -738,8 +719,8 @@ impl MarkdownParser {
         let first_line = lines[0].trim();
         
         for &pattern in &self.code_block_patterns {
-            if first_line.starts_with(pattern) {
-                let language = first_line[pattern.len()..].trim();
+            if let Some(stripped) = first_line.strip_prefix(pattern) {
+                let language = stripped.trim();
                 let language = if language.is_empty() { None } else { Some(language.to_string()) };
                 
                 let mut content = String::new();
@@ -1464,6 +1445,7 @@ impl ChunkProcessor {
     }
     
     /// Creates metadata for a chunk
+    #[allow(dead_code)]
     fn create_chunk_metadata(
         &self,
         content: &str,
@@ -1553,6 +1535,7 @@ impl ChunkProcessor {
     }
     
     /// Finalizes chunks by updating total_chunks count and chunk indices
+    #[allow(dead_code)]
     fn finalize_chunks_metadata(&self, mut chunks: Vec<TextChunk>) -> ChunkResult<Vec<TextChunk>> {
         let total_chunks = chunks.len();
         
@@ -2552,6 +2535,7 @@ And some final text."
     }
     
     /// Create a very large text for performance testing
+    #[allow(dead_code)]
     fn very_large_text() -> String {
         let paragraph = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. \
                         Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. \
@@ -2628,7 +2612,7 @@ And some final text."
 
             // Validate chunks
             assert!(!result.chunks.is_empty());
-            assert!(result.metrics.processing_time_ms >= 0); // Allow for very fast processing
+            // Processing time is always non-negative for unsigned types
             assert!(result.metrics.chunks_generated > 0);
 
             // Check that headers are preserved in metadata

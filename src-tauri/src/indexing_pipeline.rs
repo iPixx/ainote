@@ -178,7 +178,7 @@ pub struct PipelineConfig {
 impl Default for PipelineConfig {
     fn default() -> Self {
         Self {
-            worker_count: num_cpus::get().max(2).min(8), // 2-8 workers based on CPU cores
+            worker_count: num_cpus::get().clamp(2, 8), // 2-8 workers based on CPU cores
             max_queue_size: 10_000,
             progress_interval_ms: 100,
             max_worker_memory_mb: 50,
@@ -1184,7 +1184,7 @@ mod tests {
         assert_eq!(request.priority, IndexingPriority::UserTriggered);
         assert_eq!(request.status, IndexingStatus::Queued);
         // Note: First request will have ID 0, subsequent requests increment
-        assert!(request.id >= 0);
+        // ID is always non-negative for unsigned types
     }
 
     #[test]

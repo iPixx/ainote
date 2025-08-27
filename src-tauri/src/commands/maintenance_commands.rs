@@ -37,9 +37,10 @@ pub struct EnableMaintenanceRequest {
 impl EnableMaintenanceRequest {
     /// Convert request to MaintenanceConfig with defaults
     pub fn to_config(&self) -> MaintenanceConfig {
-        let mut config = MaintenanceConfig::default();
-        
-        config.enable_automatic_maintenance = self.enable_automatic_maintenance;
+        let mut config = MaintenanceConfig {
+            enable_automatic_maintenance: self.enable_automatic_maintenance,
+            ..Default::default()
+        };
         
         if let Some(interval) = self.maintenance_interval_seconds {
             config.maintenance_interval_seconds = interval;
