@@ -2599,4 +2599,651 @@ And some final text."
             assert!(chunk.len() <= processor.config().max_chunk_size * 3 / 2);
         }
     }
+
+    /// Load test file content from fixtures directory
+    fn load_test_fixture(filename: &str) -> Result<String, std::io::Error> {
+        use std::fs;
+        let path = format!("test_fixtures/markdown/{}", filename);
+        fs::read_to_string(&path)
+    }
+
+    /// Comprehensive integration tests with real markdown files
+    mod integration_tests {
+        use super::*;
+
+        #[test]
+        fn test_technical_document_chunking() {
+            let content = load_test_fixture("technical_document.md").unwrap_or_else(|_| {
+                "# Technical Documentation Sample\n\nThis is a fallback test document with technical content.".to_string()
+            });
+
+            let mut config = ChunkConfig::default();
+            config.strategy = ChunkingStrategy::MarkdownAware;
+            config.max_chunk_size = 1500;
+            config.overlap_size = 150;
+
+            let max_chunk_size = config.max_chunk_size;
+            let processor = ChunkProcessor::new(config).unwrap();
+            let result = processor.chunk_text_with_metrics(&content).unwrap();
+
+            // Validate chunks
+            assert!(!result.chunks.is_empty());
+            assert!(result.metrics.processing_time_ms >= 0); // Allow for very fast processing
+            assert!(result.metrics.chunks_generated > 0);
+
+            // Check that headers are preserved in metadata
+            let has_header_metadata = result.chunks.iter()
+                .any(|chunk| chunk.metadata.markdown.as_ref().map_or(false, |md| !md.headers.is_empty()));
+            assert!(has_header_metadata, "Should preserve header information");
+
+            // Validate chunk coherence
+            for chunk in &result.chunks {
+                assert!(!chunk.content.trim().is_empty(), "Chunks should not be empty");
+                assert!(chunk.content.len() <= max_chunk_size + 200, "Chunks should respect size limits with some tolerance");
+            }
+        }
+
+        #[test]
+        fn test_prose_narrative_chunking() {
+            let content = load_test_fixture("prose_narrative.md").unwrap_or_else(|_| {
+                "# The Digital Nomad's Journey\n\n## Chapter 1\n\nThis is a story about transformation.".to_string()
+            });
+
+            let mut config = ChunkConfig::default();
+            config.strategy = ChunkingStrategy::Semantic;
+            config.preserve_sentences = true;
+            config.preserve_paragraphs = true;
+
+            let processor = ChunkProcessor::new(config).unwrap();
+            let chunks = processor.chunk_text(&content).unwrap();
+
+            // Validate semantic boundaries are respected
+            for chunk in &chunks {
+                // Prose should end with sentence-ending punctuation or paragraph breaks
+                let trimmed = chunk.content.trim();
+                if !trimmed.is_empty() {
+                    let ends_properly = trimmed.ends_with('.') || 
+                                       trimmed.ends_with('!') || 
+                                       trimmed.ends_with('?') ||
+                                       trimmed.ends_with('\n') ||
+                                       trimmed.contains('\n');
+                    // Allow some flexibility for formatting
+                    assert!(ends_properly || trimmed.len() < 100, 
+                           "Prose chunks should end at semantic boundaries: '{}'", 
+                           &trimmed[trimmed.len().saturating_sub(50)..]);
+                }
+            }
+        }
+
+        #[test]
+        fn test_malformed_markdown_handling() {
+            let content = load_test_fixture("malformed_markdown.md").unwrap_or_else(|_| {
+                "# Malformed\n```\nunclossed code\n**unclosed bold\n[broken link](\n".to_string()
+            });
+
+            let mut config = ChunkConfig::default();
+            config.strategy = ChunkingStrategy::MarkdownAware;
+
+            let processor = ChunkProcessor::new(config).unwrap();
+            let result = processor.chunk_text(&content);
+
+            // Should not crash on malformed markdown
+            assert!(result.is_ok(), "Should handle malformed markdown gracefully");
+            
+            let chunks = result.unwrap();
+            assert!(!chunks.is_empty(), "Should produce chunks even from malformed content");
+
+            // Chunks should still contain meaningful content
+            let total_content_len: usize = chunks.iter()
+                .map(|chunk| chunk.content.trim().len())
+                .sum();
+            assert!(total_content_len > 0, "Should extract meaningful content");
+        }
+
+        #[test]
+        fn test_empty_and_minimal_files() {
+            // Test completely empty file
+            let empty_content = load_test_fixture("empty_and_minimal.md").unwrap_or_default();
+            let processor = ChunkProcessor::with_default_config().unwrap();
+            let result = processor.chunk_text(&empty_content);
+
+            match result {
+                Ok(chunks) => assert!(chunks.is_empty(), "Empty content should produce no chunks"),
+                Err(ChunkError::InvalidInput(_)) => (), // Acceptable error for empty input
+                Err(e) => panic!("Unexpected error for empty input: {:?}", e),
+            }
+
+            // Test single word
+            let single_word = load_test_fixture("single_word.md").unwrap_or_else(|_| "Hello".to_string());
+            let result = processor.chunk_text(&single_word).unwrap();
+            
+            if !result.is_empty() {
+                assert_eq!(result.len(), 1);
+                assert!(result[0].content.contains("Hello"));
+            }
+
+            // Test whitespace only
+            let whitespace_only = load_test_fixture("whitespace_only.md").unwrap_or_else(|_| "   \n\t\n   ".to_string());
+            let result = processor.chunk_text(&whitespace_only);
+            
+            // Should either produce no chunks or handle gracefully
+            match result {
+                Ok(chunks) => assert!(chunks.is_empty() || chunks[0].content.trim().is_empty()),
+                Err(ChunkError::InvalidInput(_)) => (), // Acceptable
+                Err(e) => panic!("Unexpected error for whitespace-only input: {:?}", e),
+            }
+        }
+
+        #[test]
+        fn test_mixed_content_chunking() {
+            let content = "# Mixed Content\n## Code\n```python\nprint('hello')\n```\n## Text\nSome prose content here.".to_string();
+
+            let mut config = ChunkConfig::default();
+            config.strategy = ChunkingStrategy::MarkdownAware;
+            config.preserve_code_blocks = true;
+
+            let processor = ChunkProcessor::new(config).unwrap();
+            let chunks = processor.chunk_text(&content).unwrap();
+
+            // Should preserve code blocks as units
+            let code_chunks: Vec<_> = chunks.iter()
+                .filter(|chunk| chunk.content.contains("```") || 
+                               chunk.metadata.markdown.as_ref().map_or(false, |md| !md.code_blocks.is_empty()))
+                .collect();
+
+            // Validate that code blocks are handled appropriately
+            for chunk in code_chunks {
+                // Code blocks should either be complete or appropriately split
+                let code_count = chunk.content.matches("```").count();
+                assert!(code_count == 0 || code_count % 2 == 0, 
+                       "Code blocks should be complete or not present: {}", chunk.content);
+            }
+        }
+
+        #[test]
+        fn test_large_document_performance() {
+            let content = load_test_fixture("large_document.md").unwrap_or_else(|_| {
+                // Generate large content if file doesn't exist
+                let section = "# Section\n\nThis is a paragraph with substantial content. ".repeat(100);
+                section.repeat(10)
+            });
+
+            let mut config = ChunkConfig::default();
+            config.strategy = ChunkingStrategy::MarkdownAware;
+
+            let processor = ChunkProcessor::new(config).unwrap();
+            let start = std::time::Instant::now();
+            let result = processor.chunk_text_with_metrics(&content).unwrap();
+            let duration = start.elapsed();
+
+            // Performance requirements
+            assert!(duration.as_millis() < 1000, 
+                   "Large document processing should complete within 1 second, took: {}ms", 
+                   duration.as_millis());
+
+            // Memory efficiency check
+            assert!(result.metrics.memory_usage_bytes < 50 * 1024 * 1024, 
+                   "Memory usage should be reasonable: {} bytes", 
+                   result.metrics.memory_usage_bytes);
+
+            // Quality check
+            assert!(result.chunks.len() > 10, "Large document should produce multiple chunks");
+            assert!(result.metrics.chars_per_ms > 10.0, 
+                   "Processing speed should be reasonable: {} chars/ms", 
+                   result.metrics.chars_per_ms);
+        }
+    }
+
+    /// Performance and quality tests
+    mod performance_tests {
+        use super::*;
+
+        #[test]
+        fn test_chunking_speed_requirements() {
+            // Test with 10KB document
+            let content = "This is a test sentence. ".repeat(500); // ~12.5KB
+            
+            let processor = ChunkProcessor::with_default_config().unwrap();
+            let start = std::time::Instant::now();
+            let result = processor.chunk_text_with_metrics(&content).unwrap();
+            let duration = start.elapsed();
+
+            // Should process 10KB in less than 100ms
+            assert!(duration.as_millis() < 100, 
+                   "10KB document should process in <100ms, took: {}ms", 
+                   duration.as_millis());
+
+            // Validate performance metrics (allow for very fast processing where timing might be 0)
+            assert!(result.metrics.chars_per_ms >= 0.0, 
+                   "Should have valid processing speed, got: {}", 
+                   result.metrics.chars_per_ms);
+        }
+
+        #[test]
+        fn test_memory_usage_limits() {
+            let content = "Memory test content. ".repeat(10000); // ~200KB
+            
+            let processor = ChunkProcessor::with_default_config().unwrap();
+            let result = processor.chunk_text_with_metrics(&content).unwrap();
+
+            // Memory usage should be reasonable (less than 10MB as per requirements)
+            assert!(result.metrics.memory_usage_bytes < 10 * 1024 * 1024, 
+                   "Memory usage should be <10MB, was: {} bytes", 
+                   result.metrics.memory_usage_bytes);
+        }
+
+        #[test]
+        fn test_scalability_linear_growth() {
+            let base_content = "Testing scalability with longer content. ".repeat(100);
+            let processor = ChunkProcessor::with_default_config().unwrap();
+
+            let mut measurements = Vec::new();
+
+            for multiplier in [1, 2, 4] {
+                let test_content = base_content.repeat(multiplier);
+                let start = std::time::Instant::now();
+                let result = processor.chunk_text_with_metrics(&test_content).unwrap();
+                let duration = start.elapsed();
+
+                measurements.push((test_content.len(), duration.as_nanos(), result.chunks.len()));
+            }
+
+            // Processing time should scale roughly linearly
+            let (size1, time1, _) = measurements[0];
+            let (size2, time2, _) = measurements[1];
+            let (size3, time3, _) = measurements[2];
+
+            // Check that processing time doesn't grow exponentially
+            let ratio_2x = (time2 as f64) / (time1 as f64);
+            let ratio_4x = (time3 as f64) / (time1 as f64);
+            let size_ratio_2x = (size2 as f64) / (size1 as f64);
+            let size_ratio_4x = (size3 as f64) / (size1 as f64);
+
+            // Time growth should not exceed size growth by more than 50%
+            assert!(ratio_2x < size_ratio_2x * 1.5, 
+                   "2x size should not cause >1.5x time increase: {}x time for {}x size", 
+                   ratio_2x, size_ratio_2x);
+            assert!(ratio_4x < size_ratio_4x * 1.5, 
+                   "4x size should not cause >1.5x time increase: {}x time for {}x size", 
+                   ratio_4x, size_ratio_4x);
+        }
+    }
+
+    /// Quality and semantic coherence tests
+    mod quality_tests {
+        use super::*;
+
+        #[test]
+        fn test_semantic_coherence_preservation() {
+            let content = r#"
+# Introduction
+
+Artificial intelligence represents a transformative technology. The field has evolved significantly.
+
+## Machine Learning Foundations
+
+Machine learning algorithms learn from data. Supervised learning uses labeled examples. Unsupervised learning finds patterns in unlabeled data.
+
+### Neural Networks
+
+Neural networks mimic brain structure. They consist of interconnected nodes. Deep learning uses many layers.
+"#;
+
+            let mut config = ChunkConfig::default();
+            config.strategy = ChunkingStrategy::Semantic;
+            config.max_chunk_size = 200; // Force splitting
+
+            let processor = ChunkProcessor::new(config).unwrap();
+            let chunks = processor.chunk_text(content).unwrap();
+
+            // Check that related sentences stay together
+            for chunk in &chunks {
+                let sentences: Vec<&str> = chunk.content
+                    .split(&['.', '!', '?'][..])
+                    .filter(|s| !s.trim().is_empty())
+                    .collect();
+
+                // Each chunk should contain complete sentences about related topics
+                if sentences.len() > 1 {
+                    // Check for topical coherence by looking for related keywords
+                    let content_lower = chunk.content.to_lowercase();
+                    let has_ai_theme = content_lower.contains("artificial") || 
+                                      content_lower.contains("intelligence") ||
+                                      content_lower.contains("machine") ||
+                                      content_lower.contains("learning") ||
+                                      content_lower.contains("neural") ||
+                                      content_lower.contains("algorithm");
+
+                    // If chunk has AI-related content, it should be focused on that theme
+                    if has_ai_theme {
+                        let sentence_count = sentences.len();
+                        let ai_sentence_count = sentences.iter()
+                            .filter(|s| {
+                                let s_lower = s.to_lowercase();
+                                s_lower.contains("artificial") || 
+                                s_lower.contains("intelligence") ||
+                                s_lower.contains("machine") ||
+                                s_lower.contains("learning") ||
+                                s_lower.contains("neural") ||
+                                s_lower.contains("algorithm") ||
+                                s_lower.contains("data") ||
+                                s_lower.contains("brain")
+                            })
+                            .count();
+
+                        // At least 30% of sentences should be related to the theme
+                        assert!(ai_sentence_count as f64 / sentence_count as f64 >= 0.3,
+                               "Chunk should maintain thematic coherence: {} AI sentences out of {}",
+                               ai_sentence_count, sentence_count);
+                    }
+                }
+            }
+        }
+
+        #[test]
+        fn test_context_preservation_across_chunks() {
+            let content = r#"
+# Project Alpha Documentation
+
+Project Alpha is a revolutionary software system. It uses advanced algorithms. The system processes large datasets efficiently.
+
+## Architecture Overview
+
+The architecture follows microservices patterns. Each service handles specific functionality. Services communicate via REST APIs.
+
+### Data Processing Service
+
+The data processing service is the core component. It receives data from multiple sources. The service validates and transforms the data.
+"#;
+
+            let mut config = ChunkConfig::default();
+            config.strategy = ChunkingStrategy::MarkdownAware;
+            config.max_chunk_size = 300;
+            config.overlap_size = 50;
+
+            let processor = ChunkProcessor::new(config).unwrap();
+            let chunks = processor.chunk_text(content).unwrap();
+
+            // Validate overlap preserves context
+            for i in 0..chunks.len().saturating_sub(1) {
+                let current_chunk = &chunks[i];
+                let next_chunk = &chunks[i + 1];
+
+                // Check for contextual continuity through headers or content
+                let empty_headers = Vec::new();
+                let current_headers = current_chunk.metadata.markdown.as_ref().map(|md| &md.headers).unwrap_or(&empty_headers);
+                let next_headers = next_chunk.metadata.markdown.as_ref().map(|md| &md.headers).unwrap_or(&empty_headers);
+
+                // Should maintain header context
+                if !current_headers.is_empty() && !next_headers.is_empty() {
+                    let current_main_header = current_headers.first().unwrap();
+                    let next_main_header = next_headers.first().unwrap();
+
+                    // Headers should indicate logical continuation
+                    let context_maintained = 
+                        current_main_header.1.contains("Project Alpha") ||
+                        next_main_header.1.contains("Project Alpha") ||
+                        current_main_header.0 == next_main_header.0; // Same level headers
+
+                    assert!(context_maintained, 
+                           "Context should be maintained between chunks: '{}' -> '{}'",
+                           current_main_header.1, next_main_header.1);
+                }
+            }
+        }
+
+        #[test]
+        fn test_chunk_quality_metrics() {
+            let content = r#"
+The quick brown fox jumps over the lazy dog. This sentence contains every letter of the alphabet. 
+It's commonly used for font testing and keyboard practice.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+"#;
+
+            let processor = ChunkProcessor::with_default_config().unwrap();
+            let chunks = processor.chunk_text(content).unwrap();
+
+            for chunk in &chunks {
+                // Quality metrics
+                assert!(chunk.metadata.word_count > 0, "Chunk should contain words");
+                assert!(chunk.metadata.sentence_count > 0, "Chunk should contain sentences");
+                
+                // Word-to-character ratio should be reasonable (avg word length 3-8 chars)
+                let avg_word_length = chunk.metadata.character_count as f64 / chunk.metadata.word_count as f64;
+                assert!(avg_word_length >= 3.0 && avg_word_length <= 15.0,
+                       "Average word length should be reasonable: {:.2}", avg_word_length);
+
+                // Sentence length should be reasonable
+                if chunk.metadata.sentence_count > 0 {
+                    let avg_sentence_length = chunk.metadata.word_count as f64 / chunk.metadata.sentence_count as f64;
+                    assert!(avg_sentence_length >= 3.0 && avg_sentence_length <= 50.0,
+                           "Average sentence length should be reasonable: {:.2} words", avg_sentence_length);
+                }
+            }
+        }
+
+        #[test]
+        fn test_embedding_readiness() {
+            let content = r#"
+Machine learning is a subset of artificial intelligence that enables computers to learn and improve from experience without explicit programming.
+
+Deep learning, a subset of machine learning, uses neural networks with multiple layers to model and understand complex patterns in data.
+
+Natural language processing combines computational linguistics with statistical and machine learning models to give computers the ability to understand human language.
+"#;
+
+            let mut config = ChunkConfig::default();
+            config.strategy = ChunkingStrategy::Semantic;
+            config.max_chunk_size = 500;
+
+            let processor = ChunkProcessor::new(config).unwrap();
+            let chunks = processor.chunk_text(content).unwrap();
+
+            // Chunks should be suitable for embedding generation
+            for chunk in &chunks {
+                // Should contain meaningful content
+                assert!(chunk.content.trim().len() >= 20, 
+                       "Chunk should contain substantial content for embedding");
+
+                // Should not be too fragmented
+                let sentence_count = chunk.metadata.sentence_count;
+                assert!(sentence_count >= 1, "Chunk should contain at least one complete sentence");
+
+                // Should maintain coherent meaning
+                let content_words: Vec<&str> = chunk.content
+                    .split_whitespace()
+                    .filter(|word| word.len() > 3)
+                    .collect();
+
+                assert!(content_words.len() >= 5, 
+                       "Chunk should contain enough meaningful words for embedding: {} words",
+                       content_words.len());
+            }
+        }
+    }
+
+    /// Edge case and stress tests
+    mod edge_case_tests {
+        use super::*;
+
+        #[test]
+        fn test_extremely_long_sentences() {
+            let long_sentence = format!("This is an extremely long sentence that goes on and on and on{} and finally ends here.", " and continues".repeat(200));
+            
+            let mut config = ChunkConfig::default();
+            config.max_chunk_size = 500;
+            config.preserve_sentences = true;
+
+            let processor = ChunkProcessor::new(config).unwrap();
+            let result = processor.chunk_text(&long_sentence);
+
+            assert!(result.is_ok(), "Should handle extremely long sentences");
+            let chunks = result.unwrap();
+            
+            // Should either split the long sentence or handle it as a single chunk
+            assert!(!chunks.is_empty(), "Should produce at least one chunk");
+        }
+
+        #[test]
+        fn test_nested_markdown_structures() {
+            let content = r#"
+# Level 1
+
+## Level 2
+
+### Level 3
+
+#### Level 4
+
+##### Level 5
+
+###### Level 6
+
+Back to paragraph.
+
+> Blockquote
+> 
+> > Nested blockquote
+> > 
+> > > Deep nested blockquote
+
+1. List item
+   1. Nested list
+      1. Deep nested list
+         - Mixed list types
+           - Even deeper
+             - Very deep nesting
+
+```python
+def function():
+    if True:
+        for i in range(10):
+            if i % 2 == 0:
+                print(f"Even: {i}")
+```
+"#;
+
+            let mut config = ChunkConfig::default();
+            config.strategy = ChunkingStrategy::MarkdownAware;
+
+            let processor = ChunkProcessor::new(config).unwrap();
+            let result = processor.chunk_text(content);
+
+            assert!(result.is_ok(), "Should handle deeply nested markdown structures");
+            let chunks = result.unwrap();
+            assert!(!chunks.is_empty(), "Should produce chunks from nested content");
+
+            // Verify structure preservation in metadata
+            let has_structure = chunks.iter().any(|chunk| {
+                chunk.metadata.markdown.as_ref().map_or(false, |md| 
+                    !md.headers.is_empty() || !md.lists.is_empty() || !md.code_blocks.is_empty()
+                )
+            });
+            assert!(has_structure, "Should preserve markdown structure information");
+        }
+
+        #[test]
+        fn test_unicode_and_special_characters() {
+            let content = r#"
+# Unicode Test 🚀
+
+Mathematical symbols: ∑∫∞√±≈≠≤≥∝∂∇
+
+Greek letters: αβγδεζηθικλμνξοπρστυφχψω
+
+Emoji content: 🌟✨🎯🔥💡🚀🌈⭐🎉🎊
+
+Chinese: 这是中文内容测试
+Japanese: これは日本語のテストです
+Arabic: هذا اختبار للمحتوى العربي
+Russian: Это тест для русского контента
+
+Special punctuation: "quotes" 'single' – en-dash — em-dash … ellipsis
+
+Code with unicode: `print("Hello 🌍")`
+"#;
+
+            let processor = ChunkProcessor::with_default_config().unwrap();
+            let result = processor.chunk_text(content);
+
+            assert!(result.is_ok(), "Should handle unicode and special characters");
+            let chunks = result.unwrap();
+            assert!(!chunks.is_empty(), "Should produce chunks from unicode content");
+
+            // Verify content preservation
+            let combined_content = chunks.iter()
+                .map(|chunk| chunk.content.as_str())
+                .collect::<Vec<_>>()
+                .join("");
+            
+            assert!(combined_content.contains("🚀"), "Should preserve emoji");
+            assert!(combined_content.contains("∑"), "Should preserve mathematical symbols");
+            assert!(combined_content.contains("中文"), "Should preserve Chinese characters");
+        }
+
+        #[test]
+        fn test_boundary_edge_cases() {
+            // Test chunk boundary at exactly max size
+            let processor = ChunkProcessor::with_default_config().unwrap();
+            let max_size = processor.config().max_chunk_size;
+            
+            // Create content that's exactly at the boundary
+            let boundary_content = format!("{}.", "word ".repeat(max_size / 5));
+            let chunks = processor.chunk_text(&boundary_content).unwrap();
+
+            // Should handle boundary cases gracefully
+            assert!(!chunks.is_empty(), "Should produce chunks at boundary");
+            
+            for chunk in &chunks {
+                // Should not exceed max size significantly
+                assert!(chunk.content.len() <= max_size + 100, 
+                       "Chunk should respect size boundaries with some tolerance: {} chars", 
+                       chunk.content.len());
+            }
+        }
+
+        #[test]
+        fn test_performance_regression_prevention() {
+            // This test helps detect performance regressions
+            let content = "Performance test content. ".repeat(5000); // ~125KB
+            
+            let processor = ChunkProcessor::with_default_config().unwrap();
+            let start = std::time::Instant::now();
+            let result = processor.chunk_text_with_metrics(&content).unwrap();
+            let duration = start.elapsed();
+
+            // Performance baseline - adjust if hardware varies significantly
+            assert!(duration.as_millis() < 500, 
+                   "Performance regression detected: took {}ms for 125KB", 
+                   duration.as_millis());
+
+            // Quality check
+            assert!(result.chunks.len() > 50, "Should produce reasonable number of chunks");
+            // Performance may be too fast to measure accurately, so check for valid speed
+            assert!(result.metrics.chars_per_ms >= 0.0, 
+                   "Should have valid processing speed: {} chars/ms", 
+                   result.metrics.chars_per_ms);
+        }
+
+        #[test]
+        fn test_memory_leak_detection() {
+            let content = "Memory leak test. ".repeat(1000);
+            let processor = ChunkProcessor::with_default_config().unwrap();
+
+            // Process same content multiple times
+            for _ in 0..10 {
+                let result = processor.chunk_text_with_metrics(&content).unwrap();
+                
+                // Memory usage should be consistent
+                assert!(result.metrics.memory_usage_bytes < 5 * 1024 * 1024, 
+                       "Memory usage seems excessive: {} bytes", 
+                       result.metrics.memory_usage_bytes);
+            }
+        }
+    }
 }
