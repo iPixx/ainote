@@ -469,6 +469,36 @@ input, textarea {
   border-bottom-color: var(--color-warning);
 }
 
+/* AI Panel Activation States */
+.ai-panel.ai-panel-activated {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+  transition: all var(--transition-normal);
+}
+
+.ai-panel.ai-panel-deactivated {
+  opacity: 0.7;
+  visibility: visible;
+  transform: translateX(10px);
+  transition: all var(--transition-normal);
+}
+
+.ai-panel.ai-panel-visible {
+  display: flex !important;
+}
+
+.ai-panel.ai-panel-hidden {
+  display: none !important;
+}
+
+/* AI Panel Show/Hide Animation */
+.ai-panel {
+  transition: opacity var(--transition-normal), 
+              transform var(--transition-normal), 
+              visibility var(--transition-normal);
+}
+
 /* ===============================
    Resize Handles
    =============================== */
