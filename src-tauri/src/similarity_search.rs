@@ -95,15 +95,33 @@ pub struct SearchConfig {
     pub early_termination: bool,
     /// Pre-normalize query vectors for faster computation
     pub normalize_query: bool,
+    /// Enable diversity filtering to avoid clustered suggestions
+    pub enable_diversity_filter: bool,
+    /// Minimum cosine distance between results for diversity filtering
+    pub diversity_threshold: f32,
+    /// Enable recency weighting in ranking algorithm
+    pub enable_recency_weighting: bool,
+    /// Recency weight factor (0.0 = no recency boost, 1.0 = strong recency boost)
+    pub recency_weight: f32,
+    /// Current file path to exclude from results (context filtering)
+    pub exclude_current_file: Option<String>,
+    /// Recently suggested file paths to exclude (context filtering)
+    pub exclude_recent_suggestions: Vec<String>,
 }
 
 impl Default for SearchConfig {
     fn default() -> Self {
         Self {
-            min_threshold: 0.0,    // No filtering by default
-            max_results: 50,       // Default max as per requirements
+            min_threshold: 0.3,    // Filter below 0.3 threshold as per requirements
+            max_results: 10,       // Default to 10 results as per requirements
             early_termination: true,
             normalize_query: true,
+            enable_diversity_filter: true,  // Enable diversity filtering by default
+            diversity_threshold: 0.95,      // Require 5% difference between similar results
+            enable_recency_weighting: true, // Enable recency weighting by default
+            recency_weight: 0.1,           // Modest recency boost (10% factor)
+            exclude_current_file: None,     // No exclusions by default
+            exclude_recent_suggestions: Vec::new(), // No recent exclusions by default
         }
     }
 }
@@ -815,19 +833,31 @@ impl SimilaritySearch {
         }
         
         // ==================================================================================
-        // STEP 7: RESULT COLLECTION AND SORTING
+        // STEP 7: RESULT COLLECTION AND ENHANCED PROCESSING
         // ==================================================================================
         
         // Convert heap to sorted vector (highest similarity first)
         let mut results: Vec<SearchResult> = result_heap.into_vec();
         
-        // Sort results by similarity in descending order (highest first)
-        // Note: BinaryHeap doesn't guarantee order when converted to Vec
+        // Apply context filtering (exclude current file and recent suggestions)
+        results = Self::apply_context_filtering(results, config);
+        
+        // Apply recency weighting if enabled
+        if config.enable_recency_weighting {
+            results = Self::apply_recency_weighting(results, config);
+        }
+        
+        // Sort results by final score (similarity + recency boost if applied)
         results.sort_by(|a, b| {
             b.similarity
                 .partial_cmp(&a.similarity)
                 .unwrap_or(Ordering::Equal)
         });
+        
+        // Apply diversity filtering if enabled
+        if config.enable_diversity_filter {
+            results = Self::apply_diversity_filtering(results, config);
+        }
         
         // Apply final result count limit if specified
         if config.max_results > 0 && results.len() > config.max_results {
@@ -1081,13 +1111,27 @@ impl SimilaritySearch {
                 Ok(())
             })?;
         
-        // Extract and sort final results
+        // Extract and apply enhanced processing to final results
         let heap = global_heap.lock().unwrap();
         let mut results: Vec<SearchResult> = heap.clone().into_vec();
         
+        // Apply context filtering (exclude current file and recent suggestions)
+        results = Self::apply_context_filtering(results, config);
+        
+        // Apply recency weighting if enabled
+        if config.enable_recency_weighting {
+            results = Self::apply_recency_weighting(results, config);
+        }
+        
+        // Sort results by final score (similarity + recency boost if applied)
         results.sort_by(|a, b| {
             b.similarity.partial_cmp(&a.similarity).unwrap_or(Ordering::Equal)
         });
+        
+        // Apply diversity filtering if enabled
+        if config.enable_diversity_filter {
+            results = Self::apply_diversity_filtering(results, config);
+        }
         
         // Apply final result limit
         if config.max_results > 0 && results.len() > config.max_results {
@@ -1340,6 +1384,133 @@ impl SimilaritySearch {
         let metadata_size = results.len() * 256; // Rough estimate for metadata
         
         result_size + vector_size + metadata_size
+    }
+    
+    /// Apply context filtering to exclude current file and recent suggestions
+    /// 
+    /// This function removes search results that match:
+    /// - The currently open file (to avoid suggesting the same file being edited)
+    /// - Recently suggested files (to provide fresh suggestions)
+    /// 
+    /// This helps ensure suggestions are contextually relevant and avoid redundancy.
+    fn apply_context_filtering(mut results: Vec<SearchResult>, config: &SearchConfig) -> Vec<SearchResult> {
+        // Filter out current file if specified
+        if let Some(current_file) = &config.exclude_current_file {
+            results.retain(|result| &result.entry.metadata.file_path != current_file);
+        }
+        
+        // Filter out recently suggested files if specified
+        if !config.exclude_recent_suggestions.is_empty() {
+            results.retain(|result| {
+                !config.exclude_recent_suggestions.contains(&result.entry.metadata.file_path)
+            });
+        }
+        
+        results
+    }
+    
+    /// Apply recency weighting to boost newer content in ranking
+    /// 
+    /// This function enhances the similarity scores by adding a recency bonus
+    /// based on when the content was last modified. More recent content gets
+    /// a higher ranking boost, making it more likely to appear in search results.
+    /// 
+    /// The recency boost is calculated as:
+    /// `boost = recency_weight * (1 - age_factor)`
+    /// 
+    /// Where age_factor is normalized from 0 (newest) to 1 (oldest) based on
+    /// the age spread in the current result set.
+    fn apply_recency_weighting(mut results: Vec<SearchResult>, config: &SearchConfig) -> Vec<SearchResult> {
+        if results.is_empty() || config.recency_weight == 0.0 {
+            return results;
+        }
+        
+        // Get current timestamp
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        
+        // Find the age range in the current results
+        let timestamps: Vec<u64> = results.iter()
+            .map(|r| r.entry.metadata.updated_at)
+            .collect();
+        
+        let newest = timestamps.iter().max().copied().unwrap_or(now);
+        let oldest = timestamps.iter().min().copied().unwrap_or(now);
+        let age_range = (newest - oldest) as f32;
+        
+        // Apply recency boost to each result
+        for result in &mut results {
+            if age_range > 0.0 {
+                // Calculate age factor (0.0 = newest, 1.0 = oldest)
+                let age = (newest - result.entry.metadata.updated_at) as f32;
+                let age_factor = age / age_range;
+                
+                // Calculate recency boost
+                let recency_boost = config.recency_weight * (1.0 - age_factor);
+                
+                // Apply boost to similarity score (clamped to [0, 1] range)
+                result.similarity = (result.similarity + recency_boost).min(1.0);
+            }
+        }
+        
+        results
+    }
+    
+    /// Apply diversity filtering to reduce clustered suggestions
+    /// 
+    /// This function removes results that are too similar to already selected ones,
+    /// ensuring the final suggestion list covers diverse topics rather than
+    /// clustering around a single theme.
+    /// 
+    /// The algorithm works by:
+    /// 1. Starting with the highest-scored result
+    /// 2. For each subsequent result, checking if it's sufficiently different
+    ///    from all previously selected results
+    /// 3. Only keeping results that exceed the diversity threshold
+    /// 
+    /// This helps users discover a broader range of related content.
+    fn apply_diversity_filtering(results: Vec<SearchResult>, config: &SearchConfig) -> Vec<SearchResult> {
+        if results.is_empty() || !config.enable_diversity_filter {
+            return results;
+        }
+        
+        let mut diverse_results: Vec<SearchResult> = Vec::new();
+        
+        for candidate in results {
+            let mut is_diverse = true;
+            
+            // Check if candidate is sufficiently different from already selected results
+            for selected in &diverse_results {
+                // Calculate cosine similarity between the candidate and selected result
+                match Self::cosine_similarity(&candidate.entry.vector, &selected.entry.vector) {
+                    Ok(similarity) => {
+                        // If similarity is too high (above diversity threshold), skip this candidate
+                        if similarity >= config.diversity_threshold {
+                            is_diverse = false;
+                            break;
+                        }
+                    }
+                    Err(_) => {
+                        // If we can't calculate similarity, err on the side of inclusion
+                        continue;
+                    }
+                }
+            }
+            
+            // If the candidate is sufficiently diverse, add it to results
+            if is_diverse {
+                diverse_results.push(candidate);
+            }
+            
+            // Stop if we have enough diverse results
+            if config.max_results > 0 && diverse_results.len() >= config.max_results {
+                break;
+            }
+        }
+        
+        diverse_results
     }
     
     /// Comprehensive performance benchmark for similarity search operations
@@ -1889,6 +2060,12 @@ mod tests {
             max_results: 2,
             early_termination: false,  // Don't terminate early in tests
             normalize_query: false,   // Test standard cosine similarity
+            enable_diversity_filter: false, // Disable for this test
+            diversity_threshold: 0.95,
+            enable_recency_weighting: false, // Disable for this test
+            recency_weight: 0.0,
+            exclude_current_file: None,
+            exclude_recent_suggestions: Vec::new(),
         };
         let results = SimilaritySearch::k_nearest_neighbors(&query, &entries, 2, &config).unwrap();
         
@@ -1969,7 +2146,10 @@ mod tests {
             create_test_entry(vec![0.8, 0.6], "file4.md", "chunk1"), // Similarity = 0.8
         ];
         
-        let config = SearchConfig::default();
+        let config = SearchConfig {
+            enable_diversity_filter: false, // Disable for this test to get all results
+            ..SearchConfig::default()
+        };
         let results = SimilaritySearch::threshold_search(&query, &entries, 0.7, &config).unwrap();
         
         // Should return 3 results above threshold 0.7
@@ -2013,5 +2193,209 @@ mod tests {
         
         // Test range: -1.0 <= similarity <= 1.0
         assert!(sim_ab >= -1.0 && sim_ab <= 1.0);
+    }
+    
+    #[test]
+    fn test_context_filtering() {
+        let entries = vec![
+            create_test_entry(vec![1.0, 0.0], "current_file.md", "chunk1"),
+            create_test_entry(vec![0.9, 0.1], "recent_suggestion.md", "chunk1"),
+            create_test_entry(vec![0.8, 0.2], "other_file.md", "chunk1"),
+        ];
+        
+        let results: Vec<SearchResult> = entries.into_iter()
+            .map(|entry| SearchResult { 
+                entry, 
+                similarity: 0.9 
+            })
+            .collect();
+        
+        let config = SearchConfig {
+            exclude_current_file: Some("current_file.md".to_string()),
+            exclude_recent_suggestions: vec!["recent_suggestion.md".to_string()],
+            ..SearchConfig::default()
+        };
+        
+        let filtered = SimilaritySearch::apply_context_filtering(results, &config);
+        
+        // Should only keep "other_file.md"
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].entry.metadata.file_path, "other_file.md");
+    }
+    
+    #[test]
+    fn test_recency_weighting() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let old_time = now - 3600; // 1 hour ago
+        let new_time = now - 60;   // 1 minute ago
+        
+        // Create entries with different timestamps
+        let mut old_entry = create_test_entry(vec![1.0, 0.0], "old_file.md", "chunk1");
+        old_entry.metadata.updated_at = old_time;
+        
+        let mut new_entry = create_test_entry(vec![0.9, 0.1], "new_file.md", "chunk1");
+        new_entry.metadata.updated_at = new_time;
+        
+        let results = vec![
+            SearchResult { entry: old_entry, similarity: 0.9 },
+            SearchResult { entry: new_entry, similarity: 0.8 }, // Lower base similarity
+        ];
+        
+        let config = SearchConfig {
+            enable_recency_weighting: true,
+            recency_weight: 0.2, // 20% boost for newer content
+            ..SearchConfig::default()
+        };
+        
+        let weighted = SimilaritySearch::apply_recency_weighting(results, &config);
+        
+        // The newer file should get a recency boost
+        assert!(weighted[1].similarity > 0.8); // Should be boosted
+        // The older file should remain unchanged (it was already the newest in range)
+        assert_eq!(weighted[0].similarity, 0.9);
+    }
+    
+    #[test]
+    fn test_diversity_filtering() {
+        // Create very similar vectors (high similarity)
+        let entries = vec![
+            create_test_entry(vec![1.0, 0.0, 0.0], "file1.md", "chunk1"),
+            create_test_entry(vec![0.99, 0.01, 0.0], "file2.md", "chunk1"), // Very similar
+            create_test_entry(vec![0.0, 1.0, 0.0], "file3.md", "chunk1"),   // Different
+            create_test_entry(vec![0.98, 0.02, 0.0], "file4.md", "chunk1"), // Very similar to first
+        ];
+        
+        let results: Vec<SearchResult> = entries.into_iter()
+            .enumerate()
+            .map(|(i, entry)| SearchResult { 
+                entry, 
+                similarity: 0.9 - (i as f32 * 0.1) // Descending similarity
+            })
+            .collect();
+        
+        let config = SearchConfig {
+            enable_diversity_filter: true,
+            diversity_threshold: 0.95, // Require 5% difference
+            max_results: 10,
+            ..SearchConfig::default()
+        };
+        
+        let diverse = SimilaritySearch::apply_diversity_filtering(results, &config);
+        
+        // Should keep file1.md and file3.md (diverse), filter out file2.md and file4.md (too similar)
+        assert_eq!(diverse.len(), 2);
+        assert_eq!(diverse[0].entry.metadata.file_path, "file1.md");
+        assert_eq!(diverse[1].entry.metadata.file_path, "file3.md");
+    }
+    
+    #[test]
+    fn test_enhanced_search_config_defaults() {
+        let config = SearchConfig::default();
+        
+        // Verify new default values per requirements
+        assert_eq!(config.min_threshold, 0.3);
+        assert_eq!(config.max_results, 10);
+        assert!(config.enable_diversity_filter);
+        assert_eq!(config.diversity_threshold, 0.95);
+        assert!(config.enable_recency_weighting);
+        assert_eq!(config.recency_weight, 0.1);
+        assert!(config.exclude_current_file.is_none());
+        assert!(config.exclude_recent_suggestions.is_empty());
+    }
+    
+    #[test]
+    fn test_k_nearest_neighbors_with_enhancements() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let query = vec![1.0, 0.0];
+        
+        // Create diverse entries with different timestamps
+        let mut entries = vec![
+            create_test_entry(vec![1.0, 0.0], "identical.md", "chunk1"),     // Perfect match
+            create_test_entry(vec![0.99, 0.01], "very_similar.md", "chunk1"), // Very similar (should be filtered by diversity)
+            create_test_entry(vec![0.7071, 0.7071], "different.md", "chunk1"), // Different direction
+            create_test_entry(vec![0.8, 0.6], "recent.md", "chunk1"),         // Recent file
+        ];
+        
+        // Set different timestamps
+        entries[0].metadata.updated_at = now - 7200; // 2 hours ago
+        entries[1].metadata.updated_at = now - 3600; // 1 hour ago  
+        entries[2].metadata.updated_at = now - 1800; // 30 minutes ago
+        entries[3].metadata.updated_at = now - 60;   // 1 minute ago (most recent)
+        
+        let config = SearchConfig {
+            min_threshold: 0.3,
+            max_results: 3,
+            enable_diversity_filter: true,
+            diversity_threshold: 0.98, // Filter very similar results
+            enable_recency_weighting: true,
+            recency_weight: 0.1,
+            exclude_current_file: None,
+            exclude_recent_suggestions: Vec::new(),
+            ..SearchConfig::default()
+        };
+        
+        let results = SimilaritySearch::k_nearest_neighbors(&query, &entries, 5, &config).unwrap();
+        
+        // Should apply all filters and ranking enhancements
+        assert!(results.len() <= 3); // Max results limit
+        assert!(results.len() >= 2); // Should have diverse results
+        
+        // All results should be above threshold
+        for result in &results {
+            assert!(result.similarity >= 0.3);
+        }
+        
+        // Should be sorted by final score (similarity + recency)
+        for i in 1..results.len() {
+            assert!(results[i-1].similarity >= results[i].similarity);
+        }
+    }
+    
+    #[test]
+    fn test_performance_targets() {
+        use std::time::Instant;
+        
+        // Create a moderately large test dataset (100 entries)
+        let mut entries = Vec::new();
+        for i in 0..100 {
+            let vector: Vec<f32> = (0..384).map(|j| ((i * j) as f32).sin()).collect();
+            entries.push(create_test_entry(vector, &format!("file{}.md", i), "chunk1"));
+        }
+        
+        let query: Vec<f32> = (0..384).map(|i| (i as f32).cos()).collect();
+        
+        let config = SearchConfig {
+            min_threshold: 0.3,
+            max_results: 10,
+            enable_diversity_filter: true,
+            enable_recency_weighting: true,
+            ..SearchConfig::default()
+        };
+        
+        // Test similarity search performance (should be <500ms)
+        let start = Instant::now();
+        let results = SimilaritySearch::k_nearest_neighbors(&query, &entries, 10, &config).unwrap();
+        let similarity_time = start.elapsed();
+        
+        // Performance assertions
+        assert!(similarity_time.as_millis() < 500, 
+               "Similarity search took {}ms, should be <500ms", similarity_time.as_millis());
+        
+        assert!(!results.is_empty(), "Should return results");
+        assert!(results.len() <= 10, "Should respect max_results limit");
+        
+        // All results should be above threshold
+        for result in &results {
+            assert!(result.similarity >= 0.3, "Result below threshold: {}", result.similarity);
+        }
+        
+        println!("✅ Performance test passed:");
+        println!("   - Similarity search: {}ms (target: <500ms)", similarity_time.as_millis());
+        println!("   - Results returned: {} (target: ≤10)", results.len());
+        println!("   - Memory usage estimate: ~{}KB", results.len() * 1024 / 1000); // Rough estimate
     }
 }

@@ -457,6 +457,12 @@ impl SearchEngine {
             max_results: config.max_results,
             early_termination: config.enable_early_termination,
             normalize_query: config.normalize_query,
+            enable_diversity_filter: false,  // Disabled for basic search commands
+            diversity_threshold: 0.95,
+            enable_recency_weighting: false, // Disabled for basic search commands
+            recency_weight: 0.0,
+            exclude_current_file: None,
+            exclude_recent_suggestions: Vec::new(),
         };
         
         // Perform similarity search with timeout
