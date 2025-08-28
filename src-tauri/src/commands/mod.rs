@@ -82,6 +82,10 @@ pub mod ollama_commands;
 // Handles: embedding generation, batch processing, caching, and configuration
 pub mod embedding_commands;
 
+// Enhanced Embedding Queue Commands Module
+// Handles: advanced embedding queue with request queuing, cancellation, performance optimization, and real-time monitoring
+pub mod embedding_queue_commands;
+
 // Performance Commands Module
 // Handles: benchmarking, baseline management, and regression detection
 pub mod performance_commands;
@@ -121,6 +125,7 @@ pub use state_management::*;
 pub use text_processing::*;
 pub use ollama_commands::*;
 pub use embedding_commands::*;
+pub use embedding_queue_commands::*;
 pub use performance_commands::*;
 pub use search_commands::*;
 pub use incremental_commands::*;

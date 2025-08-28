@@ -40,6 +40,7 @@ use once_cell::sync::Lazy;
 use crate::ollama_client::{OllamaClient, OllamaConfig};
 use crate::embedding_generator::EmbeddingGenerator;  
 use crate::embedding_cache::EmbeddingCache;
+use crate::embedding_queue::EmbeddingQueue;
 use crate::vector_db::VectorDatabase;
 
 /// Global Ollama client instance for AI model interactions
@@ -64,6 +65,14 @@ pub static EMBEDDING_GENERATOR: Lazy<Arc<RwLock<Option<EmbeddingGenerator>>>> =
 /// computation. Includes TTL support, persistence options, and metrics
 /// tracking for cache efficiency monitoring.
 pub static EMBEDDING_CACHE: Lazy<Arc<RwLock<Option<EmbeddingCache>>>> = 
+    Lazy::new(|| Arc::new(RwLock::new(None)));
+
+/// Global embedding queue instance for advanced request management
+///
+/// Provides sophisticated queuing system for embedding requests with
+/// priority-based processing, request deduplication, cancellation support,
+/// and comprehensive performance monitoring for optimal resource usage.
+pub static EMBEDDING_QUEUE: Lazy<Arc<RwLock<Option<EmbeddingQueue>>>> = 
     Lazy::new(|| Arc::new(RwLock::new(None)));
 
 /// Global vector database instance for embedding storage and retrieval
@@ -107,6 +116,61 @@ pub async fn get_embedding_cache() -> EmbeddingCache {
             let cache = EmbeddingCache::new();
             *cache_lock = Some(cache.clone());
             cache
+        }
+    }
+}
+
+/// Helper function to get or initialize the embedding queue
+///
+/// This function uses the double-checked locking pattern to ensure
+/// thread-safe lazy initialization. If the queue doesn't exist,
+/// it creates a new one with default configuration and starts
+/// the background processing tasks.
+///
+/// # Returns
+///
+/// Returns a cloned `EmbeddingQueue` instance that can be used
+/// for queued embedding generation with advanced features.
+///
+/// # Example
+///
+/// ```rust
+/// let queue = get_embedding_queue().await;
+/// let request_id = queue.submit_request("text", "model", priority).await?;
+/// let embedding = queue.wait_for_result(request_id).await?;
+/// ```
+pub async fn get_embedding_queue() -> EmbeddingQueue {
+    let queue_lock = EMBEDDING_QUEUE.read().await;
+    if let Some(queue) = queue_lock.as_ref() {
+        queue.clone()
+    } else {
+        drop(queue_lock);
+        // Initialize queue if not exists
+        let mut queue_lock = EMBEDDING_QUEUE.write().await;
+        
+        // Double-check pattern to avoid race conditions
+        if let Some(queue) = queue_lock.as_ref() {
+            queue.clone()
+        } else {
+            // Get Ollama config from global client
+            let ollama_config = {
+                let client_lock = OLLAMA_CLIENT.read().await;
+                if let Some(client) = client_lock.as_ref() {
+                    client.get_config().clone()
+                } else {
+                    OllamaConfig::default()
+                }
+            };
+            
+            let queue = EmbeddingQueue::with_default_config(ollama_config);
+            
+            // Start the queue's background processing tasks
+            let (_processor_handle, _cleanup_handle) = queue.start().await;
+            // Note: We're not storing the handles. In a production system,
+            // you might want to store these globally to manage shutdown
+            
+            *queue_lock = Some(queue.clone());
+            queue
         }
     }
 }

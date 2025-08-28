@@ -41,6 +41,7 @@ pub mod validation;
 pub mod ollama_client;          // Ollama HTTP client and connection management
 pub mod embedding_generator;    // Embedding generation engine
 pub mod embedding_cache;        // Embedding cache management
+pub mod embedding_queue;        // Advanced embedding request queue with cancellation and performance optimization
 pub mod vector_db;             // Vector database storage and operations
 pub mod similarity_search;     // Similarity search algorithms
 pub mod text_chunker;          // Text chunking algorithms and infrastructure
@@ -78,6 +79,10 @@ pub use ollama_client::{
 };
 pub use embedding_generator::{EmbeddingGenerator, EmbeddingError, EmbeddingResult, EmbeddingConfig};
 pub use embedding_cache::{EmbeddingCache, CacheError, CacheResult, CacheConfig, CacheMetrics};
+pub use embedding_queue::{
+    EmbeddingQueue, QueueConfig, QueueMetrics, QueueError, QueueResult,
+    RequestPriority, RequestStatus, RequestId, CancellationToken as EmbeddingCancellationToken, EmbeddingRequest, EmbeddingRequestResult
+};
 pub use similarity_search::{
     SimilaritySearch, SimilarityError, SearchResult, SearchConfig, SearchMetrics, PerformanceConfig,
     EnhancedSearchResult, BenchmarkReport, ConcurrentSearchManager, GlobalSearchMetrics
@@ -175,6 +180,17 @@ pub fn run() {
             commands::embedding_commands::get_embedding_cache_config,
             commands::embedding_commands::cleanup_expired_embeddings,
             commands::embedding_commands::check_embedding_cached,
+            
+            // Enhanced Embedding Queue
+            commands::embedding_queue_commands::queue_embedding_request,
+            commands::embedding_queue_commands::queue_batch_embedding_requests,
+            commands::embedding_queue_commands::wait_for_embedding_result,
+            commands::embedding_queue_commands::get_embedding_request_status,
+            commands::embedding_queue_commands::cancel_embedding_request,
+            commands::embedding_queue_commands::get_embedding_queue_metrics,
+            commands::embedding_queue_commands::update_embedding_queue_config,
+            commands::embedding_queue_commands::get_embedding_queue_config,
+            commands::embedding_queue_commands::queue_and_wait_embedding,
             
             // Performance & Benchmarking
             commands::performance_commands::run_embedding_benchmarks,
