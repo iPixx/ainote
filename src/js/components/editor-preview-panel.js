@@ -51,6 +51,7 @@ class EditorPreviewPanel {
     // Component instances
     this.markdownEditor = null;
     this.previewRenderer = null;
+    this.contentChangeDetector = null;
     
     // UI elements
     this.editorContainer = null;
@@ -221,12 +222,102 @@ class EditorPreviewPanel {
           }
         });
         
+        // Initialize ContentChangeDetector for AI suggestions
+        this.initializeContentChangeDetector();
+        
         console.log('✅ MarkdownEditor initialized in panel');
       }).catch(error => {
         this.handleError('editor-initialization', error);
       });
     } catch (error) {
       this.handleError('editor-initialization', error);
+    }
+  }
+
+  /**
+   * Initialize content change detector for AI suggestions
+   * @private
+   */
+  initializeContentChangeDetector() {
+    try {
+      // Import ContentChangeDetector class
+      import('../services/content-change-detector.js').then(({ default: ContentChangeDetector }) => {
+        if (this.markdownEditor && this.appState) {
+          this.contentChangeDetector = new ContentChangeDetector(this.markdownEditor, this.appState);
+          
+          // Listen for content change events for AI suggestions
+          this.contentChangeDetector.addEventListener(ContentChangeDetector.EVENTS.CONTENT_CHANGE_DETECTED, (event) => {
+            this.handleAiContentChange(event);
+          });
+          
+          // Listen for performance warnings
+          this.contentChangeDetector.addEventListener(ContentChangeDetector.EVENTS.PERFORMANCE_WARNING, (event) => {
+            console.warn('📝 ContentChangeDetector performance warning:', event);
+          });
+          
+          // Listen for memory warnings  
+          this.contentChangeDetector.addEventListener(ContentChangeDetector.EVENTS.MEMORY_WARNING, (event) => {
+            console.warn('🧠 ContentChangeDetector memory warning:', event);
+          });
+          
+          // Listen for paragraph extraction events
+          this.contentChangeDetector.addEventListener(ContentChangeDetector.EVENTS.PARAGRAPH_EXTRACTED, (event) => {
+            // Emit to parent for AI panel integration
+            this.emit('paragraph_extracted', event);
+          });
+          
+          console.log('✅ ContentChangeDetector initialized for AI suggestions');
+        } else {
+          console.warn('⚠️ Cannot initialize ContentChangeDetector - missing editor or appState');
+        }
+      }).catch(error => {
+        this.handleError('content-change-detector-initialization', error);
+      });
+    } catch (error) {
+      this.handleError('content-change-detector-initialization', error);
+    }
+  }
+
+  /**
+   * Handle content changes for AI suggestion system
+   * @param {Object} event - Content change event data
+   * @private
+   */
+  handleAiContentChange(event) {
+    const { currentParagraph, contextParagraphs, cursorPosition, extractionTime, timestamp, changeId, quickUpdate } = event;
+    
+    try {
+      // Only process meaningful content changes
+      if (!currentParagraph || currentParagraph.trim().length < 10) {
+        return;
+      }
+      
+      // Emit event for AI panel to handle suggestion generation
+      this.emit('ai_content_change', {
+        currentParagraph,
+        contextParagraphs,
+        cursorPosition,
+        extractionTime,
+        timestamp,
+        changeId,
+        quickUpdate: quickUpdate || false,
+        contentLength: currentParagraph.length,
+        contextLength: contextParagraphs ? contextParagraphs.join('\n').length : 0
+      });
+      
+      // Debug logging for development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🤖 AI content change detected:', {
+          paragraphLength: currentParagraph.length,
+          contextCount: contextParagraphs ? contextParagraphs.length : 0,
+          extractionTime: extractionTime.toFixed(2) + 'ms',
+          quickUpdate
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error handling AI content change:', error);
+      this.handleError('ai-content-change', error);
     }
   }
 
@@ -1324,6 +1415,10 @@ class EditorPreviewPanel {
     if (this.previewRenderer && this.previewRenderer.destroy) {
       this.previewRenderer.destroy();
     }
+    
+    if (this.contentChangeDetector && this.contentChangeDetector.destroy) {
+      this.contentChangeDetector.destroy();
+    }
 
     // Clear DOM
     if (this.container) {
@@ -1333,6 +1428,7 @@ class EditorPreviewPanel {
     // Clear references
     this.markdownEditor = null;
     this.previewRenderer = null;
+    this.contentChangeDetector = null;
     this.container = null;
     this.appState = null;
     this.isInitialized = false;
