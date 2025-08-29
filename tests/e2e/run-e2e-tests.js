@@ -339,11 +339,22 @@ class E2ETestRunner {
     const startTime = Date.now();
     
     return new Promise((resolve) => {
-      const child = spawn(command, args, {
-        stdio,
-        env,
-        shell: true
-      });
+      // Handle shell commands properly based on platform
+      let spawnOptions;
+      let commandToRun;
+      let argsToUse;
+      
+      if (process.platform === 'win32') {
+        commandToRun = 'cmd';
+        argsToUse = ['/c', command, ...args];
+        spawnOptions = { stdio, env };
+      } else {
+        commandToRun = command;
+        argsToUse = args;
+        spawnOptions = { stdio, env };
+      }
+      
+      const child = spawn(commandToRun, argsToUse, spawnOptions);
       
       let stdout = '';
       let stderr = '';
