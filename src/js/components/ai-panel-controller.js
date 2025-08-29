@@ -9,9 +9,11 @@
  */
 import AiPanel from './ai-panel.js';
 import SuggestionList from './suggestion-list.js';
+import EnhancedSuggestionList from './enhanced-suggestion-list.js';
 import AiSuggestionService from '../services/ai-suggestion-service.js';
 import ContentChangeDetector from '../services/content-change-detector.js';
 import SuggestionCacheManager from '../services/suggestion-cache-manager.js';
+import NavigationService from '../services/navigation-service.js';
 
 class AiPanelController {
   /**
@@ -32,8 +34,10 @@ class AiPanelController {
    * @param {MarkdownEditor} editor - Markdown editor instance
    * @param {AppState} appState - Application state manager
    * @param {Object} layoutManager - Layout manager instance
+   * @param {FileTree} fileTree - File tree component (for navigation)
+   * @param {EditorPreviewPanel} editorPanel - Editor/preview panel (for navigation)
    */
-  constructor(panelElement, editor, appState, layoutManager) {
+  constructor(panelElement, editor, appState, layoutManager, fileTree = null, editorPanel = null) {
     if (!panelElement) {
       throw new Error('AI panel element is required');
     }
@@ -49,6 +53,8 @@ class AiPanelController {
     this.editor = editor;
     this.appState = appState;
     this.layoutManager = layoutManager;
+    this.fileTree = fileTree;
+    this.editorPanel = editorPanel;
     
     // Component instances
     this.aiPanel = null;
@@ -56,6 +62,7 @@ class AiPanelController {
     this.suggestionService = null;
     this.contentDetector = null;
     this.cacheManager = null;
+    this.navigationService = null;
     
     // UI elements
     this.contentContainer = null;
@@ -210,6 +217,18 @@ class AiPanelController {
       // Initialize cache manager
       this.cacheManager = new SuggestionCacheManager(this.appState);
       
+      // Initialize navigation service (if components are available)
+      if (this.fileTree && this.editorPanel) {
+        this.navigationService = new NavigationService(
+          this.appState,
+          this.fileTree,
+          this.editorPanel
+        );
+        console.log('✅ Navigation service initialized');
+      } else {
+        console.warn('⚠️ Navigation service not initialized - FileTree or EditorPanel not available');
+      }
+      
       // Initialize suggestion service
       this.suggestionService = new AiSuggestionService(
         this.editor,
@@ -232,12 +251,29 @@ class AiPanelController {
    */
   initializeSuggestionComponents() {
     try {
-      // Initialize suggestion list
-      this.suggestionList = new SuggestionList(
-        this.suggestionContainer,
-        this.editor,
-        this.appState
-      );
+      // Use enhanced suggestion list if navigation service is available
+      if (this.navigationService) {
+        console.log('🚀 Initializing enhanced suggestion list with navigation');
+        this.suggestionList = new EnhancedSuggestionList(
+          this.suggestionContainer,
+          this.editor,
+          this.appState,
+          this.navigationService,
+          {
+            useCardComponents: true,
+            enableNavigationIntegration: true,
+            enableHoverPreviews: true,
+            enableKeyboardNavigation: true
+          }
+        );
+      } else {
+        console.log('📝 Using basic suggestion list (no navigation service)');
+        this.suggestionList = new SuggestionList(
+          this.suggestionContainer,
+          this.editor,
+          this.appState
+        );
+      }
       
       // Enable keyboard navigation when panel is visible
       if (this.aiPanel.isVisible()) {
