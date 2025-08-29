@@ -864,6 +864,7 @@ window.debouncedSaveLayoutState = debouncedSaveLayoutState;
 window.activateFileTreeSearch = activateFileTreeSearch;
 window.saveWindowState = saveWindowState;
 window.showNotification = showNotification;
+window.togglePerformanceDashboard = togglePerformanceDashboard;
 
 // Development and testing functions
 window.runLayoutTest = function() {
@@ -1295,6 +1296,13 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
     }
     
+    // Handle performance dashboard keyboard shortcut (Ctrl+Shift+M or Cmd+Shift+M)
+    if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'M') {
+      event.preventDefault();
+      console.log('📊 Performance dashboard shortcut detected');
+      togglePerformanceDashboard();
+    }
+    
     // Handle performance testing panel keyboard shortcut (Ctrl+Shift+Alt+P or Cmd+Shift+Alt+P)
     if (((event.metaKey || event.ctrlKey) && event.shiftKey && event.altKey && event.key === 'P')) {
       event.preventDefault();
@@ -1515,6 +1523,17 @@ function updateOperationStatus(status) {
   const operationStatus = document.getElementById('operationStatus');
   if (operationStatus) {
     operationStatus.textContent = status;
+  }
+}
+
+/**
+ * Toggle performance monitoring dashboard
+ */
+function togglePerformanceDashboard() {
+  if (window.performanceDashboard) {
+    window.performanceDashboard.toggle();
+  } else {
+    showNotification('Performance dashboard not initialized', 'warning');
   }
 }
 

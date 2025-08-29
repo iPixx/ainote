@@ -75,12 +75,7 @@ class PerformanceMonitoringDashboard {
      * Create dashboard DOM elements
      */
     createDashboardElements() {
-        // Toggle button
-        this.toggleButton = document.createElement('button');
-        this.toggleButton.className = 'performance-toggle-button';
-        this.toggleButton.textContent = 'PERF';
-        this.toggleButton.title = 'Toggle Performance Dashboard';
-        document.body.appendChild(this.toggleButton);
+        // No longer create floating toggle button - using main UI button instead
 
         // Dashboard container
         this.dashboardElement = document.createElement('div');
@@ -239,10 +234,7 @@ class PerformanceMonitoringDashboard {
      * Attach event listeners
      */
     attachEventListeners() {
-        // Toggle button
-        this.toggleButton.addEventListener('click', () => {
-            this.toggle();
-        });
+        // No toggle button event listener needed - handled by main UI
 
         // Dashboard close button
         this.dashboardElement.querySelector('[data-action="close"]').addEventListener('click', () => {
@@ -262,13 +254,7 @@ class PerformanceMonitoringDashboard {
             this.clearHistory();
         });
 
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.shiftKey && e.key === 'P') {
-                e.preventDefault();
-                this.toggle();
-            }
-        });
+        // Keyboard shortcuts are now handled in main.js
 
         // Handle window resize
         window.addEventListener('resize', () => {
@@ -796,7 +782,6 @@ class PerformanceMonitoringDashboard {
     show() {
         this.isVisible = true;
         this.dashboardElement.classList.add('visible');
-        this.toggleButton.textContent = 'HIDE';
     }
 
     /**
@@ -805,7 +790,6 @@ class PerformanceMonitoringDashboard {
     hide() {
         this.isVisible = false;
         this.dashboardElement.classList.remove('visible');
-        this.toggleButton.textContent = 'PERF';
     }
 
     /**
@@ -827,10 +811,6 @@ class PerformanceMonitoringDashboard {
         
         if (this.dashboardElement) {
             document.body.removeChild(this.dashboardElement);
-        }
-        
-        if (this.toggleButton) {
-            document.body.removeChild(this.toggleButton);
         }
     }
 }

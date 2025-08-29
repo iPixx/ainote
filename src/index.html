@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="js/components/suggestion-list.css" />
     <link rel="stylesheet" href="js/components/suggestion-card.css" />
     <link rel="stylesheet" href="js/components/ai-panel-controller.css" />
+    <link rel="stylesheet" href="js/components/performance-monitoring-dashboard.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>aiNote</title>
     <script type="module" src="/main.js" defer></script>
@@ -70,6 +71,9 @@
             </button>
             <button id="toggleAiBtn" class="control-btn" onclick="toggleAiPanel()" aria-label="Toggle AI panel (Cmd+2)" title="Toggle AI Panel (Cmd+2)">
               🤖
+            </button>
+            <button id="performanceBtn" class="control-btn" onclick="togglePerformanceDashboard()" aria-label="Performance Monitor (Ctrl+Shift+M)" title="Performance Monitor (Ctrl+Shift+M)">
+              📊
             </button>
           </div>
         </header>
@@ -218,6 +222,7 @@
           <div class="shortcut"><kbd>Ctrl/Cmd</kbd> + <kbd>S</kbd> - Save file</div>
           <div class="shortcut"><kbd>Ctrl/Cmd</kbd> + <kbd>O</kbd> - Open vault</div>
           <div class="shortcut"><kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> - Toggle editor/preview</div>
+          <div class="shortcut"><kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>M</kbd> - Performance Monitor</div>
           <div class="shortcut"><kbd>Alt</kbd> + <kbd>E</kbd> - Switch to editor mode</div>
           <div class="shortcut"><kbd>Alt</kbd> + <kbd>P</kbd> - Switch to preview mode</div>
           <div class="shortcut"><kbd>Ctrl/Cmd</kbd> + <kbd>1</kbd> - Toggle file tree</div>
