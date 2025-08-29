@@ -71,7 +71,7 @@ export const WebDriverConfig = {
     switch (browser.toLowerCase()) {
       case 'chrome':
         capabilities.setBrowserName(Browser.CHROME);
-        capabilities.set('goog:chromeOptions', this.getChromeOptions().toCapabilities()['goog:chromeOptions']);
+        // Chrome options are handled directly in createDriver method
         break;
         
       case 'firefox':
@@ -97,10 +97,8 @@ export const WebDriverConfig = {
   async createDriver(browser = 'chrome') {
     const builder = new Builder();
     
-    // Set browser and capabilities
+    // Set browser 
     builder.forBrowser(browser);
-    const capabilities = this.getCapabilities(browser);
-    builder.withCapabilities(capabilities);
     
     // Platform-specific driver setup
     if (browser === 'chrome') {

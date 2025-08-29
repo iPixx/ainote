@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "generated": "2025-08-29T00:20:31.656Z",
+    "platform": "darwin",
+    "arch": "arm64",
+    "nodeVersion": "v24.6.0",
+    "config": {
+      "headless": false,
+      "debug": false,
+      "browser": "chrome",
+      "timeout": 30000,
+      "bail": false
+    }
+  },
+  "execution": {
+    "started": "2025-08-29T00:19:20.785Z",
+    "tests": [],
+    "summary": {
+      "success": false,
+      "exitCode": 1,
+      "duration": 604
+    }
+  },
+  "screenshots": []
+}
