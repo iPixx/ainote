@@ -9,10 +9,18 @@
     "test:ui": "vitest --ui",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage",
-    "test:e2e": "node ./tests/e2e/run-e2e-tests.js",
-    "test:e2e:headless": "HEADLESS=true node ./tests/e2e/run-e2e-tests.js",
-    "test:e2e:debug": "DEBUG=true node ./tests/e2e/run-e2e-tests.js",
-    "test:all": "npm run test && npm run test:e2e:headless"
+    "test:e2e": "E2E_MODE=hybrid node ./tests/e2e/run-e2e-tests.js",
+    "test:e2e:frontend": "E2E_MODE=frontend SKIP_BUILD=true node ./tests/e2e/run-e2e-tests.js",
+    "test:e2e:full": "E2E_MODE=full FORCE_BUILD=true node ./tests/e2e/run-e2e-tests.js",
+    "test:e2e:headless": "HEADLESS=true E2E_MODE=hybrid node ./tests/e2e/run-e2e-tests.js",
+    "test:e2e:debug": "DEBUG=true E2E_MODE=hybrid node ./tests/e2e/run-e2e-tests.js",
+    "test:e2e:fast": "E2E_MODE=frontend HEADLESS=true SKIP_BUILD=true LOAD_IMAGES=false node ./tests/e2e/run-e2e-tests.js",
+    "test:e2e:demo": "npx mocha tests/e2e/specs/infrastructure-demo.e2e.js --timeout 60000 --reporter spec",
+    "test:e2e:comprehensive": "E2E_MODE=comprehensive node ./tests/e2e/run-e2e-tests.js && node ./tests/comprehensive/comprehensive-runner.js",
+    "test:comprehensive": "node ./tests/comprehensive/comprehensive-runner.js",
+    "test:comprehensive:verbose": "node ./tests/comprehensive/comprehensive-runner.js --verbose",
+    "test:comprehensive:unit-only": "node ./tests/comprehensive/comprehensive-runner.js --skip-e2e --skip-rust",
+    "test:all": "npm run test && npm run test:e2e:headless && npm run test:comprehensive"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

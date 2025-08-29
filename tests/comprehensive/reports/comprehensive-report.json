@@ -1,0 +1,2173 @@
+{
+  "timestamp": "2025-08-29T07:27:08.233Z",
+  "environment": {
+    "node": "v24.6.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "memory": {
+      "rss": 46759936,
+      "heapTotal": 6389760,
+      "heapUsed": 4462112,
+      "external": 1767990,
+      "arrayBuffers": 35125
+    }
+  },
+  "tests": {
+    "unit": {
+      "passed": 0,
+      "failed": 0,
+      "details": [],
+      "duration": 0
+    },
+    "rust": {
+      "passed": 488,
+      "failed": 8,
+      "details": [
+        {
+          "test": "test benchmarks::tests::test_benchmark_config_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test benchmarks::tests::test_memory_measurement_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test benchmarks::tests::test_performance_targets_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::incremental_commands::tests::test_monitoring_request_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::incremental_commands::tests::test_process_updates_response_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::incremental_commands::tests::test_enable_incremental_request_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::indexing_commands::tests::test_cancel_indexing_not_running",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::indexing_commands::tests::test_get_indexing_progress_uninitialized",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::indexing_commands::tests::test_pipeline_lifecycle",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::indexing_commands::tests::test_get_indexing_status_uninitialized",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::indexing_commands::tests::test_process_file_changes_empty",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::maintenance_commands::tests::test_maintenance_response_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::maintenance_commands::tests::test_maintenance_response_with_stats",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::maintenance_commands::tests::test_enable_maintenance_request",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::optimization_commands::tests::test_configure_optimization_request",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::optimization_commands::tests::test_configuration_summary",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::optimization_commands::tests::test_optimization_response_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::optimization_commands::tests::test_usage_counters_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::rebuilding_commands::tests::test_enable_health_checks_request",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::rebuilding_commands::tests::test_enable_rebuilding_request",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::rebuilding_commands::tests::test_health_check_response_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test commands::rebuilding_commands::tests::test_rebuilding_response_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_cache::tests::test_cache_config_defaults",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_cache::tests::test_cache_entry_expiration_check",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_cache::tests::test_cache_key_generation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_cache::tests::test_cache_clear",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_cache::tests::test_cache_metrics",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_cache::tests::test_cache_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_cache::tests::test_cache_set_and_get",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_generator::tests::test_embedding_config_defaults",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_generator::tests::test_embedding_generator_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_generator::tests::test_empty_text_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_generator::tests::test_model_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test benchmarks::tests::test_memory_usage_calculation",
+          "status": "PASS"
+        },
+        {
+          "test": "test benchmarks::tests::test_benchmarks_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test benchmarks::tests::test_benchmark_result_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_generator::tests::test_batch_embedding_empty_list",
+          "status": "PASS"
+        },
+        {
+          "test": "test benchmarks::tests::test_performance_regression_detection",
+          "status": "PASS"
+        },
+        {
+          "test": "test benchmarks::tests::test_benchmark_report_generation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_generator::tests::test_text_too_long_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_queue::tests::test_priority_ordering",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_queue::tests::test_cancellation_token",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_queue::tests::test_queue_capacity",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_queue::tests::test_queue_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_queue::tests::test_metrics_tracking",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_queue::tests::test_request_submission",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_queue::tests::test_request_cancellation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::embedding_generator_tests::test_embedding_generator_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::embedding_cache_tests::test_cache_basic_operations",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::embedding_cache_tests::test_cache_metrics",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::embedding_cache_tests::test_cache_miss_scenarios",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::embedding_generator_tests::test_embedding_input_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::performance_tests::test_cache_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::embedding_generator_tests::test_model_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::performance_tests::test_text_processing_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::text_processing_tests::test_markdown_preprocessing_comprehensive",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::text_processing_tests::test_text_validation_edge_cases",
+          "status": "PASS"
+        },
+        {
+          "test": "test errors::tests::test_error_conversion_to_string",
+          "status": "PASS"
+        },
+        {
+          "test": "test errors::tests::test_error_with_path_context",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::embedding_generator_tests::test_successful_embedding_generation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::end_to_end_tests::test_complete_system_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::integration_tests_mocked::test_end_to_end_embedding_flow",
+          "status": "PASS"
+        },
+        {
+          "test": "test errors::tests::test_file_too_large_formatting",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::performance_tests::test_embedding_generation_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test errors::tests::test_io_error_conversion",
+          "status": "PASS"
+        },
+        {
+          "test": "test errors::tests::test_filesystem_error_user_messages",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::text_processing_tests::test_text_chunking_basic",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_locks::tests::test_file_lock_nonexistent_file",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_locks::tests::test_file_lock_acquire_and_release",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_monitor::tests::test_file_event_kind",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_monitor::tests::test_file_monitor_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_locks::tests::test_file_lock_double_acquire_fails",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_monitor::tests::test_file_monitor_custom_config",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_monitor::tests::test_file_monitor_invalid_path",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_locks::tests::test_file_lock_path_normalization",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_locks::tests::test_file_lock_guard_drop",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_locks::tests::test_file_lock_multiple_different_files",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_create_file_invalid_extension",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_create_file_success",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_auto_save_file",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_create_folder_already_exists",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_create_file_already_exists",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_create_folder_nested",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_delete_file_not_found",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_create_folder_success",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_delete_file_invalid_extension",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_get_file_info_directory",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_get_file_info_not_found",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_delete_file_success",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_get_file_info_success",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_preview_file_large",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_preview_file_small",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_read_file_is_directory",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_read_file_not_found",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_read_file_invalid_extension",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_nested_directory_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_rename_file_source_not_found",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_rename_file_invalid_extension",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_read_file_success",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_rename_file_destination_exists",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_write_file_invalid_extension",
+          "status": "PASS"
+        },
+        {
+          "test": "test indexing_pipeline::tests::test_cancellation_token",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_rename_file_success",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_rename_directory_success",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_utf8_encoding",
+          "status": "PASS"
+        },
+        {
+          "test": "test indexing_pipeline::tests::test_indexing_queue_basic_operations",
+          "status": "PASS"
+        },
+        {
+          "test": "test indexing_pipeline::tests::test_indexing_request_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test indexing_pipeline::tests::test_indexing_queue_priority_ordering",
+          "status": "PASS"
+        },
+        {
+          "test": "test indexing_pipeline::tests::test_pipeline_config_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test indexing_pipeline::tests::test_pipeline_config_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_operations::tests::test_write_file_success",
+          "status": "PASS"
+        },
+        {
+          "test": "test metadata_cache::tests::test_cache_clear",
+          "status": "PASS"
+        },
+        {
+          "test": "test metadata_cache::tests::test_cache_entry_expiry",
+          "status": "PASS"
+        },
+        {
+          "test": "test metadata_cache::tests::test_cache_entry_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test metadata_cache::tests::test_cache_miss_nonexistent_file",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_cancel_non_existent_download",
+          "status": "PASS"
+        },
+        {
+          "test": "test metadata_cache::tests::test_cache_hit",
+          "status": "PASS"
+        },
+        {
+          "test": "test metadata_cache::tests::test_cache_expiry",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_clear_completed_downloads",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_config_update",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_concurrent_download_access",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_configuration_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_connection_state_management",
+          "status": "PASS"
+        },
+        {
+          "test": "test metadata_cache::tests::test_concurrent_cache_access",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_custom_config",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_download_config_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_download_config_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_download_error_types",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_connection_status_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_download_memory_usage",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_download_progress_calculation",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_download_progress_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_download_state_management",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_download_status_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_embedding_model_patterns",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_error_handling",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_eta_calculation",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_exponential_backoff_calculation",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_health_response_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_model_compatibility_case_insensitive",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_memory_usage_estimation",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_model_compatibility_logic",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_model_compatibility_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_model_info_memory_usage",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_model_info_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_model_name_edge_cases",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_model_verification_result_construction",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_model_verification_result_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_ollama_client_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_model_verification_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_performance_requirements",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_state_consistency",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_speed_calculation",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_locks::tests::test_file_lock_concurrent_access",
+          "status": "PASS"
+        },
+        {
+          "test": "test metadata_cache::tests::test_cache_cleanup",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::benchmarks::benchmark_state_access_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::cross_platform_tests::test_url_parsing_cross_platform",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::integration_tests::test_concurrent_health_checks",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::integration_tests::test_config_update_integration",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::integration_tests::test_connection_state_transitions",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::integration_tests::test_error_recovery_scenarios",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::cross_platform_tests::test_thread_safety_cross_platform",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::benchmarks::benchmark_concurrent_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::integration_tests::test_performance_requirements",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_client::tests::test_thread_safety",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::integration_tests::test_server_error_handling",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::integration_tests::test_successful_connection_integration",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::integration_tests::test_retry_exhaustion",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::cross_platform_tests::test_timeout_behavior_cross_platform",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::integration_tests::test_timeout_handling",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::load_tests::test_memory_usage_under_sustained_load",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance::tests::test_performance_tracker_checkpoint",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance::tests::test_performance_tracker_concurrent_usage",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance::tests::test_performance_tracker_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance::tests::test_performance_tracker_finish",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance::tests::test_performance_tracker_long_operation",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance::tests::test_performance_tracker_multiple_checkpoints",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance::tests::test_time_operation_macro",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance::tests::test_time_operation_macro_with_error",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance::tests::test_time_operation_with_complex_operation",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance_baseline::tests::test_baseline_comparison",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance_baseline::tests::test_baseline_comparison_summary",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance_baseline::tests::test_baseline_config_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance_baseline::tests::test_baseline_manager_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance_baseline::tests::test_baseline_metrics_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test performance_baseline::tests::test_system_info_gathering",
+          "status": "PASS"
+        },
+        {
+          "test": "test regression_detection::tests::test_performance_data_point_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test regression_detection::tests::test_regression_analysis_report_generation",
+          "status": "PASS"
+        },
+        {
+          "test": "test regression_detection::tests::test_regression_detection_config_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test regression_detection::tests::test_regression_detection_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test regression_detection::tests::test_severity_calculation",
+          "status": "PASS"
+        },
+        {
+          "test": "test regression_detection::tests::test_trend_calculation",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_batch_k_nearest_neighbors",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_context_filtering",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_cosine_similarity_dimension_mismatch",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_cosine_similarity_empty_vector",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_cosine_similarity_identical_vectors",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_cosine_similarity_invalid_values",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_cosine_similarity_normalized",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_cosine_similarity_opposite_vectors",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_cosine_similarity_orthogonal_vectors",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_cosine_similarity_zero_vector",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_diversity_filtering",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_edge_case_single_dimension",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_enhanced_search_config_defaults",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_k_nearest_neighbors",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_k_nearest_neighbors_with_enhancements",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_k_nearest_neighbors_with_threshold",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_mathematical_properties",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_normalize_vector",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_performance_targets",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_recency_weighting",
+          "status": "PASS"
+        },
+        {
+          "test": "test similarity_search::tests::test_threshold_search",
+          "status": "PASS"
+        },
+        {
+          "test": "test state_management::tests::test_app_state_default_values",
+          "status": "PASS"
+        },
+        {
+          "test": "test state_management::tests::test_app_state_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test state_management::tests::test_complete_app_state_with_session",
+          "status": "PASS"
+        },
+        {
+          "test": "test state_management::tests::test_layout_state_editor_modes",
+          "status": "PASS"
+        },
+        {
+          "test": "test state_management::tests::test_load_app_state_nonexistent_file",
+          "status": "PASS"
+        },
+        {
+          "test": "test state_management::tests::test_save_session_state_internal",
+          "status": "PASS"
+        },
+        {
+          "test": "test state_management::tests::test_session_state_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test state_management::tests::test_session_state_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test state_management::tests::test_session_state_view_modes",
+          "status": "PASS"
+        },
+        {
+          "test": "test state_management::tests::test_session_state_with_nulls",
+          "status": "PASS"
+        },
+        {
+          "test": "test state_management::tests::test_state_backward_compatibility",
+          "status": "PASS"
+        },
+        {
+          "test": "test state_management::tests::test_window_state_edge_cases",
+          "status": "PASS"
+        },
+        {
+          "test": "test tests::test_module_imports",
+          "status": "PASS"
+        },
+        {
+          "test": "test tests::test_re_exports",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::edge_case_tests::test_boundary_edge_cases",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::edge_case_tests::test_extremely_long_sentences",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::edge_case_tests::test_memory_leak_detection",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::edge_case_tests::test_nested_markdown_structures",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::edge_case_tests::test_performance_regression_prevention",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::edge_case_tests::test_unicode_and_special_characters",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::integration_tests::test_empty_and_minimal_files",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::integration_tests::test_large_document_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::integration_tests::test_malformed_markdown_handling",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::integration_tests::test_mixed_content_chunking",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::integration_tests::test_prose_narrative_chunking",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::integration_tests::test_technical_document_chunking",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::performance_tests::test_chunking_speed_requirements",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::performance_tests::test_memory_usage_limits",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::performance_tests::test_scalability_linear_growth",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::quality_tests::test_chunk_quality_metrics",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::quality_tests::test_context_preservation_across_chunks",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::quality_tests::test_embedding_readiness",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::quality_tests::test_semantic_coherence_preservation",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_average_paragraph_length",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_average_sentence_length",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_boundary_detection",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_chunk_config_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_chunk_config_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_chunk_error_display",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_chunk_metadata",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_chunk_processor_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_config_update",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_empty_text_handling",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_fixed_size_chunking",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_hybrid_chunking",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_large_document_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_large_document_performance_streaming",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_markdown_aware_chunking_basic",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_markdown_code_block_preservation",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_markdown_formatting_stripping",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_markdown_header_boundaries",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_memory_efficiency",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_optimal_chunk_size_calculation",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_optimized_sentence_counting",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_optimized_word_counting",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_overlap_management",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_performance_monitoring",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_performance_requirements_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_semantic_chunking",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_sentence_counting",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_small_text_handling",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_streaming_chunking_large_document",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_text_analysis_for_chunking",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_text_chunk_methods",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_unusual_punctuation",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_very_long_sentence",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_chunker::tests::test_whitespace_only_text",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_benchmark_chunk_sizes",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_chunk_text_basic",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_chunk_text_invalid_params",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_chunk_text_short",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_code_block_processing",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_custom_config",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_markdown_link_processing",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_optimal_chunk_size",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_overlap_functionality",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_preprocess_empty_text",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_preprocess_text_basic",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_sentence_boundary_preservation",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_unicode_handling",
+          "status": "PASS"
+        },
+        {
+          "test": "test text_processing::tests::test_validate_text",
+          "status": "PASS"
+        },
+        {
+          "test": "test types::tests::test_app_state_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test types::tests::test_case_insensitive_comparison",
+          "status": "PASS"
+        },
+        {
+          "test": "test types::tests::test_file_info_comparison",
+          "status": "PASS"
+        },
+        {
+          "test": "test types::tests::test_file_info_directory",
+          "status": "PASS"
+        },
+        {
+          "test": "test types::tests::test_file_info_from_dir_entry",
+          "status": "PASS"
+        },
+        {
+          "test": "test types::tests::test_file_info_from_path",
+          "status": "PASS"
+        },
+        {
+          "test": "test types::tests::test_fileinfo_extension_methods",
+          "status": "PASS"
+        },
+        {
+          "test": "test types::tests::test_fileinfo_path_utilities",
+          "status": "PASS"
+        },
+        {
+          "test": "test types::tests::test_fileinfo_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test types::tests::test_layout_state_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test types::tests::test_unicode_normalization",
+          "status": "PASS"
+        },
+        {
+          "test": "test types::tests::test_window_state_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test validation::tests::test_cleanup_old_backups",
+          "status": "PASS"
+        },
+        {
+          "test": "test validation::tests::test_create_backup",
+          "status": "PASS"
+        },
+        {
+          "test": "test validation::tests::test_ensure_parent_directory",
+          "status": "PASS"
+        },
+        {
+          "test": "test validation::tests::test_path_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test validation::tests::test_validate_existing_file_size",
+          "status": "PASS"
+        },
+        {
+          "test": "test validation::tests::test_validate_file_size",
+          "status": "PASS"
+        },
+        {
+          "test": "test validation::tests::test_validate_markdown_extension",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_load_vault_empty_directory",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_load_vault_file_instead_of_directory",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_load_vault_nonexistent",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_load_vault_success",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_scan_vault_files_chunked",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_scan_vault_files_empty_directory",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_scan_vault_files_file_instead_of_directory",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_scan_vault_files_mixed_file_types",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_scan_vault_files_nested_directories",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_scan_vault_files_nonexistent_path",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_scan_vault_files_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_scan_vault_files_with_markdown_files",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_validate_vault_file_instead_of_directory",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_validate_vault_nonexistent",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_validate_vault_success",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_vault_scanning_comprehensive",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_watch_vault_file_instead_of_directory",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_watch_vault_nonexistent_directory",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::integration_tests::test_exponential_backoff_integration",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::atomic::tests::test_atomic_config_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::atomic::tests::test_atomic_writer_paths",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::atomic::tests::test_lock_content_format",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::atomic::tests::test_path_generation",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_cache::tests::test_cache_expiration",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::atomic_performance_test::performance_tests::test_atomic_write_manual_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::atomic_performance_test::performance_tests::test_atomic_write_performance_target",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::atomic_performance_test::performance_tests::test_atomic_write_with_custom_timeout",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::automatic_cleanup::tests::test_cleanup_config_defaults",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::automatic_cleanup::tests::test_cleanup_manager_creation",
+          "status": "FAIL"
+        },
+        {
+          "test": "test vector_db::automatic_cleanup::tests::test_manual_cleanup",
+          "status": "FAIL"
+        },
+        {
+          "test": "test vector_db::automatic_cleanup::tests::test_task_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::automatic_cleanup::tests::test_task_stats",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression::tests::test_16bit_compression_decompression",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression::tests::test_8bit_compression_decompression",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression::tests::test_compression_stats",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression::tests::test_delta_compression",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression::tests::test_invalid_quantization_bits",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression::tests::test_quantization_params",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression::tests::test_vector_compressor_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression_tests::tests::test_16bit_quantization_accuracy",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression_tests::tests::test_8bit_quantization_accuracy",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression_tests::tests::test_batch_compression",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression_tests::tests::test_compression_integration",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression_tests::tests::test_compression_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression_tests::tests::test_delta_compression",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression_tests::tests::test_error_handling",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::compression_tests::tests::test_memory_efficiency",
+          "status": "FAIL"
+        },
+        {
+          "test": "test vector_db::compression_tests::tests::test_optimized_storage_serialization",
+          "status": "FAIL"
+        },
+        {
+          "test": "test vector_db::compression_tests::tests::test_progressive_loading",
+          "status": "FAIL"
+        },
+        {
+          "test": "test vector_db::compression_tests::tests::test_storage_compression_ratios",
+          "status": "FAIL"
+        },
+        {
+          "test": "test vector_db::compression_tests::tests::test_vector_compression_config_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::deduplication::tests::test_deduplication_config_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::deduplication::tests::test_deduplication_stats_calculation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::deduplication::tests::test_empty_embedding_set",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::deduplication::tests::test_representative_selection_longest_content",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::deduplication::tests::test_representative_selection_most_recent",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::deduplication::tests::test_resolve_embedding_reference",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::enhanced_cache::tests::test_access_pattern_tracking",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::enhanced_cache::tests::test_cache_entry_operations",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::enhanced_cache::tests::test_enhanced_cache_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::enhanced_cache::tests::test_eviction_policies",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::enhanced_cache::tests::test_multi_level_cache_operations",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::file_ops::tests::test_cleanup_result",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::file_ops::tests::test_file_operations_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::file_ops::tests::test_file_system_metrics",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::file_ops::tests::test_initialization_status",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::file_ops::tests::test_is_storage_file",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::incremental::tests::test_change_record_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::incremental::tests::test_change_record_file_filtering",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::incremental::tests::test_change_type_moved",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::incremental::tests::test_incremental_config_defaults",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::atomic_performance_test::performance_tests::test_concurrent_atomic_writes_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::incremental::tests::test_update_stats_calculation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::incremental::tests::test_update_transaction_lifecycle",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::indexing::tests::test_index_metadata_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::indexing::tests::test_index_stats_summary",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::lazy_loading::tests::test_access_pattern_tracking",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::lazy_loading::tests::test_chunk_info",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::lazy_loading::tests::test_lazy_loading_config_defaults",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::lazy_loading::tests::test_lazy_chunk_operations",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::lazy_loading::tests::test_lazy_loading_manager_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::maintenance::tests::test_index_optimizer_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::maintenance::tests::test_maintenance_config_default",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::maintenance::tests::test_maintenance_stats_performance_targets",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::maintenance::tests::test_maintenance_stats_update",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::maintenance::tests::test_maintenance_scheduler_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::maintenance::tests::test_orphan_detection_result",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::maintenance::tests::test_orphan_validation_method",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::maintenance::tests::test_orphan_detector_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::metrics_collector_tests::test_concurrent_metrics_operations",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::maintenance::tests::test_storage_reclaimer_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::metrics_collector_tests::test_index_health_monitoring",
+          "status": "FAIL"
+        },
+        {
+          "test": "test vector_db::metrics_collector_tests::test_memory_metrics_collection",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::metrics_collector_tests::test_metrics_accuracy_and_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::metrics_collector_tests::test_metrics_collector_creation_and_startup",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::integration_tests_mocked::test_network_error_recovery",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::load_tests::test_connection_pool_under_load",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::metrics_collector_tests::test_performance_overhead_requirements",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::metrics_collector_tests::test_search_metrics_history_limit",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::metrics_collector_tests::test_search_metrics_recording",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::operations::tests::test_batch_operations_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::operations::tests::test_cleanup_operations_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::operations::tests::test_operations_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::operations::tests::test_timestamp_helpers",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::operations::tests::test_validation_operations_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::optimization_scheduler::tests::test_configuration_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::optimization_scheduler::tests::test_optimization_pipeline_structure",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::optimization_scheduler::tests::test_scheduler_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::optimization_scheduler::tests::test_trigger_types",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::optimization_scheduler::tests::test_usage_tracker",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::optimized_storage::tests::test_compact_metadata_conversion",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::optimized_storage::tests::test_cosine_similarity",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::optimized_storage::tests::test_optimized_storage_engine_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::optimized_storage::tests::test_serialization_deserialization_roundtrip",
+          "status": "FAIL"
+        },
+        {
+          "test": "test vector_db::optimized_storage::tests::test_vector_hash_consistency",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::optimized_storage::tests::test_vectors_identical",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::performance_monitor::tests::test_metrics_calculation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::performance_monitor::tests::test_monitor_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::metrics_collector_tests::test_optimization_recommendations_generation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::performance_monitor::tests::test_performance_report_generation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::rebuilding::tests::test_corruption_severity_ordering",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::rebuilding::tests::test_health_check_config_defaults",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::rebuilding::tests::test_health_check_result_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::rebuilding::tests::test_health_checker_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::rebuilding::tests::test_health_issue_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::rebuilding::tests::test_health_status_ordering",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::rebuilding::tests::test_index_rebuilder_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::rebuilding::tests::test_rebuild_metrics_performance_targets",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::rebuilding::tests::test_rebuild_phases",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::rebuilding::tests::test_rebuild_progress",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::rebuilding::tests::test_rebuilding_config_defaults",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::storage::tests::test_compression_algorithms",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::storage::tests::test_delete_entry_structure",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::storage::tests::test_file_location",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::storage::tests::test_integrity_report",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::storage::tests::test_list_entry_ids_structure",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::storage::tests::test_storage_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::storage::tests::test_store_and_retrieve_entries_structure",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_batch_entry_creation_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_batch_operations_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_cleanup_operations_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_compression_algorithm_extensions",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_concurrent_entry_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_database_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_database_initialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_embedding_entry_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_embedding_entry_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::integration_tests::test_memory_efficiency_under_load",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_embedding_entry_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_empty_and_minimal_entries",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_entry_hash_consistency",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_entry_id_uniqueness",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_large_vector_handling",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_long_text_handling",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_memory_footprint_calculation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_storage_file_header",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_storage_file_header_serialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_storage_metrics_initialization",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_unicode_text_handling",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_validation_operations_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_vector_db_error_types",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_vector_operations_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_vector_storage_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_version_compatibility",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::types::tests::test_compression_algorithm_extensions",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::types::tests::test_content_preview",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::types::tests::test_data_version_compatibility",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::types::tests::test_embedding_entry_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::types::tests::test_embedding_entry_validation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::types::tests::test_embedding_metadata_creation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::types::tests::test_entry_id_generation",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::types::tests::test_storage_file_header",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::types::tests::test_storage_metrics_update",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::types::tests::test_text_hash_consistency",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::performance_monitor::tests::test_operation_lifecycle",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::benchmarks::benchmark_health_check_performance",
+          "status": "PASS"
+        },
+        {
+          "test": "test file_monitor::tests::test_file_monitor_lifecycle",
+          "status": "PASS"
+        },
+        {
+          "test": "test vault_operations::tests::test_watch_vault_success",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::tests::unit_tests::test_embedding_entry_update",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::metrics_collector_tests::test_metrics_history_management",
+          "status": "PASS"
+        },
+        {
+          "test": "test vector_db::metrics_collector_tests::test_end_to_end_metrics_pipeline",
+          "status": "PASS"
+        },
+        {
+          "test": "test ollama_integration_tests::load_tests::test_high_frequency_health_checks",
+          "status": "PASS"
+        },
+        {
+          "test": "test embedding_tests::integration_tests_mocked::test_api_error_handling",
+          "status": "PASS"
+        }
+      ],
+      "duration": 33966
+    },
+    "e2e": {
+      "passed": 15,
+      "failed": 0,
+      "details": [
+        "E2E test execution: SUCCESS"
+      ],
+      "duration": 13137
+    },
+    "integration": {
+      "passed": 6,
+      "failed": 4,
+      "details": [
+        {
+          "component": "vitest.config.js",
+          "status": "EXISTS",
+          "type": "infrastructure"
+        },
+        {
+          "component": "tests/setup.js",
+          "status": "EXISTS",
+          "type": "infrastructure"
+        },
+        {
+          "component": "tests/unit",
+          "status": "EXISTS",
+          "type": "infrastructure"
+        },
+        {
+          "component": "tests/e2e",
+          "status": "EXISTS",
+          "type": "infrastructure"
+        },
+        {
+          "component": "src-tauri/tests",
+          "status": "EXISTS",
+          "type": "infrastructure"
+        },
+        {
+          "component": "package.json",
+          "status": "EXISTS",
+          "type": "infrastructure"
+        },
+        {
+          "component": "VaultManager",
+          "status": "NO_TESTS",
+          "type": "component"
+        },
+        {
+          "component": "AutoSave",
+          "status": "NO_TESTS",
+          "type": "component"
+        },
+        {
+          "component": "AppState",
+          "status": "NO_TESTS",
+          "type": "component"
+        },
+        {
+          "component": "FileTree",
+          "status": "NO_TESTS",
+          "type": "component"
+        }
+      ]
+    },
+    "performance": {
+      "passed": 5,
+      "failed": 0,
+      "details": [
+        {
+          "name": "E2E Frontend Testing",
+          "target": "<10 seconds",
+          "implemented": true,
+          "measured": "~4.5s"
+        },
+        {
+          "name": "E2E Hybrid Testing",
+          "target": "<15 seconds",
+          "implemented": true,
+          "measured": "~12.6s"
+        },
+        {
+          "name": "Unit Test Execution",
+          "target": "<5 seconds",
+          "implemented": true,
+          "measured": "TBD"
+        },
+        {
+          "name": "Rust Test Execution",
+          "target": "<30 seconds",
+          "implemented": true,
+          "measured": "TBD"
+        },
+        {
+          "name": "Memory Efficiency",
+          "target": "<100MB application footprint",
+          "implemented": true,
+          "measured": "TBD"
+        }
+      ]
+    },
+    "compliance": {
+      "passed": 5,
+      "failed": 1,
+      "details": [
+        {
+          "criterion": "unitTestCoverage",
+          "status": "PASS",
+          "description": "Unit test coverage for core components"
+        },
+        {
+          "criterion": "e2eIntegration",
+          "status": "PASS",
+          "description": "E2E testing infrastructure with hybrid approach"
+        },
+        {
+          "criterion": "rustBackendTesting",
+          "status": "PASS",
+          "description": "Rust backend testing with Cargo"
+        },
+        {
+          "criterion": "performanceValidation",
+          "status": "PASS",
+          "description": "Performance validation and benchmarking"
+        },
+        {
+          "criterion": "comprehensiveReporting",
+          "status": "PASS",
+          "description": "Comprehensive test reporting and analysis"
+        },
+        {
+          "criterion": "errorHandling",
+          "status": "FAIL",
+          "description": "Error handling and validation coverage"
+        }
+      ]
+    }
+  },
+  "summary": {
+    "totalTests": 532,
+    "totalPassed": 519,
+    "totalFailed": 13,
+    "totalDuration": 47103,
+    "successRate": "97.6"
+  },
+  "recommendations": [
+    "Address 8 failing Rust tests",
+    "Address error handling compliance",
+    "Achieve >95% test success rate before production deployment",
+    "Consider implementing automated performance regression testing",
+    "Set up continuous integration with comprehensive test suite",
+    "Add test coverage reporting and monitoring"
+  ],
+  "issueCompliance": {
+    "errorHandling": false,
+    "unitTestCoverage": true,
+    "e2eIntegration": true,
+    "performanceValidation": true,
+    "rustBackendTesting": true,
+    "comprehensiveReporting": true
+  }
+}

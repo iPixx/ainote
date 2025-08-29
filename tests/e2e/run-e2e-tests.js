@@ -20,7 +20,10 @@ class E2ETestRunner {
       debug: process.env.DEBUG === 'true',
       browser: process.env.BROWSER || 'chrome',
       timeout: parseInt(process.env.TEST_TIMEOUT) || 30000,
-      bail: process.env.BAIL === 'true'
+      bail: process.env.BAIL === 'true',
+      mode: process.env.E2E_MODE || 'hybrid', // 'frontend', 'full', 'hybrid'
+      skipBuild: process.env.SKIP_BUILD === 'true',
+      forceBuild: process.env.FORCE_BUILD === 'true'
     };
     
     this.results = {
@@ -43,8 +46,8 @@ class E2ETestRunner {
       console.log('\n🔧 Phase 1: Pre-flight checks...');
       await this.preflightChecks();
       
-      console.log('\n🏗️  Phase 2: Building application...');
-      await this.buildApplication();
+      console.log('\n🏗️  Phase 2: Verifying application...');
+      await this.verifyApplication();
       
       console.log('\n🧪 Phase 3: Running E2E tests...');
       success = await this.runTests();
@@ -102,6 +105,40 @@ class E2ETestRunner {
   }
   
   /**
+   * Verify or build the application based on mode
+   */
+  async verifyApplication() {
+    if (this.config.mode === 'frontend' && this.config.skipBuild) {
+      console.log('ℹ️  Skipping application verification for frontend-only testing');
+      return;
+    }
+    
+    const platforms = {
+      darwin: './src-tauri/target/release/ainote',
+      linux: './src-tauri/target/release/ainote',
+      win32: './src-tauri/target/release/ainote.exe'
+    };
+    
+    const expectedBinary = platforms[process.platform];
+    
+    // Check if application already exists
+    if (fs.existsSync(expectedBinary) && !this.config.forceBuild) {
+      const stats = fs.statSync(expectedBinary);
+      console.log(`✅ Found existing application: ${expectedBinary}`);
+      console.log(`📏 Size: ${(stats.size / 1024 / 1024).toFixed(1)}MB`);
+      console.log(`📅 Modified: ${stats.mtime.toLocaleString()}`);
+      return;
+    }
+    
+    // Build the application if needed
+    if (this.config.mode === 'full' || this.config.forceBuild) {
+      await this.buildApplication();
+    } else {
+      console.log('⚠️  Application not found, but not building for this test mode');
+    }
+  }
+  
+  /**
    * Check if Chrome browser is available
    */
   checkChromeBrowser() {
@@ -140,10 +177,44 @@ class E2ETestRunner {
   }
   
   /**
+   * Get test file patterns based on execution mode
+   */
+  getTestPatterns() {
+    switch (this.config.mode) {
+      case 'frontend':
+        return [
+          './tests/e2e/specs/infrastructure-demo.e2e.js',
+          // Add other frontend-only tests here
+        ];
+        
+      case 'full':
+        return [
+          './tests/e2e/specs/true-e2e-complete.e2e.js',
+          // Add other full-stack E2E tests here
+        ];
+        
+      case 'comprehensive':
+        return [
+          './tests/e2e/specs/infrastructure-demo.e2e.js',
+          './tests/e2e/specs/true-e2e-complete.e2e.js',
+          // Future: Add comprehensive validation specs
+        ];
+        
+      case 'hybrid':
+      default:
+        return [
+          './tests/e2e/specs/infrastructure-demo.e2e.js',
+          './tests/e2e/specs/true-e2e-complete.e2e.js',
+          // Include all test types for comprehensive testing
+        ];
+    }
+  }
+  
+  /**
    * Run the E2E test suite
    */
   async runTests() {
-    console.log('Starting E2E test execution...');
+    console.log(`Starting E2E test execution (mode: ${this.config.mode})...`);
     
     // Set environment variables for tests
     const testEnv = {
@@ -151,13 +222,16 @@ class E2ETestRunner {
       HEADLESS: this.config.headless.toString(),
       DEBUG: this.config.debug.toString(),
       BROWSER: this.config.browser,
-      TEST_TIMEOUT: this.config.timeout.toString()
+      TEST_TIMEOUT: this.config.timeout.toString(),
+      E2E_MODE: this.config.mode
     };
+    
+    // Configure test files based on mode
+    const testPatterns = this.getTestPatterns();
     
     const mochaArgs = [
       '--config', './tests/e2e/config/mocha.config.js',
-      '--require', './tests/e2e/helpers/test-setup.js',
-      './tests/e2e/specs/**/*.e2e.js'
+      ...testPatterns
     ];
     
     if (this.config.bail) {
@@ -339,11 +413,22 @@ class E2ETestRunner {
     const startTime = Date.now();
     
     return new Promise((resolve) => {
-      const child = spawn(command, args, {
-        stdio,
-        env,
-        shell: true
-      });
+      // Handle shell commands properly based on platform
+      let spawnOptions;
+      let commandToRun;
+      let argsToUse;
+      
+      if (process.platform === 'win32') {
+        commandToRun = 'cmd';
+        argsToUse = ['/c', command, ...args];
+        spawnOptions = { stdio, env };
+      } else {
+        commandToRun = command;
+        argsToUse = args;
+        spawnOptions = { stdio, env };
+      }
+      
+      const child = spawn(commandToRun, argsToUse, spawnOptions);
       
       let stdout = '';
       let stderr = '';

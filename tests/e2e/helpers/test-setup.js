@@ -18,15 +18,17 @@ global.TEST_CONFIG = {
 };
 
 /**
- * Global setup - runs once before all tests
+ * Setup functions that can be called by individual test files
  */
-before(async function() {
-  this.timeout(60000); // Extended timeout for setup
-  
+
+/**
+ * Initialize global test environment (call from individual test files)
+ */
+export async function setupTestEnvironment() {
   console.log('🚀 Starting aiNote E2E test setup...');
   console.log(`📋 Configuration:`);
-  console.log(`   - Headless: ${global.TEST_CONFIG.headless}`);
-  console.log(`   - Debug: ${global.TEST_CONFIG.debug}`);
+  console.log(`   - Headless: ${global.TEST_CONFIG?.headless || process.env.HEADLESS}`);
+  console.log(`   - Debug: ${global.TEST_CONFIG?.debug || process.env.DEBUG}`);
   console.log(`   - Platform: ${process.platform}`);
   console.log(`   - Environment: ${process.env.NODE_ENV || 'test'}`);
   
@@ -34,51 +36,19 @@ before(async function() {
   await verifyTestEnvironment();
   
   console.log('✅ E2E test setup complete');
-});
+}
 
 /**
- * Global cleanup - runs once after all tests
+ * Cleanup test environment (call from individual test files)
  */
-after(async function() {
-  this.timeout(30000);
-  
+export async function cleanupTestEnvironment() {
   console.log('🧹 Running E2E test cleanup...');
   
   // Cleanup any remaining processes or files
-  await cleanupTestEnvironment();
+  await cleanupTestEnvironmentImpl();
   
   console.log('✅ E2E test cleanup complete');
-});
-
-/**
- * Per-test setup
- */
-beforeEach(function() {
-  // Set test timeout based on test type
-  const testName = this.currentTest.title;
-  
-  if (testName.includes('startup') || testName.includes('build')) {
-    this.timeout(60000); // Extended timeout for slow operations
-  } else {
-    this.timeout(global.TEST_CONFIG.timeout);
-  }
-  
-  if (global.TEST_CONFIG.debug) {
-    console.log(`\n🧪 Starting test: ${testName}`);
-  }
-});
-
-/**
- * Per-test cleanup
- */
-afterEach(function() {
-  const testName = this.currentTest.title;
-  const testState = this.currentTest.state;
-  
-  if (global.TEST_CONFIG.debug) {
-    console.log(`📊 Test completed: ${testName} (${testState})`);
-  }
-});
+}
 
 /**
  * Verify test environment is properly configured
@@ -119,9 +89,9 @@ async function verifyTestEnvironment() {
 }
 
 /**
- * Cleanup test environment
+ * Cleanup test environment implementation
  */
-async function cleanupTestEnvironment() {
+async function cleanupTestEnvironmentImpl() {
   // Kill any remaining test processes
   // This will be implemented in driver-manager.js
   

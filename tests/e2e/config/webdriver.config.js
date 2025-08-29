@@ -14,12 +14,12 @@ import chrome from 'selenium-webdriver/chrome.js';
 export const WebDriverConfig = {
   
   /**
-   * Get Chrome WebDriver options for macOS (current implementation)
+   * Get Chrome WebDriver options optimized for Chrome for Testing
    */
   getChromeOptions() {
     const options = new chrome.Options();
     
-    // Basic Chrome options
+    // Chrome for Testing optimizations
     options.addArguments([
       '--disable-dev-shm-usage',
       '--no-sandbox',
@@ -28,12 +28,35 @@ export const WebDriverConfig = {
       '--disable-features=VizDisplayCompositor',
       '--disable-extensions',
       '--disable-plugins',
-      '--disable-images',
       '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--disable-translate',
+      '--hide-scrollbars',
+      '--metrics-recording-only',
+      '--mute-audio',
+      '--no-first-run',
+      '--safebrowsing-disable-auto-update',
       '--window-size=1200,800'
     ]);
+    
+    // Chrome for Testing specific optimizations
+    if (process.env.USE_CHROME_FOR_TESTING !== 'false') {
+      options.addArguments([
+        '--enable-automation',
+        '--disable-browser-side-navigation',
+        '--disable-client-side-phishing-detection',
+        '--disable-component-update',
+        '--disable-hang-monitor',
+        '--disable-ipc-flooding-protection',
+        '--disable-popup-blocking',
+        '--disable-prompt-on-repost',
+        '--password-store=basic',
+        '--use-mock-keychain'
+      ]);
+    }
     
     // Headless mode for CI/CD
     if (process.env.HEADLESS === 'true' || process.env.CI) {
@@ -46,18 +69,34 @@ export const WebDriverConfig = {
         '--enable-logging',
         '--v=1'
       ]);
+    } else {
+      // Reduce logging in production
+      options.addArguments([
+        '--log-level=3',
+        '--silent'
+      ]);
     }
     
-    // Performance optimizations
+    // Performance optimizations for E2E testing
     options.setUserPreferences({
       'profile.default_content_setting_values': {
         notifications: 2, // Block notifications
-        media_stream: 2   // Block media access
+        media_stream: 2,  // Block media access
+        geolocation: 2,   // Block location requests
+        plugins: 2,       // Block plugins
+        popups: 2,        // Block popups
+        mixed_script: 2   // Block mixed scripts
       },
       'profile.managed_default_content_settings': {
-        images: 2 // Block images for faster loading
-      }
+        images: process.env.LOAD_IMAGES === 'true' ? 1 : 2 // Block images by default for speed
+      },
+      'profile.content_settings.exceptions.automatic_downloads.*.setting': 2 // Block downloads
     });
+    
+    // Set Chrome for Testing binary path if available
+    if (process.env.CHROME_FOR_TESTING_PATH) {
+      options.setChromeBinaryPath(process.env.CHROME_FOR_TESTING_PATH);
+    }
     
     return options;
   },
@@ -71,7 +110,7 @@ export const WebDriverConfig = {
     switch (browser.toLowerCase()) {
       case 'chrome':
         capabilities.setBrowserName(Browser.CHROME);
-        capabilities.set('goog:chromeOptions', this.getChromeOptions().toCapabilities()['goog:chromeOptions']);
+        // Chrome options are handled directly in createDriver method
         break;
         
       case 'firefox':
@@ -97,10 +136,8 @@ export const WebDriverConfig = {
   async createDriver(browser = 'chrome') {
     const builder = new Builder();
     
-    // Set browser and capabilities
+    // Set browser 
     builder.forBrowser(browser);
-    const capabilities = this.getCapabilities(browser);
-    builder.withCapabilities(capabilities);
     
     // Platform-specific driver setup
     if (browser === 'chrome') {
