@@ -30,6 +30,9 @@ aiNote is a **local-first, AI-powered markdown note-taking application** built w
 - `pnpm test:ui` - Run tests with browser UI
 - `pnpm test:watch` - Run tests in watch mode during development
 - `pnpm test:coverage` - Generate coverage report
+- `pnpm test:e2e` - Run end-to-end tests with browser UI
+- `pnpm test:e2e:headless` - Run E2E tests in headless mode (for CI)
+- `pnpm test:all` - Run complete test suite (unit + E2E)
 - `pnpm test tests/unit/smoke-test.test.js --run` - Validate testing infrastructure
 
 ### Performance Monitoring
@@ -66,7 +69,14 @@ ainote/
 │   ├── unit/           # Unit tests
 │   │   ├── smoke-test.test.js # Infrastructure validation
 │   │   └── *.test.js   # Component and utility tests
-│   └── integration/    # Integration tests (future)
+│   ├── integration/    # Integration tests
+│   └── e2e/            # End-to-end tests
+│       ├── README.md   # E2E testing documentation
+│       ├── config/     # E2E test configuration
+│       ├── helpers/    # E2E testing utilities
+│       ├── specs/      # E2E test specifications
+│       ├── fixtures/   # Test data and sample vaults
+│       └── run-e2e-tests.js # E2E test runner
 └── src-tauri/          # Backend (Rust)
     ├── src/
     │   ├── main.rs     # Application entry point

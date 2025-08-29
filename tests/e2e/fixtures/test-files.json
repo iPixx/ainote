@@ -1,0 +1,88 @@
+{
+  "testVault": {
+    "path": "./tests/e2e/fixtures/test-vault",
+    "files": [
+      {
+        "name": "welcome.md",
+        "type": "file",
+        "size": 500,
+        "description": "Main welcome file with various markdown features"
+      },
+      {
+        "name": "notes.md", 
+        "type": "file",
+        "size": 200,
+        "description": "Simple notes file for basic testing"
+      },
+      {
+        "name": "empty.md",
+        "type": "file", 
+        "size": 0,
+        "description": "Empty file for edge case testing"
+      },
+      {
+        "name": "subfolder",
+        "type": "directory",
+        "children": [
+          {
+            "name": "nested-file.md",
+            "type": "file",
+            "size": 100,
+            "description": "File in subdirectory"
+          }
+        ]
+      }
+    ]
+  },
+  "testScenarios": [
+    {
+      "name": "Basic Vault Operations",
+      "description": "Test vault selection, file tree loading, and navigation",
+      "steps": [
+        "Select test vault",
+        "Verify file tree loads",
+        "Check all expected files are present",
+        "Test folder expansion/collapse"
+      ]
+    },
+    {
+      "name": "File Operations",
+      "description": "Test file selection, content loading, and editing",
+      "steps": [
+        "Select welcome.md file",
+        "Verify content loads in editor",
+        "Edit content",
+        "Verify auto-save functionality",
+        "Switch between files"
+      ]
+    },
+    {
+      "name": "Editor/Preview Toggle",
+      "description": "Test switching between editor and preview modes",
+      "steps": [
+        "Load file with markdown content",
+        "Switch to preview mode",
+        "Verify markdown is rendered",
+        "Switch back to editor mode",
+        "Verify content is editable"
+      ]
+    },
+    {
+      "name": "Performance Validation",
+      "description": "Validate application meets performance requirements",
+      "steps": [
+        "Measure vault loading time",
+        "Measure file switching time",
+        "Measure large file handling",
+        "Check memory usage"
+      ]
+    }
+  ],
+  "performanceThresholds": {
+    "vaultLoadTime": 5000,
+    "fileLoadTime": 1000,
+    "fileSwitchTime": 500,
+    "memoryUsage": 104857600,
+    "domContentLoaded": 3000
+  }
+}
