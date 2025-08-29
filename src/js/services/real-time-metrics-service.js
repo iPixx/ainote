@@ -89,6 +89,7 @@ class RealTimeMetricsService {
                     enable_alerts: true,
                     alert_degradation_threshold: 20.0,
                     enable_detailed_logging: false,
+                    auto_persist_interval_seconds: 60, // Auto-persist metrics every 60 seconds
                 };
                 
                 await invoke('start_performance_monitoring', { request: { config } });

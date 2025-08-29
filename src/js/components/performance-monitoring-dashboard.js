@@ -719,6 +719,10 @@ class PerformanceMonitoringDashboard {
                     resource_tracking_interval_ms: this.resourceUpdateInterval,
                     enable_alerts: true,
                     max_overhead_percent: 1.0, // <1% overhead requirement
+                    auto_persist_interval_seconds: 60, // Auto-persist metrics every 60 seconds
+                    max_samples_in_memory: 1000,
+                    alert_degradation_threshold: 20.0,
+                    enable_detailed_logging: false,
                 };
                 
                 await invoke('start_performance_monitoring', { 
