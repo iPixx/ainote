@@ -8,6 +8,8 @@ import FileTree from './js/components/file-tree.js';
 import EditorPreviewPanel from './js/components/editor-preview-panel.js';
 import AiStatusPanel from './js/components/ai-status-panel.js';
 import AiPanelController from './js/components/ai-panel-controller.js';
+import { PerformanceMonitoringDashboard } from './js/components/performance-monitoring-dashboard.js';
+import { realTimeMetricsService } from './js/services/real-time-metrics-service.js';
 
 // Initialize global application state
 const appState = new AppState();
@@ -19,6 +21,7 @@ let fileTreeComponent;
 let editorPreviewPanel;
 let aiStatusPanel;
 let aiPanelController;
+let performanceDashboard;
 
 // Initialize service instances
 let vaultManager;
@@ -880,6 +883,23 @@ window.addEventListener('DOMContentLoaded', async () => {
   console.log('🔍 Tauri available:', !!window.__TAURI__);
   console.log('🔍 Tauri core:', !!window.__TAURI__?.core);
   console.log('🔍 Tauri window:', !!window.__TAURI__?.window);
+  
+  // Initialize performance monitoring dashboard
+  try {
+    performanceDashboard = new PerformanceMonitoringDashboard();
+    console.log('✅ Performance monitoring dashboard initialized');
+    
+    // Start real-time metrics service
+    await realTimeMetricsService.start();
+    console.log('✅ Real-time metrics service started');
+    
+    // Make dashboard globally accessible
+    window.performanceDashboard = performanceDashboard;
+    window.realTimeMetricsService = realTimeMetricsService;
+    
+  } catch (error) {
+    console.warn('⚠️ Failed to initialize performance monitoring:', error);
+  }
   
   // Initialize window instance
   try {

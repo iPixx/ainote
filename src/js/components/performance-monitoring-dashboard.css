@@ -1,0 +1,451 @@
+/* Performance Monitoring Dashboard Styles */
+
+.performance-monitoring-dashboard {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 400px;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.95);
+    color: #ffffff;
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+    z-index: 1000;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    overflow-y: auto;
+    border-left: 1px solid #333;
+}
+
+.performance-monitoring-dashboard.visible {
+    transform: translateX(0);
+}
+
+.performance-dashboard-header {
+    position: sticky;
+    top: 0;
+    background: #000;
+    padding: 12px;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: between;
+    align-items: center;
+}
+
+.performance-dashboard-title {
+    font-weight: bold;
+    color: #00ff00;
+    flex: 1;
+}
+
+.performance-dashboard-toggle {
+    background: transparent;
+    border: 1px solid #555;
+    color: #fff;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 2px;
+    font-size: 10px;
+}
+
+.performance-dashboard-toggle:hover {
+    border-color: #00ff00;
+}
+
+.performance-dashboard-content {
+    padding: 0;
+}
+
+.performance-section {
+    margin: 16px 12px;
+    border: 1px solid #333;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.performance-section-header {
+    background: #1a1a1a;
+    padding: 8px 12px;
+    font-weight: bold;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #ccc;
+}
+
+.performance-section-content {
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* Real-time Metrics Panel */
+.realtime-metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.metric-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 2px;
+    border: 1px solid transparent;
+}
+
+.metric-item.warning {
+    border-color: #ffaa00;
+    background: rgba(255, 170, 0, 0.1);
+}
+
+.metric-item.critical {
+    border-color: #ff4444;
+    background: rgba(255, 68, 68, 0.1);
+}
+
+.metric-value {
+    font-size: 16px;
+    font-weight: bold;
+    color: #00ff00;
+    margin-bottom: 2px;
+}
+
+.metric-value.warning {
+    color: #ffaa00;
+}
+
+.metric-value.critical {
+    color: #ff4444;
+}
+
+.metric-label {
+    font-size: 9px;
+    color: #ccc;
+    text-align: center;
+}
+
+.metric-trend {
+    font-size: 8px;
+    margin-top: 2px;
+}
+
+.trend-up {
+    color: #ff4444;
+}
+
+.trend-down {
+    color: #00ff00;
+}
+
+.trend-stable {
+    color: #ccc;
+}
+
+/* Resource Utilization Chart */
+.resource-chart {
+    height: 60px;
+    background: rgba(0, 0, 0, 0.8);
+    position: relative;
+    border: 1px solid #333;
+    margin: 8px 0;
+}
+
+.resource-chart-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.chart-legend {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 4px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    font-size: 8px;
+}
+
+.legend-color {
+    width: 8px;
+    height: 8px;
+    margin-right: 4px;
+    border-radius: 1px;
+}
+
+.legend-cpu {
+    background: #00ff00;
+}
+
+.legend-memory {
+    background: #0088ff;
+}
+
+.legend-disk {
+    background: #ff8800;
+}
+
+/* AI Operation Metrics */
+.ai-operations-list {
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.ai-operation-item {
+    display: flex;
+    justify-content: between;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 10px;
+}
+
+.ai-operation-item:last-child {
+    border-bottom: none;
+}
+
+.ai-operation-name {
+    flex: 1;
+    color: #ccc;
+}
+
+.ai-operation-time {
+    color: #00ff00;
+    font-family: monospace;
+}
+
+.ai-operation-time.slow {
+    color: #ffaa00;
+}
+
+.ai-operation-time.very-slow {
+    color: #ff4444;
+}
+
+/* UI Responsiveness Indicator */
+.ui-responsiveness {
+    display: flex;
+    align-items: center;
+    justify-content: between;
+}
+
+.frame-time-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.frame-time-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #00ff00;
+}
+
+.frame-time-dot.warning {
+    background: #ffaa00;
+}
+
+.frame-time-dot.critical {
+    background: #ff4444;
+}
+
+.input-lag-meter {
+    width: 60px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    position: relative;
+    border-radius: 2px;
+}
+
+.input-lag-fill {
+    height: 100%;
+    background: #00ff00;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.input-lag-fill.warning {
+    background: #ffaa00;
+}
+
+.input-lag-fill.critical {
+    background: #ff4444;
+}
+
+/* Performance Reports */
+.performance-reports {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.report-button {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid #555;
+    color: #fff;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 2px;
+    font-size: 10px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.report-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: #00ff00;
+}
+
+.report-button:active {
+    background: rgba(0, 255, 0, 0.1);
+}
+
+/* Performance Alerts */
+.performance-alerts {
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.performance-alert {
+    padding: 6px;
+    margin: 4px 0;
+    border-radius: 2px;
+    font-size: 9px;
+    border-left: 3px solid;
+}
+
+.performance-alert.info {
+    background: rgba(0, 136, 255, 0.1);
+    border-left-color: #0088ff;
+}
+
+.performance-alert.warning {
+    background: rgba(255, 170, 0, 0.1);
+    border-left-color: #ffaa00;
+}
+
+.performance-alert.critical {
+    background: rgba(255, 68, 68, 0.1);
+    border-left-color: #ff4444;
+}
+
+.alert-message {
+    margin-bottom: 2px;
+}
+
+.alert-timestamp {
+    color: #999;
+    font-size: 8px;
+}
+
+/* Toggle Button (floating) */
+.performance-toggle-button {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid #555;
+    color: #fff;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: monospace;
+    z-index: 999;
+    transition: all 0.2s ease;
+}
+
+.performance-toggle-button:hover {
+    background: rgba(0, 255, 0, 0.1);
+    border-color: #00ff00;
+    color: #00ff00;
+}
+
+/* Data Tables */
+.performance-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9px;
+}
+
+.performance-data-table th,
+.performance-data-table td {
+    padding: 4px 6px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.performance-data-table th {
+    background: rgba(255, 255, 255, 0.1);
+    font-weight: bold;
+    color: #ccc;
+}
+
+.performance-data-table td {
+    color: #fff;
+}
+
+/* Scrollbar styling */
+.performance-monitoring-dashboard::-webkit-scrollbar,
+.ai-operations-list::-webkit-scrollbar,
+.performance-alerts::-webkit-scrollbar {
+    width: 6px;
+}
+
+.performance-monitoring-dashboard::-webkit-scrollbar-track,
+.ai-operations-list::-webkit-scrollbar-track,
+.performance-alerts::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.performance-monitoring-dashboard::-webkit-scrollbar-thumb,
+.ai-operations-list::-webkit-scrollbar-thumb,
+.performance-alerts::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.performance-monitoring-dashboard::-webkit-scrollbar-thumb:hover,
+.ai-operations-list::-webkit-scrollbar-thumb:hover,
+.performance-alerts::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* Loading states */
+.loading-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: #ccc;
+}
+
+.loading-dots {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid #00ff00;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .performance-monitoring-dashboard {
+        width: 100%;
+    }
+    
+    .realtime-metrics-grid {
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+}
