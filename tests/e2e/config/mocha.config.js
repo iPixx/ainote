@@ -25,10 +25,8 @@ export default {
   bail: false,          // Continue running tests after failures
   parallel: false,      // Run tests sequentially for E2E stability
   
-  // Environment
-  require: [
-    'tests/e2e/helpers/test-setup.js'  // Global test setup
-  ],
+  // Environment - individual tests handle their own setup
+  // require: [] // No global setup to avoid ES module issues
   
   // Grep patterns (can be overridden by CLI)
   grep: process.env.TEST_GREP || undefined,
