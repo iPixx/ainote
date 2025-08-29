@@ -122,6 +122,10 @@ pub mod optimization_commands;
 // Handles: AI suggestion caching, context-aware filtering, cache invalidation, and performance monitoring
 pub mod suggestion_cache_commands;
 
+// Memory Management Commands Module
+// Handles: memory monitoring, allocation limits, leak detection, and garbage collection
+pub mod memory_commands;
+
 // Re-export all command functions for easy access in lib.rs
 pub use file_operations::*;
 pub use vault_operations::*;
@@ -139,3 +143,4 @@ pub use monitoring_commands::*;
 pub use indexing_commands::*;
 pub use optimization_commands::*;
 pub use suggestion_cache_commands::*;
+pub use memory_commands::*;

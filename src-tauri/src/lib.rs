@@ -53,6 +53,7 @@ pub mod file_monitor;          // File system monitoring for real-time indexing 
 pub mod benchmarks;
 pub mod performance_baseline;
 pub mod regression_detection;
+pub mod memory_manager;        // Advanced memory management system
 
 // Legacy standalone command modules (still used in invoke_handler)
 // TODO: These should eventually be fully integrated into commands/ modules
@@ -68,6 +69,9 @@ pub mod ollama_integration_tests;
 
 #[cfg(test)]
 pub mod embedding_tests;
+
+#[cfg(test)]
+pub mod memory_integration_test;
 
 // Re-exports for commonly used types
 pub use errors::{FileSystemError, FileSystemResult};
@@ -94,6 +98,10 @@ pub use text_chunker::{
 pub use indexing_pipeline::{
     IndexingPipeline, PipelineConfig, IndexingRequest, IndexingPriority, IndexingStatus, 
     IndexingProgress, CancellationToken, IndexingError, IndexingResult
+};
+pub use memory_manager::{
+    MemoryManager, MemoryManagerConfig, MemoryError, MemoryResult, MemoryMetrics,
+    AllocationLimiter, AllocationType, MemoryAllocation
 };
 
 /// Main application entry point and Tauri app configuration.
@@ -280,7 +288,22 @@ pub fn run() {
             commands::suggestion_cache_commands::get_suggestion_cache_config,
             commands::suggestion_cache_commands::update_suggestion_cache_config,
             commands::suggestion_cache_commands::warm_suggestion_cache_for_file,
-            commands::suggestion_cache_commands::get_suggestion_cache_size
+            commands::suggestion_cache_commands::get_suggestion_cache_size,
+            
+            // Memory Management Commands
+            commands::memory_commands::start_memory_management,
+            commands::memory_commands::stop_memory_management,
+            commands::memory_commands::get_memory_management_status,
+            commands::memory_commands::get_memory_metrics,
+            commands::memory_commands::get_memory_usage_history,
+            commands::memory_commands::request_ai_memory_allocation,
+            commands::memory_commands::release_ai_memory_allocation,
+            commands::memory_commands::track_memory_allocation,
+            commands::memory_commands::release_memory_allocation,
+            commands::memory_commands::trigger_memory_garbage_collection,
+            commands::memory_commands::detect_memory_leaks,
+            commands::memory_commands::update_memory_management_config,
+            commands::memory_commands::is_memory_management_active
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
