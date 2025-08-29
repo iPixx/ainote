@@ -126,6 +126,10 @@ pub mod suggestion_cache_commands;
 // Handles: memory monitoring, allocation limits, leak detection, and garbage collection
 pub mod memory_commands;
 
+// Resource Allocation Commands Module
+// Handles: CPU priority management, I/O scheduling, background thread management, and graceful degradation
+pub mod resource_commands_simple;
+
 // Re-export all command functions for easy access in lib.rs
 pub use file_operations::*;
 pub use vault_operations::*;
@@ -144,3 +148,4 @@ pub use indexing_commands::*;
 pub use optimization_commands::*;
 pub use suggestion_cache_commands::*;
 pub use memory_commands::*;
+pub use resource_commands_simple::*;

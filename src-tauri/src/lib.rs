@@ -54,6 +54,7 @@ pub mod benchmarks;
 pub mod performance_baseline;
 pub mod regression_detection;
 pub mod memory_manager;        // Advanced memory management system
+pub mod resource_allocator;    // CPU and I/O resource allocation system
 
 // Legacy standalone command modules (still used in invoke_handler)
 // TODO: These should eventually be fully integrated into commands/ modules
@@ -72,6 +73,9 @@ pub mod embedding_tests;
 
 #[cfg(test)]
 pub mod memory_integration_test;
+
+#[cfg(test)]
+pub mod resource_integration_test;
 
 // Re-exports for commonly used types
 pub use errors::{FileSystemError, FileSystemResult};
@@ -102,6 +106,10 @@ pub use indexing_pipeline::{
 pub use memory_manager::{
     MemoryManager, MemoryManagerConfig, MemoryError, MemoryResult, MemoryMetrics,
     AllocationLimiter, AllocationType, MemoryAllocation
+};
+pub use resource_allocator::{
+    ResourceAllocator, ResourceAllocatorConfig, ResourceError, ResourceResult, ResourceMetrics,
+    OperationPriority, OperationType
 };
 
 /// Main application entry point and Tauri app configuration.
@@ -303,7 +311,20 @@ pub fn run() {
             commands::memory_commands::trigger_memory_garbage_collection,
             commands::memory_commands::detect_memory_leaks,
             commands::memory_commands::update_memory_management_config,
-            commands::memory_commands::is_memory_management_active
+            commands::memory_commands::is_memory_management_active,
+            
+            // Resource Allocation Commands
+            commands::resource_commands_simple::start_resource_allocation,
+            commands::resource_commands_simple::stop_resource_allocation,
+            commands::resource_commands_simple::get_resource_allocation_status,
+            commands::resource_commands_simple::get_resource_metrics_json,
+            commands::resource_commands_simple::is_system_under_pressure,
+            commands::resource_commands_simple::request_ui_operation_priority,
+            commands::resource_commands_simple::schedule_ai_operation,
+            commands::resource_commands_simple::schedule_file_io_operation,
+            commands::resource_commands_simple::enable_graceful_degradation,
+            commands::resource_commands_simple::cleanup_completed_tasks,
+            commands::resource_commands_simple::update_resource_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
