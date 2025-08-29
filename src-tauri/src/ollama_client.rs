@@ -431,9 +431,9 @@ impl OllamaClient {
         // Get all available models
         let available_models = self.get_available_models().await?;
         
-        // Find the requested model
+        // Find the requested model (with flexible tag matching)
         let model_info = available_models.iter()
-            .find(|model| model.name == model_name)
+            .find(|model| self.matches_model_name(&model.name, model_name))
             .cloned();
         
         let is_available = model_info.is_some();
@@ -454,6 +454,33 @@ impl OllamaClient {
             info: model_info,
             verification_time_ms: elapsed.as_millis() as u64,
         })
+    }
+
+    /// Match model names with flexible tag handling
+    /// Handles cases where user searches for "model-name" but Ollama has "model-name:latest"
+    fn matches_model_name(&self, ollama_model_name: &str, search_name: &str) -> bool {
+        // First check exact match
+        if ollama_model_name == search_name {
+            return true;
+        }
+        
+        // Check if the search name matches the base name (without tag)
+        if let Some(base_name) = ollama_model_name.split(':').next() {
+            if base_name == search_name {
+                return true;
+            }
+        }
+        
+        // Check if the search name includes a tag but matches a different tag version
+        if let Some(search_base) = search_name.split(':').next() {
+            if let Some(ollama_base) = ollama_model_name.split(':').next() {
+                if search_base == ollama_base {
+                    return true;
+                }
+            }
+        }
+        
+        false
     }
 
     /// Check if a model is compatible for embedding use
@@ -523,7 +550,7 @@ impl OllamaClient {
     /// Get model information for a specific model
     pub async fn get_model_info(&self, model_name: &str) -> Result<Option<ModelInfo>, OllamaClientError> {
         let models = self.get_available_models().await?;
-        Ok(models.into_iter().find(|model| model.name == model_name))
+        Ok(models.into_iter().find(|model| self.matches_model_name(&model.name, model_name)))
     }
 
     // === MODEL DOWNLOAD METHODS ===
@@ -1390,6 +1417,38 @@ mod tests {
                 (actual, expected) => panic!("Model '{}': expected {:?}, got {:?}", model_name, expected, actual),
             }
         }
+    }
+
+    #[test]
+    fn test_matches_model_name() {
+        let client = OllamaClient::new();
+        
+        // Test exact matches
+        assert!(client.matches_model_name("nomic-embed-text", "nomic-embed-text"));
+        assert!(client.matches_model_name("llama3:8b", "llama3:8b"));
+        
+        // Test tag handling - search without tag matches model with :latest
+        assert!(client.matches_model_name("nomic-embed-text:latest", "nomic-embed-text"));
+        assert!(client.matches_model_name("llama3:8b", "llama3"));
+        assert!(client.matches_model_name("mistral:latest", "mistral"));
+        
+        // Test tag handling - search with tag matches model with different tag
+        assert!(client.matches_model_name("nomic-embed-text:latest", "nomic-embed-text:v1"));
+        assert!(client.matches_model_name("llama3:8b", "llama3:7b"));
+        
+        // Test non-matches
+        assert!(!client.matches_model_name("nomic-embed-text", "different-model"));
+        assert!(!client.matches_model_name("llama3:8b", "mistral"));
+        assert!(!client.matches_model_name("nomic-embed-text:latest", "mxbai-embed-large"));
+        
+        // Test edge cases
+        assert!(!client.matches_model_name("", "nomic-embed-text"));
+        assert!(!client.matches_model_name("nomic-embed-text", ""));
+        assert!(client.matches_model_name("", ""));
+        
+        // Test partial matches (should not match)
+        assert!(!client.matches_model_name("nomic-embed-text", "nomic"));
+        assert!(!client.matches_model_name("nomic", "nomic-embed-text"));
     }
 
     // === DOWNLOAD FUNCTIONALITY TESTS ===
