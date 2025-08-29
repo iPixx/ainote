@@ -118,6 +118,10 @@ pub mod indexing_commands;
 // Handles: automatic optimization scheduling, trigger configuration, manual optimization execution, and status monitoring
 pub mod optimization_commands;
 
+// Suggestion Cache Commands Module
+// Handles: AI suggestion caching, context-aware filtering, cache invalidation, and performance monitoring
+pub mod suggestion_cache_commands;
+
 // Re-export all command functions for easy access in lib.rs
 pub use file_operations::*;
 pub use vault_operations::*;
@@ -134,3 +138,4 @@ pub use rebuilding_commands::*;
 pub use monitoring_commands::*;
 pub use indexing_commands::*;
 pub use optimization_commands::*;
+pub use suggestion_cache_commands::*;
