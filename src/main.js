@@ -8,6 +8,8 @@ import FileTree from './js/components/file-tree.js';
 import EditorPreviewPanel from './js/components/editor-preview-panel.js';
 import AiStatusPanel from './js/components/ai-status-panel.js';
 import AiPanelController from './js/components/ai-panel-controller.js';
+import { PerformanceMonitoringDashboard } from './js/components/performance-monitoring-dashboard.js';
+import { realTimeMetricsService } from './js/services/real-time-metrics-service.js';
 
 // Initialize global application state
 const appState = new AppState();
@@ -19,6 +21,7 @@ let fileTreeComponent;
 let editorPreviewPanel;
 let aiStatusPanel;
 let aiPanelController;
+let performanceDashboard;
 
 // Initialize service instances
 let vaultManager;
@@ -861,6 +864,7 @@ window.debouncedSaveLayoutState = debouncedSaveLayoutState;
 window.activateFileTreeSearch = activateFileTreeSearch;
 window.saveWindowState = saveWindowState;
 window.showNotification = showNotification;
+window.togglePerformanceDashboard = togglePerformanceDashboard;
 
 // Development and testing functions
 window.runLayoutTest = function() {
@@ -1275,6 +1279,13 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
     }
     
+    // Handle performance dashboard keyboard shortcut (Ctrl+Shift+M or Cmd+Shift+M)
+    if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'M') {
+      event.preventDefault();
+      console.log('📊 Performance dashboard shortcut detected');
+      togglePerformanceDashboard();
+    }
+    
     // Handle performance testing panel keyboard shortcut (Ctrl+Shift+Alt+P or Cmd+Shift+Alt+P)
     if (((event.metaKey || event.ctrlKey) && event.shiftKey && event.altKey && event.key === 'P')) {
       event.preventDefault();
@@ -1416,6 +1427,36 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Initialize save status
   updateSaveStatus(currentState.unsavedChanges ? 'unsaved' : 'saved');
   
+  // Initialize performance monitoring dashboard (after all DOM elements are ready)
+  setTimeout(async () => {
+    try {
+      console.log('🔄 Initializing performance monitoring dashboard...');
+      performanceDashboard = new PerformanceMonitoringDashboard();
+      console.log('✅ Performance monitoring dashboard initialized');
+      
+      // Start real-time metrics service
+      await realTimeMetricsService.start();
+      console.log('✅ Real-time metrics service started');
+      
+      // Make dashboard globally accessible
+      window.performanceDashboard = performanceDashboard;
+      window.realTimeMetricsService = realTimeMetricsService;
+      
+      console.log('🎉 Performance monitoring system fully initialized');
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize performance monitoring:', error);
+      console.error('Error details:', error);
+      
+      // Provide a fallback
+      window.performanceDashboard = {
+        toggle: () => showNotification('Performance dashboard failed to initialize: ' + error.message, 'error'),
+        show: () => showNotification('Performance dashboard failed to initialize: ' + error.message, 'error'),
+        hide: () => {},
+      };
+    }
+  }, 1000); // Wait 1 second for all DOM elements to be ready
+  
   // Show welcome notification
   setTimeout(() => {
     const welcomeState = appState.getState();
@@ -1495,6 +1536,28 @@ function updateOperationStatus(status) {
   const operationStatus = document.getElementById('operationStatus');
   if (operationStatus) {
     operationStatus.textContent = status;
+  }
+}
+
+/**
+ * Toggle performance monitoring dashboard
+ */
+function togglePerformanceDashboard() {
+  if (window.performanceDashboard && typeof window.performanceDashboard.toggle === 'function') {
+    window.performanceDashboard.toggle();
+  } else {
+    showNotification('Performance dashboard is still initializing... Please wait a moment.', 'info');
+    
+    // Try again after a short delay
+    setTimeout(() => {
+      if (window.performanceDashboard && typeof window.performanceDashboard.toggle === 'function') {
+        window.performanceDashboard.toggle();
+        showNotification('Performance dashboard is now ready!', 'success');
+      } else {
+        console.error('Performance dashboard initialization failed or is taking too long');
+        showNotification('Performance dashboard failed to initialize. Check console for details.', 'error');
+      }
+    }, 2000);
   }
 }
 
