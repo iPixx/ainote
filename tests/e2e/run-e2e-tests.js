@@ -193,6 +193,13 @@ class E2ETestRunner {
           // Add other full-stack E2E tests here
         ];
         
+      case 'comprehensive':
+        return [
+          './tests/e2e/specs/infrastructure-demo.e2e.js',
+          './tests/e2e/specs/true-e2e-complete.e2e.js',
+          // Future: Add comprehensive validation specs
+        ];
+        
       case 'hybrid':
       default:
         return [
