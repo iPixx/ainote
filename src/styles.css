@@ -1405,6 +1405,41 @@ button:focus-visible,
 }
 
 /* ===============================
+   Navigation Highlighting (for suggestion navigation)
+   =============================== */
+
+.navigation-highlight {
+  background-color: rgba(255, 235, 59, 0.3) !important;
+  transition: background-color 0.3s ease-out;
+  animation: navigation-highlight-fade 3s ease-out;
+}
+
+@keyframes navigation-highlight-fade {
+  0% {
+    background-color: rgba(255, 235, 59, 0.6);
+  }
+  100% {
+    background-color: rgba(255, 235, 59, 0.1);
+  }
+}
+
+/* Dark mode navigation highlight */
+@media (prefers-color-scheme: dark) {
+  .navigation-highlight {
+    background-color: rgba(255, 193, 7, 0.2) !important;
+  }
+  
+  @keyframes navigation-highlight-fade {
+    0% {
+      background-color: rgba(255, 193, 7, 0.4);
+    }
+    100% {
+      background-color: rgba(255, 193, 7, 0.1);
+    }
+  }
+}
+
+/* ===============================
    Print Styles
    =============================== */
 
