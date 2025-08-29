@@ -55,6 +55,8 @@ pub mod performance_baseline;
 pub mod regression_detection;
 pub mod memory_manager;        // Advanced memory management system
 pub mod resource_allocator;    // CPU and I/O resource allocation system
+pub mod background_processor;  // Background processing system for non-critical AI operations
+pub mod ai_operation_manager;  // Intelligent AI operation prioritization and management system
 
 // Legacy standalone command modules (still used in invoke_handler)
 // TODO: These should eventually be fully integrated into commands/ modules

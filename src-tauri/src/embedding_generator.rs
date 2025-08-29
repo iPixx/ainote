@@ -1,7 +1,9 @@
 use std::time::{Duration, Instant};
+use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
 use thiserror::Error;
+use tokio::sync::RwLock;
 
 use crate::ollama_client::{OllamaConfig, OllamaClientError};
 use crate::text_processing::{TextProcessor, TextProcessingError};
@@ -102,6 +104,16 @@ pub struct EmbeddingConfig {
     pub max_text_length: usize,
     /// Batch size for multiple embedding requests
     pub batch_size: usize,
+    /// Connection warmup on startup
+    pub warmup_connections: bool,
+    /// Keep-alive duration for connections (seconds)
+    pub keep_alive_seconds: u64,
+    /// TCP no-delay optimization
+    pub tcp_nodelay: bool,
+    /// Adaptive timeout based on network conditions
+    pub adaptive_timeout: bool,
+    /// Connection health check interval (seconds)
+    pub health_check_interval_seconds: u64,
 }
 
 impl Default for EmbeddingConfig {
@@ -113,6 +125,11 @@ impl Default for EmbeddingConfig {
             preprocess_text: true,
             max_text_length: 8192, // 8KB max text length
             batch_size: 10, // Process up to 10 texts at once
+            warmup_connections: true, // Warm up connections on startup
+            keep_alive_seconds: 60, // Keep connections alive for 60 seconds
+            tcp_nodelay: true, // Enable TCP no-delay for lower latency
+            adaptive_timeout: true, // Adapt timeout based on network conditions
+            health_check_interval_seconds: 30, // Health check every 30 seconds
         }
     }
 }
@@ -124,6 +141,69 @@ pub struct EmbeddingGenerator {
     ollama_config: OllamaConfig,
     embedding_config: EmbeddingConfig,
     text_processor: TextProcessor,
+    /// Network performance metrics for adaptive timeout
+    network_metrics: Arc<RwLock<NetworkMetrics>>,
+}
+
+/// Network performance tracking for adaptive optimization
+#[derive(Debug, Clone)]
+pub struct NetworkMetrics {
+    /// Moving average of request latencies (ms)
+    avg_latency_ms: f64,
+    /// Number of successful requests
+    success_count: u64,
+    /// Number of failed requests
+    failure_count: u64,
+    /// Last health check timestamp
+    last_health_check: Instant,
+    /// Connection pool efficiency (0.0-1.0)
+    pool_efficiency: f64,
+}
+
+impl Default for NetworkMetrics {
+    fn default() -> Self {
+        Self {
+            avg_latency_ms: 0.0,
+            success_count: 0,
+            failure_count: 0,
+            last_health_check: Instant::now(),
+            pool_efficiency: 1.0,
+        }
+    }
+}
+
+impl NetworkMetrics {
+    /// Update metrics with a new request timing
+    fn update_request_timing(&mut self, latency_ms: f64, success: bool) {
+        if success {
+            self.success_count += 1;
+            // Exponential moving average
+            let alpha = 0.2;
+            if self.avg_latency_ms == 0.0 {
+                self.avg_latency_ms = latency_ms;
+            } else {
+                self.avg_latency_ms = alpha * latency_ms + (1.0 - alpha) * self.avg_latency_ms;
+            }
+        } else {
+            self.failure_count += 1;
+        }
+    }
+
+    /// Calculate adaptive timeout based on current network performance
+    fn calculate_adaptive_timeout(&self, base_timeout_ms: u64) -> u64 {
+        if self.success_count == 0 {
+            return base_timeout_ms;
+        }
+
+        let failure_rate = self.failure_count as f64 / (self.success_count + self.failure_count) as f64;
+        let latency_multiplier = if self.avg_latency_ms > 1000.0 { 2.0 } else { 1.5 };
+        let failure_multiplier = 1.0 + failure_rate;
+
+        let adaptive_timeout = (base_timeout_ms as f64 * latency_multiplier * failure_multiplier) as u64;
+        
+        // Cap at reasonable limits
+        adaptive_timeout.min(base_timeout_ms * 3).max(base_timeout_ms / 2)
+    }
 }
 
 impl EmbeddingGenerator {
@@ -135,19 +215,47 @@ impl EmbeddingGenerator {
     
     /// Create a new embedding generator with custom configuration
     pub fn with_config(ollama_config: OllamaConfig, embedding_config: EmbeddingConfig) -> Self {
-        let client = Client::builder()
+        let mut client_builder = Client::builder()
             .timeout(Duration::from_millis(embedding_config.timeout_ms))
             .pool_max_idle_per_host(embedding_config.connection_pool_size)
-            .pool_idle_timeout(Duration::from_secs(30))
+            .pool_idle_timeout(Duration::from_secs(embedding_config.keep_alive_seconds))
+            .tcp_keepalive(Duration::from_secs(embedding_config.keep_alive_seconds))
+            .tcp_nodelay(embedding_config.tcp_nodelay);
+
+        // Enable HTTP/2 for better connection reuse
+        client_builder = client_builder.http2_prior_knowledge();
+
+        let client = client_builder
             .build()
             .unwrap_or_else(|_| Client::new());
-            
-        Self {
+
+        let network_metrics = Arc::new(RwLock::new(NetworkMetrics::default()));
+        
+        let generator = Self {
             client,
             ollama_config,
-            embedding_config,
+            embedding_config: embedding_config.clone(),
             text_processor: TextProcessor::new(),
+            network_metrics: network_metrics.clone(),
+        };
+
+        // Start connection warmup if enabled
+        if embedding_config.warmup_connections {
+            let warmup_generator = generator.clone();
+            tokio::spawn(async move {
+                warmup_generator.warmup_connections().await;
+            });
         }
+
+        // Start periodic health checks if enabled
+        if embedding_config.health_check_interval_seconds > 0 {
+            let health_generator = generator.clone();
+            tokio::spawn(async move {
+                health_generator.periodic_health_checks().await;
+            });
+        }
+
+        generator
     }
     
     /// Generate embedding for a single text
@@ -286,8 +394,10 @@ impl EmbeddingGenerator {
         Ok(all_embeddings)
     }
     
-    /// Generate a single embedding via HTTP request
+    /// Generate a single embedding via HTTP request with adaptive timeout
     async fn generate_single_embedding_request(&self, text: &str, model: &str) -> EmbeddingResult<Vec<f32>> {
+        let request_start = Instant::now();
+        
         let request = EmbeddingRequest {
             model: model.to_string(),
             prompt: text.to_string(),
@@ -296,13 +406,33 @@ impl EmbeddingGenerator {
         
         let url = format!("{}/api/embeddings", self.ollama_config.base_url);
         
-        let response = self.client
-            .post(&url)
-            .json(&request)
-            .send()
-            .await?;
-            
+        // Use adaptive timeout if enabled
+        let timeout_ms = if self.embedding_config.adaptive_timeout {
+            let metrics = self.network_metrics.read().await;
+            metrics.calculate_adaptive_timeout(self.embedding_config.timeout_ms)
+        } else {
+            self.embedding_config.timeout_ms
+        };
+
+        let response = tokio::time::timeout(
+            Duration::from_millis(timeout_ms),
+            self.client
+                .post(&url)
+                .json(&request)
+                .send()
+        ).await
+        .map_err(|_| EmbeddingError::Timeout { duration_ms: timeout_ms })?
+        .map_err(EmbeddingError::from)?;
+
+        let request_latency = request_start.elapsed().as_millis() as f64;
+        
         if !response.status().is_success() {
+            // Update metrics with failure
+            {
+                let mut metrics = self.network_metrics.write().await;
+                metrics.update_request_timing(request_latency, false);
+            }
+            
             let status_code = response.status().as_u16();
             let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
             return Err(EmbeddingError::Api {
@@ -315,9 +445,21 @@ impl EmbeddingGenerator {
         
         // Validate embedding
         if embedding_response.embedding.is_empty() {
+            // Update metrics with failure
+            {
+                let mut metrics = self.network_metrics.write().await;
+                metrics.update_request_timing(request_latency, false);
+            }
+            
             return Err(EmbeddingError::InvalidResponse {
                 reason: "Empty embedding vector returned".to_string(),
             });
+        }
+
+        // Update metrics with success
+        {
+            let mut metrics = self.network_metrics.write().await;
+            metrics.update_request_timing(request_latency, true);
         }
         
         Ok(embedding_response.embedding)
@@ -424,14 +566,87 @@ impl EmbeddingGenerator {
     /// Update the embedding configuration
     pub fn update_embedding_config(&mut self, config: EmbeddingConfig) {
         // Recreate HTTP client with new timeout and pool settings
-        self.client = Client::builder()
+        let mut client_builder = Client::builder()
             .timeout(Duration::from_millis(config.timeout_ms))
             .pool_max_idle_per_host(config.connection_pool_size)
-            .pool_idle_timeout(Duration::from_secs(30))
+            .pool_idle_timeout(Duration::from_secs(config.keep_alive_seconds))
+            .tcp_keepalive(Duration::from_secs(config.keep_alive_seconds))
+            .tcp_nodelay(config.tcp_nodelay);
+
+        // Enable HTTP/2 for better connection reuse
+        client_builder = client_builder.http2_prior_knowledge();
+
+        self.client = client_builder
             .build()
             .unwrap_or_else(|_| Client::new());
             
         self.embedding_config = config;
+    }
+
+    /// Warm up connections to Ollama service for better initial performance
+    async fn warmup_connections(&self) {
+        eprintln!("🔥 Warming up connections to Ollama service...");
+        
+        // Send a small test request to establish connections
+        let test_text = "Connection warmup test";
+        let test_model = "nomic-embed-text"; // Common embedding model
+        
+        for i in 0..self.embedding_config.connection_pool_size.min(3) {
+            let warmup_start = Instant::now();
+            match self.generate_single_embedding_request(test_text, test_model).await {
+                Ok(_) => {
+                    let warmup_time = warmup_start.elapsed();
+                    eprintln!("✅ Connection {} warmed up in {:?}", i + 1, warmup_time);
+                }
+                Err(e) => {
+                    eprintln!("⚠️ Connection {} warmup failed: {}", i + 1, e);
+                    // Continue with other connections
+                }
+            }
+            
+            // Small delay between warmup requests
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+
+    /// Periodic health checks to monitor connection quality
+    async fn periodic_health_checks(&self) {
+        let mut interval = tokio::time::interval(
+            Duration::from_secs(self.embedding_config.health_check_interval_seconds)
+        );
+        
+        loop {
+            interval.tick().await;
+            
+            let health_check_start = Instant::now();
+            let url = format!("{}/api/tags", self.ollama_config.base_url);
+            
+            match self.client.get(&url).send().await {
+                Ok(response) => {
+                    let latency = health_check_start.elapsed().as_millis() as f64;
+                    let mut metrics = self.network_metrics.write().await;
+                    metrics.last_health_check = Instant::now();
+                    
+                    if response.status().is_success() {
+                        metrics.pool_efficiency = 1.0;
+                        eprintln!("💚 Health check passed ({:.1}ms latency)", latency);
+                    } else {
+                        metrics.pool_efficiency = 0.7; // Degraded but functional
+                        eprintln!("⚠️ Health check degraded: HTTP {}", response.status());
+                    }
+                }
+                Err(e) => {
+                    let mut metrics = self.network_metrics.write().await;
+                    metrics.pool_efficiency = 0.3; // Significant issues
+                    eprintln!("❌ Health check failed: {}", e);
+                }
+            }
+        }
+    }
+
+    /// Get current network performance metrics
+    pub async fn get_network_metrics(&self) -> NetworkMetrics {
+        self.network_metrics.read().await.clone()
     }
 }
 
@@ -446,6 +661,7 @@ mod tests {
             max_retries: 1,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 1000,
+            ..OllamaConfig::default()
         }
     }
     

@@ -14,6 +14,18 @@ pub struct OllamaConfig {
     pub max_retries: usize,
     pub initial_retry_delay_ms: u64,
     pub max_retry_delay_ms: u64,
+    /// Enable HTTP/2 pipelining for better performance
+    pub enable_http2_pipelining: bool,
+    /// Maximum concurrent requests per connection
+    pub max_concurrent_requests: usize,
+    /// Connection keep-alive duration (seconds)
+    pub keep_alive_seconds: u64,
+    /// Enable request batching optimization
+    pub enable_request_batching: bool,
+    /// Maximum batch size for batch requests
+    pub max_batch_size: usize,
+    /// Batch timeout - maximum time to wait for batch completion (ms)
+    pub batch_timeout_ms: u64,
 }
 
 impl Default for OllamaConfig {
@@ -24,6 +36,12 @@ impl Default for OllamaConfig {
             max_retries: 4, // 1s, 2s, 4s, 8s backoff sequence
             initial_retry_delay_ms: 1000, // 1s
             max_retry_delay_ms: 30000, // max 30s
+            enable_http2_pipelining: true, // Enable HTTP/2 pipelining by default
+            max_concurrent_requests: 6, // Allow 6 concurrent requests per connection
+            keep_alive_seconds: 120, // Keep connections alive for 2 minutes
+            enable_request_batching: true, // Enable intelligent request batching
+            max_batch_size: 10, // Maximum 10 requests per batch
+            batch_timeout_ms: 50, // 50ms batch collection timeout
         }
     }
 }
@@ -177,8 +195,26 @@ impl OllamaClient {
 
     /// Create a new Ollama client with custom configuration
     pub fn with_config(config: OllamaConfig) -> Self {
-        let client = Client::builder()
+        let mut client_builder = Client::builder()
             .timeout(Duration::from_millis(config.timeout_ms))
+            .pool_idle_timeout(Duration::from_secs(config.keep_alive_seconds))
+            .tcp_keepalive(Duration::from_secs(config.keep_alive_seconds))
+            .tcp_nodelay(true); // Enable TCP no-delay for lower latency
+
+        // Enable HTTP/2 pipelining if configured
+        if config.enable_http2_pipelining {
+            client_builder = client_builder
+                .http2_prior_knowledge()
+                .http2_keep_alive_interval(Some(Duration::from_secs(30)))
+                .http2_keep_alive_timeout(Duration::from_secs(10));
+        }
+
+        // Configure connection pooling for concurrent requests
+        client_builder = client_builder
+            .pool_max_idle_per_host(config.max_concurrent_requests)
+            .connection_verbose(true);
+
+        let client = client_builder
             .build()
             .expect("Failed to create HTTP client");
 
@@ -912,6 +948,7 @@ mod tests {
             max_retries: 3,
             initial_retry_delay_ms: 500,
             max_retry_delay_ms: 15000,
+            ..OllamaConfig::default()
         };
         
         let client = OllamaClient::with_config(custom_config.clone());
@@ -953,6 +990,7 @@ mod tests {
             max_retries: 2,
             initial_retry_delay_ms: 750,
             max_retry_delay_ms: 20000,
+            ..OllamaConfig::default()
         };
         
         client.update_config(new_config.clone()).await;
@@ -1115,6 +1153,7 @@ mod tests {
                 max_retries: 1,
                 initial_retry_delay_ms: 500,
                 max_retry_delay_ms: 1000,
+                ..OllamaConfig::default()
             },
             OllamaConfig {
                 base_url: "https://remote.ollama.com:8443".to_string(),
@@ -1122,6 +1161,7 @@ mod tests {
                 max_retries: 10,
                 initial_retry_delay_ms: 100,
                 max_retry_delay_ms: 60000,
+                ..OllamaConfig::default()
             },
         ];
         
