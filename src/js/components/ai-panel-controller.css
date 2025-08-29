@@ -1,0 +1,445 @@
+/**
+ * AI Panel Controller Styles
+ * 
+ * Enhanced styling for the AI panel with integrated suggestion display,
+ * status indicators, loading states, and error handling.
+ */
+
+/* Main AI panel layout */
+.ai-panel-main-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 300px;
+  background: var(--ai-panel-background, #fafafa);
+  position: relative;
+}
+
+/* Status indicator */
+.ai-panel-status-indicator {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  background: var(--status-background, #fff);
+  transition: all 0.3s ease;
+}
+
+.status-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.status-text {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary, #333);
+  flex: 1;
+}
+
+/* Status state styling */
+.ai-panel-status-active {
+  --status-background: #f0f9ff;
+  border-bottom-color: var(--accent-color, #007acc);
+}
+
+.ai-panel-status-active .status-icon {
+  color: var(--accent-color, #007acc);
+}
+
+.ai-panel-status-loading {
+  --status-background: #fffbeb;
+  border-bottom-color: var(--warning-color, #f59e0b);
+}
+
+.ai-panel-status-loading .status-icon {
+  color: var(--warning-color, #f59e0b);
+  animation: rotate 1s linear infinite;
+}
+
+.ai-panel-status-loaded {
+  --status-background: #f0fdf4;
+  border-bottom-color: var(--success-color, #10b981);
+}
+
+.ai-panel-status-loaded .status-icon {
+  color: var(--success-color, #10b981);
+  animation: pulse 1s ease-in-out;
+}
+
+.ai-panel-status-empty {
+  --status-background: #f9fafb;
+  border-bottom-color: var(--text-muted, #6b7280);
+}
+
+.ai-panel-status-empty .status-icon {
+  color: var(--text-muted, #6b7280);
+}
+
+.ai-panel-status-error {
+  --status-background: #fef2f2;
+  border-bottom-color: var(--error-color, #ef4444);
+}
+
+.ai-panel-status-error .status-icon {
+  color: var(--error-color, #ef4444);
+  animation: shake 0.5s ease-in-out;
+}
+
+.ai-panel-status-inserted {
+  --status-background: #ecfdf5;
+  border-bottom-color: var(--success-color, #10b981);
+}
+
+.ai-panel-status-inserted .status-icon {
+  color: var(--success-color, #10b981);
+  animation: bounce 0.6s ease-in-out;
+}
+
+.ai-panel-status-referenced {
+  --status-background: #eff6ff;
+  border-bottom-color: var(--info-color, #3b82f6);
+}
+
+.ai-panel-status-referenced .status-icon {
+  color: var(--info-color, #3b82f6);
+  animation: bounce 0.6s ease-in-out;
+}
+
+.ai-panel-status-inactive {
+  --status-background: #f5f5f5;
+  border-bottom-color: var(--border-color, #e0e0e0);
+}
+
+.ai-panel-status-inactive .status-icon {
+  color: var(--text-muted, #6b7280);
+  opacity: 0.6;
+}
+
+.ai-panel-status-disabled {
+  --status-background: #f1f5f9;
+  border-bottom-color: var(--border-color, #e0e0e0);
+}
+
+.ai-panel-status-disabled .status-icon {
+  color: var(--text-muted, #6b7280);
+  opacity: 0.5;
+}
+
+/* Status animations */
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-2px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes bounce {
+  0%, 20%, 60%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-5px);
+  }
+  80% {
+    transform: translateY(-2px);
+  }
+}
+
+/* Suggestions container */
+.ai-panel-suggestions {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Error container */
+.ai-panel-error-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--error-background, #fef2f2);
+  border: 1px solid var(--error-color, #ef4444);
+  border-radius: 4px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.error-content {
+  text-align: center;
+  max-width: 300px;
+}
+
+.error-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  color: var(--error-color, #ef4444);
+}
+
+.error-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--error-color, #ef4444);
+  margin-bottom: 0.5rem;
+}
+
+.error-message {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.4;
+  margin-bottom: 1rem;
+}
+
+.error-retry-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--error-color, #ef4444);
+  background: transparent;
+  color: var(--error-color, #ef4444);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.error-retry-btn:hover {
+  background: var(--error-color, #ef4444);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.error-retry-btn:focus {
+  outline: 2px solid var(--error-color, #ef4444);
+  outline-offset: 2px;
+}
+
+/* Panel disabled state */
+.ai-panel.suggestions-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.ai-panel.suggestions-disabled .ai-panel-status-indicator {
+  background: var(--disabled-background, #f8f9fa);
+  border-bottom-color: var(--border-color, #e0e0e0);
+}
+
+.ai-panel.suggestions-disabled .status-text {
+  color: var(--text-muted, #6b7280);
+}
+
+/* Integration with existing AI panel styles */
+.ai-panel .ai-panel-main-layout {
+  background: transparent; /* Inherit from parent */
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .ai-panel-status-indicator {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .status-icon {
+    font-size: 0.875rem;
+  }
+  
+  .status-text {
+    font-size: 0.8125rem;
+  }
+  
+  .error-content {
+    max-width: 250px;
+  }
+  
+  .error-title {
+    font-size: 0.9375rem;
+  }
+  
+  .error-message {
+    font-size: 0.8125rem;
+  }
+  
+  .error-retry-btn {
+    padding: 0.4375rem 0.875rem;
+    font-size: 0.8125rem;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .ai-panel-status-indicator {
+    border-bottom-width: 2px;
+  }
+  
+  .error-retry-btn {
+    border-width: 2px;
+  }
+  
+  .ai-panel-error-container {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .status-icon,
+  .error-retry-btn,
+  .ai-panel-status-indicator {
+    transition: none;
+    animation: none;
+  }
+  
+  .ai-panel-status-loading .status-icon {
+    animation: none;
+  }
+  
+  .ai-panel-status-loaded .status-icon {
+    animation: none;
+  }
+  
+  .ai-panel-status-error .status-icon {
+    animation: none;
+  }
+  
+  .ai-panel-status-inserted .status-icon,
+  .ai-panel-status-referenced .status-icon {
+    animation: none;
+  }
+  
+  .error-retry-btn:hover {
+    transform: none;
+  }
+}
+
+/* Focus management for keyboard navigation */
+.ai-panel:focus-within .ai-panel-suggestions {
+  outline: 2px solid var(--accent-color, #007acc);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+/* Accessibility improvements */
+.ai-panel-status-indicator[role="status"] {
+  position: relative;
+}
+
+.ai-panel-status-indicator[aria-live="polite"] {
+  /* Screen reader announcements for status changes */
+}
+
+/* Integration with suggestion list styles */
+.ai-panel-suggestions .suggestion-list {
+  border-radius: 0;
+  background: transparent;
+  border: none;
+}
+
+.ai-panel-suggestions .suggestion-item {
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+.ai-panel-suggestions .suggestions-container {
+  padding: 0.5rem;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .ai-panel-main-layout {
+    --ai-panel-background: #1e1e1e;
+    --status-background: #2d2d2d;
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --text-muted: #999999;
+    --border-color: #404040;
+    --accent-color: #4a9eff;
+    --success-color: #51cf66;
+    --error-color: #ff6b6b;
+    --warning-color: #ffd43b;
+    --info-color: #22d3ee;
+    --error-background: #3d1a1a;
+    --disabled-background: #2a2a2a;
+  }
+  
+  .ai-panel-status-active {
+    --status-background: #1a2332;
+  }
+  
+  .ai-panel-status-loading {
+    --status-background: #332b1a;
+  }
+  
+  .ai-panel-status-loaded {
+    --status-background: #1a2e1a;
+  }
+  
+  .ai-panel-status-error {
+    --status-background: #3d1a1a;
+  }
+  
+  .ai-panel-status-inserted {
+    --status-background: #1a2e1a;
+  }
+  
+  .ai-panel-status-referenced {
+    --status-background: #1a2332;
+  }
+  
+  .ai-panel-status-empty,
+  .ai-panel-status-inactive,
+  .ai-panel-status-disabled {
+    --status-background: #2a2a2a;
+  }
+}
+
+/* Panel layout adjustments */
+.ai-panel .ai-content {
+  padding: 0; /* Remove default padding as we handle it in controller */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure proper height inheritance */
+.ai-panel-main-layout,
+.ai-panel-suggestions,
+.ai-panel-suggestions .suggestion-list {
+  height: 100%;
+  min-height: 0; /* Allow flexbox to work properly */
+}
