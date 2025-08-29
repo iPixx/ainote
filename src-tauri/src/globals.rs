@@ -42,6 +42,7 @@ use crate::embedding_generator::EmbeddingGenerator;
 use crate::embedding_cache::EmbeddingCache;
 use crate::embedding_queue::EmbeddingQueue;
 use crate::vector_db::VectorDatabase;
+use crate::suggestion_cache::SuggestionCache;
 
 /// Global Ollama client instance for AI model interactions
 /// 
@@ -81,6 +82,14 @@ pub static EMBEDDING_QUEUE: Lazy<Arc<RwLock<Option<EmbeddingQueue>>>> =
 /// Includes support for incremental updates, similarity search, and
 /// comprehensive database operations with transaction safety.
 pub static VECTOR_DATABASE: Lazy<Arc<RwLock<Option<VectorDatabase>>>> = 
+    Lazy::new(|| Arc::new(RwLock::new(None)));
+
+/// Global suggestion cache instance for AI suggestion optimization
+///
+/// Provides intelligent caching for AI-powered note suggestions with
+/// context-aware filtering, cache invalidation, and performance monitoring.
+/// Includes support for recent suggestion tracking and cache warming.
+pub static SUGGESTION_CACHE: Lazy<Arc<RwLock<Option<SuggestionCache>>>> = 
     Lazy::new(|| Arc::new(RwLock::new(None)));
 
 /// Helper function to get or initialize the embedding cache
@@ -218,6 +227,43 @@ pub async fn get_embedding_generator() -> EmbeddingGenerator {
             let generator = EmbeddingGenerator::new(ollama_config);
             *generator_lock = Some(generator.clone());
             generator
+        }
+    }
+}
+
+/// Helper function to get or initialize the suggestion cache
+///
+/// This function uses the double-checked locking pattern to ensure
+/// thread-safe lazy initialization. If the cache doesn't exist,
+/// it creates a new one with default configuration.
+///
+/// # Returns
+/// 
+/// Returns a cloned `SuggestionCache` instance that can be used
+/// for suggestion caching operations.
+///
+/// # Example
+///
+/// ```rust
+/// let cache = get_suggestion_cache().await;
+/// cache.cache_suggestions("content", "model", &context, suggestions).await;
+/// ```
+pub async fn get_suggestion_cache() -> SuggestionCache {
+    let cache_lock = SUGGESTION_CACHE.read().await;
+    if let Some(cache) = cache_lock.as_ref() {
+        cache.clone()
+    } else {
+        drop(cache_lock);
+        // Initialize cache if not exists
+        let mut cache_lock = SUGGESTION_CACHE.write().await;
+        
+        // Double-check pattern to avoid race conditions
+        if let Some(cache) = cache_lock.as_ref() {
+            cache.clone()
+        } else {
+            let cache = SuggestionCache::new();
+            *cache_lock = Some(cache.clone());
+            cache
         }
     }
 }

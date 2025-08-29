@@ -127,7 +127,7 @@ impl Default for SearchConfig {
 }
 
 /// A similarity search result containing the entry and its similarity score
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResult {
     /// The embedding entry
     pub entry: EmbeddingEntry,

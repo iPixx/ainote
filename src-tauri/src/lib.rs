@@ -42,6 +42,7 @@ pub mod ollama_client;          // Ollama HTTP client and connection management
 pub mod embedding_generator;    // Embedding generation engine
 pub mod embedding_cache;        // Embedding cache management
 pub mod embedding_queue;        // Advanced embedding request queue with cancellation and performance optimization
+pub mod suggestion_cache;       // AI suggestion caching system with context awareness
 pub mod vector_db;             // Vector database storage and operations
 pub mod similarity_search;     // Similarity search algorithms
 pub mod text_chunker;          // Text chunking algorithms and infrastructure
@@ -266,7 +267,20 @@ pub fn run() {
             commands::indexing_commands::get_indexing_status,
             commands::indexing_commands::start_indexing_pipeline,
             commands::indexing_commands::stop_indexing_pipeline,
-            commands::indexing_commands::process_file_changes
+            commands::indexing_commands::process_file_changes,
+            
+            // Suggestion Cache Management
+            commands::suggestion_cache_commands::get_cached_suggestions,
+            commands::suggestion_cache_commands::cache_suggestions,
+            commands::suggestion_cache_commands::check_suggestion_cached,
+            commands::suggestion_cache_commands::invalidate_suggestions_for_file,
+            commands::suggestion_cache_commands::clear_suggestion_cache,
+            commands::suggestion_cache_commands::cleanup_expired_suggestions,
+            commands::suggestion_cache_commands::get_suggestion_cache_metrics,
+            commands::suggestion_cache_commands::get_suggestion_cache_config,
+            commands::suggestion_cache_commands::update_suggestion_cache_config,
+            commands::suggestion_cache_commands::warm_suggestion_cache_for_file,
+            commands::suggestion_cache_commands::get_suggestion_cache_size
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
