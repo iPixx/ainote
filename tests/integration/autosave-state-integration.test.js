@@ -275,8 +275,12 @@ describe('AutoSave + AppState Integration', () => {
       // Trigger content change
       autoSave.handleContentChange('content');
       
-      // Advance timers to trigger save
+      // Advance timers to trigger save and wait for retries to complete
       vi.advanceTimersByTime(AutoSave.DEFAULTS.AUTO_SAVE_DELAY);
+      await vi.runAllTimersAsync();
+      
+      // Advance through all retry delays (3 attempts with 1000ms delays)
+      vi.advanceTimersByTime(3000);
       await vi.runAllTimersAsync();
 
       // Should remain dirty due to save failure
@@ -302,6 +306,10 @@ describe('AutoSave + AppState Integration', () => {
 
       autoSave.handleContentChange('content');
       vi.advanceTimersByTime(AutoSave.DEFAULTS.AUTO_SAVE_DELAY);
+      await vi.runAllTimersAsync();
+      
+      // Advance through retry delay for the second attempt
+      vi.advanceTimersByTime(1000);
       await vi.runAllTimersAsync();
 
       // Should eventually succeed and mark as clean
@@ -417,11 +425,17 @@ describe('AutoSave + AppState Integration', () => {
       
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const result = await autoSave.forceSave();
+      const forcePromise = autoSave.forceSave();
+      
+      // Advance through all retry delays (3 attempts with 1000ms delays)
+      vi.advanceTimersByTime(3000);
+      await vi.runAllTimersAsync();
+      
+      const result = await forcePromise;
 
       expect(result).toBe(false);
       expect(appState.unsavedChanges).toBe(true); // Should remain dirty
-      expect(consoleSpy).toHaveBeenCalledWith('Force save failed:', expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith('Manual save failed:', expect.any(Error));
       
       consoleSpy.mockRestore();
     });

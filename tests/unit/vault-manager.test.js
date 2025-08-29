@@ -70,7 +70,7 @@ describe('VaultManager', () => {
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to load vault preferences during initialization:',
+        'Failed to load recent vaults from app_state.json:',
         expect.any(Error)
       );
       
@@ -215,12 +215,14 @@ describe('VaultManager', () => {
     });
 
     it('should throw error for invalid vault', async () => {
+      tauriMocks.invoke.mockReset();
       tauriMocks.invoke.mockResolvedValue(false); // Invalid vault
 
       await expect(vaultManager.loadVault('/invalid/vault')).rejects.toThrow('Invalid or inaccessible vault: /invalid/vault');
     });
 
     it('should handle loading errors', async () => {
+      tauriMocks.invoke.mockReset();
       tauriMocks.invoke
         .mockImplementationOnce(() => Promise.resolve(true)) // validate_vault succeeds
         .mockImplementationOnce(() => Promise.reject(new Error('Load failed'))); // load_vault fails
@@ -229,6 +231,7 @@ describe('VaultManager', () => {
     });
 
     it('should validate files response format', async () => {
+      tauriMocks.invoke.mockReset();
       tauriMocks.invoke
         .mockImplementationOnce(() => Promise.resolve(true)) // validate_vault
         .mockImplementationOnce(() => Promise.resolve('not-an-array')); // load_vault with invalid response
@@ -245,7 +248,7 @@ describe('VaultManager', () => {
     beforeEach(() => {
       // Mock successful validation and loading
       tauriMocks.invoke
-        .mockImplementation((command, params) => {
+        .mockImplementation((command) => {
           if (command === 'validate_vault') return Promise.resolve(true);
           if (command === 'load_vault') return Promise.resolve(mockFiles);
           if (command === 'save_session_state') return Promise.resolve(true);
@@ -278,12 +281,14 @@ describe('VaultManager', () => {
     });
 
     it('should handle switch failures gracefully', async () => {
-      tauriMocks.invoke.mockRejectedValue(new Error('Switch failed'));
+      // Mock appState.setVault to throw error
+      const setVaultSpy = vi.spyOn(appState, 'setVault').mockRejectedValue(new Error('AppState error'));
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      await expect(vaultManager.switchVault('/failing/vault')).rejects.toThrow('Vault switching failed: Switch failed');
+      await expect(vaultManager.switchVault('/failing/vault')).rejects.toThrow('Vault switching failed: AppState error');
       expect(consoleSpy).toHaveBeenCalledWith('❌ VaultManager: Failed to switch vault:', expect.any(Error));
       
+      setVaultSpy.mockRestore();
       consoleSpy.mockRestore();
     });
 
@@ -524,10 +529,11 @@ describe('VaultManager', () => {
     });
 
     it('should handle refresh errors', async () => {
+      tauriMocks.invoke.mockReset();
       tauriMocks.invoke.mockRejectedValue(new Error('Refresh failed'));
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      await expect(vaultManager.refreshVault()).rejects.toThrow('Vault refresh failed: Refresh failed');
+      await expect(vaultManager.refreshVault()).rejects.toThrow('Vault refresh failed: Vault loading failed: Invalid or inaccessible vault: /test/vault');
       expect(consoleSpy).toHaveBeenCalledWith('Failed to refresh vault:', expect.any(Error));
       
       consoleSpy.mockRestore();

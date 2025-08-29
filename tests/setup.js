@@ -59,12 +59,23 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Mock IntersectionObserver
-global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+// Mock IntersectionObserver - this ensures it's always available in the test environment
+global.IntersectionObserver = vi.fn().mockImplementation((callback, options) => ({
   observe: vi.fn(),
   unobserve: vi.fn(),
   disconnect: vi.fn(),
+  root: options?.root || null,
+  rootMargin: options?.rootMargin || '0px',
+  thresholds: options?.threshold || [0],
+  // Add callback property for testing
+  _callback: callback
 }));
+
+// Make sure window also has IntersectionObserver
+Object.defineProperty(window, 'IntersectionObserver', {
+  writable: true,
+  value: global.IntersectionObserver
+});
 
 // Mock ResizeObserver
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
@@ -80,7 +91,22 @@ global.performance = global.performance || {
   measure: vi.fn(),
   getEntriesByName: vi.fn(() => []),
   getEntriesByType: vi.fn(() => []),
+  // Add memory API mock for FileTree performance monitoring
+  memory: {
+    usedJSHeapSize: 1024 * 1024 * 10, // 10MB
+    totalJSHeapSize: 1024 * 1024 * 50, // 50MB
+    jsHeapSizeLimit: 1024 * 1024 * 100 // 100MB
+  }
 };
+
+// Mock requestIdleCallback and cancelIdleCallback
+global.requestIdleCallback = vi.fn((callback) => {
+  return setTimeout(() => callback({ timeRemaining: () => 50 }), 0);
+});
+global.cancelIdleCallback = vi.fn((id) => clearTimeout(id));
+
+// Mock scrollIntoView method for DOM elements
+Element.prototype.scrollIntoView = vi.fn();
 
 // Set up localStorage mock
 const localStorageMock = {

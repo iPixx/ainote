@@ -13,6 +13,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setupTauriMocks } from '../__mocks__/tauri-mocks.js';
 
+// Mock dynamic imports that might be called during testing
+vi.mock('../../src/js/components/context-menu.js', () => ({
+  default: class MockContextMenu {
+    constructor() {
+      this.show = vi.fn();
+      this.destroy = vi.fn();
+    }
+    static EVENTS = {
+      ACTION_EXECUTED: 'action_executed'
+    };
+  }
+}));
+
 // Import dependencies
 import FileTree from '../../src/js/components/file-tree.js';
 import AppState from '../../src/js/state.js';
@@ -41,6 +54,10 @@ describe('FileTree', () => {
   afterEach(() => {
     // Clean up
     if (fileTree) {
+      // Ensure intersectionObserver is properly mocked before calling destroy
+      if (fileTree.intersectionObserver && typeof fileTree.intersectionObserver.disconnect !== 'function') {
+        fileTree.intersectionObserver.disconnect = vi.fn();
+      }
       fileTree.destroy();
     }
     if (container && container.parentNode) {
@@ -377,7 +394,7 @@ describe('FileTree', () => {
       const eventSpy = vi.fn();
       container.addEventListener(FileTree.EVENTS.FILE_SELECTED, eventSpy);
 
-      const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' });
+      const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
       fileItem.dispatchEvent(enterEvent);
 
       expect(eventSpy).toHaveBeenCalled();
@@ -390,7 +407,7 @@ describe('FileTree', () => {
       const eventSpy = vi.fn();
       container.addEventListener(FileTree.EVENTS.FILE_SELECTED, eventSpy);
 
-      const spaceEvent = new KeyboardEvent('keydown', { key: ' ' });
+      const spaceEvent = new KeyboardEvent('keydown', { key: ' ', bubbles: true });
       fileItem.dispatchEvent(spaceEvent);
 
       expect(eventSpy).toHaveBeenCalled();
@@ -480,7 +497,7 @@ describe('FileTree', () => {
 
   describe('Performance', () => {
     it('should handle large file lists efficiently', () => {
-      const largeFileList = Array.from({ length: 1000 }, (_, i) => ({
+      const largeFileList = Array.from({ length: 1500 }, (_, i) => ({
         name: `file${i}.md`,
         path: `/vault/file${i}.md`,
         is_dir: false
@@ -491,9 +508,9 @@ describe('FileTree', () => {
       const renderTime = performance.now() - startTime;
 
       // Should complete rendering in reasonable time
-      expect(renderTime).toBeLessThan(1000); // 1 second for 1000 files
+      expect(renderTime).toBeLessThan(1000); // 1 second for 1500 files
 
-      // Should enable virtual scrolling for large trees
+      // Should enable virtual scrolling for large trees (>1000 files)
       expect(fileTree.isVirtualScrolling).toBe(true);
     });
 
@@ -593,6 +610,11 @@ describe('FileTree', () => {
     it('should clean up resources on destroy', () => {
       const initialSize = fileTree.eventListeners.size;
       expect(initialSize).toBeGreaterThan(0);
+
+      // Ensure intersectionObserver is properly mocked before calling destroy
+      if (fileTree.intersectionObserver && typeof fileTree.intersectionObserver.disconnect !== 'function') {
+        fileTree.intersectionObserver.disconnect = vi.fn();
+      }
 
       fileTree.destroy();
 

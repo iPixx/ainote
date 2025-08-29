@@ -26,6 +26,12 @@ class MockMarkdownParser {
     html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
     html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>');
     
+    // Code blocks (process before inline code)
+    html = html.replace(/```(\w+)?(?:\n)?([\s\S]*?)(?:\n)?```/g, (match, lang, code) => {
+      const className = lang ? ` class="language-${lang}"` : '';
+      return `<pre><code${className}>${code}</code></pre>`;
+    });
+    
     // Bold and italic
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
@@ -35,12 +41,6 @@ class MockMarkdownParser {
     
     // Links
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-    
-    // Code blocks
-    html = html.replace(/```(\w+)?\n([\s\S]*?)\n```/g, (match, lang, code) => {
-      const className = lang ? ` class="language-${lang}"` : '';
-      return `<pre><code${className}>${code}</code></pre>`;
-    });
     
     // Wrap non-header content in paragraphs
     const lines = html.split('\n');

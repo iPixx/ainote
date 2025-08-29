@@ -511,6 +511,14 @@ describe('AutoSave', () => {
   });
 
   describe('Error Handling and Retry Logic', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('should retry on save failure', async () => {
       let attemptCount = 0;
       tauriMocks.invoke.mockImplementation(() => {
@@ -521,18 +529,28 @@ describe('AutoSave', () => {
         return Promise.resolve(true);
       });
 
-      const result = await autoSave.performSave('/test.md', 'content', 'manual');
+      const savePromise = autoSave.performSave('/test.md', 'content', 'manual');
+      
+      // Fast-forward through the retry delay
+      await vi.advanceTimersByTimeAsync(1000);
+      
+      const result = await savePromise;
 
       expect(result).toBe(true);
       expect(attemptCount).toBe(2);
-    }, 15000);
+    });
 
     it('should fail after max retry attempts', async () => {
       tauriMocks.invoke.mockRejectedValue(new Error('Persistent failure'));
       const mockCallback = vi.fn();
       autoSave.addEventListener(AutoSave.EVENTS.SAVE_ERROR, mockCallback);
 
-      const result = await autoSave.performSave('/test.md', 'content', 'manual');
+      const savePromise = autoSave.performSave('/test.md', 'content', 'manual');
+      
+      // Fast-forward through all retry delays (3 attempts with 1000ms delays)
+      await vi.advanceTimersByTimeAsync(3000);
+      
+      const result = await savePromise;
 
       expect(result).toBe(false);
       expect(autoSave.saveStats.saveErrors).toBe(1);
@@ -540,7 +558,7 @@ describe('AutoSave', () => {
         error: 'Persistent failure',
         maxAttemptsReached: true
       }));
-    }, 15000);
+    });
 
     it('should handle conflict errors without retry', async () => {
       tauriMocks.invoke.mockRejectedValue(new Error('File was modified externally'));
@@ -566,10 +584,8 @@ describe('AutoSave', () => {
 
     it('should wait between retry attempts', async () => {
       let attemptCount = 0;
-      const attemptTimes = [];
       
       tauriMocks.invoke.mockImplementation(() => {
-        attemptTimes.push(Date.now());
         attemptCount++;
         if (attemptCount < 2) {
           return Promise.reject(new Error('Temporary failure'));
@@ -577,10 +593,14 @@ describe('AutoSave', () => {
         return Promise.resolve(true);
       });
 
-      await autoSave.performSave('/test.md', 'content', 'manual');
-
-      // Note: With fake timers, we can't easily test actual time delays
-      // But we can verify the retry logic was called
+      const savePromise = autoSave.performSave('/test.md', 'content', 'manual');
+      
+      // Fast-forward through the retry delay to verify timing
+      await vi.advanceTimersByTimeAsync(1000);
+      
+      const result = await savePromise;
+      
+      expect(result).toBe(true);
       expect(attemptCount).toBe(2);
     });
   });
