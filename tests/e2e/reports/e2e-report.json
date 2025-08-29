@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2025-08-29T00:20:31.656Z",
+    "generated": "2025-08-29T06:23:56.594Z",
     "platform": "darwin",
     "arch": "arm64",
     "nodeVersion": "v24.6.0",
@@ -13,13 +13,64 @@
     }
   },
   "execution": {
-    "started": "2025-08-29T00:19:20.785Z",
+    "started": "2025-08-29T06:23:34.075Z",
     "tests": [],
     "summary": {
       "success": false,
       "exitCode": 1,
-      "duration": 604
+      "duration": 557
     }
   },
-  "screenshots": []
+  "screenshots": [
+    {
+      "filename": "demo_before_should_collect_performance_metrics.png",
+      "path": "tests/e2e/screenshots/demo_before_should_collect_performance_metrics.png",
+      "size": 90299
+    },
+    {
+      "filename": "demo_before_should_demonstrate_screenshot_functionality.png",
+      "path": "tests/e2e/screenshots/demo_before_should_demonstrate_screenshot_functionality.png",
+      "size": 90299
+    },
+    {
+      "filename": "demo_before_should_execute_JavaScript_on_aiNote_page.png",
+      "path": "tests/e2e/screenshots/demo_before_should_execute_JavaScript_on_aiNote_page.png",
+      "size": 90299
+    },
+    {
+      "filename": "demo_before_should_find_and_interact_with_DOM_elements.png",
+      "path": "tests/e2e/screenshots/demo_before_should_find_and_interact_with_DOM_elements.png",
+      "size": 39906
+    },
+    {
+      "filename": "demo_before_should_load_aiNote_index.html_file.png",
+      "path": "tests/e2e/screenshots/demo_before_should_load_aiNote_index.html_file.png",
+      "size": 39906
+    },
+    {
+      "filename": "demo_before_should_meet_performance_requirements_for_E2E_operations.png",
+      "path": "tests/e2e/screenshots/demo_before_should_meet_performance_requirements_for_E2E_operations.png",
+      "size": 90299
+    },
+    {
+      "filename": "demo_before_should_navigate_to_a_simple_HTML_page.png",
+      "path": "tests/e2e/screenshots/demo_before_should_navigate_to_a_simple_HTML_page.png",
+      "size": 12513
+    },
+    {
+      "filename": "demo_before_should_test_fixture_creation_utilities.png",
+      "path": "tests/e2e/screenshots/demo_before_should_test_fixture_creation_utilities.png",
+      "size": 90299
+    },
+    {
+      "filename": "demo_screenshot_test.png",
+      "path": "tests/e2e/screenshots/demo_screenshot_test.png",
+      "size": 90299
+    },
+    {
+      "filename": "quick_validation_test.png",
+      "path": "tests/e2e/screenshots/quick_validation_test.png",
+      "size": 30010
+    }
+  ]
 }

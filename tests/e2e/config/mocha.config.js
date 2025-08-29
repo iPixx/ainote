@@ -4,7 +4,7 @@
  * Optimized for Tauri application testing with performance requirements.
  */
 
-module.exports = {
+export default {
   // Test execution settings
   timeout: 30000,        // 30 seconds per test (generous for E2E)
   slow: 5000,           // Mark tests as slow if they take >5s

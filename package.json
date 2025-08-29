@@ -12,6 +12,8 @@
     "test:e2e": "node ./tests/e2e/run-e2e-tests.js",
     "test:e2e:headless": "HEADLESS=true node ./tests/e2e/run-e2e-tests.js",
     "test:e2e:debug": "DEBUG=true node ./tests/e2e/run-e2e-tests.js",
+    "test:e2e:fast": "HEADLESS=true LOAD_IMAGES=false node ./tests/e2e/run-e2e-tests.js",
+    "test:e2e:demo": "npx mocha tests/e2e/specs/infrastructure-demo.e2e.js --timeout 60000 --reporter spec",
     "test:all": "npm run test && npm run test:e2e:headless"
   },
   "devDependencies": {

@@ -21,10 +21,11 @@ pnpm test:e2e:headless
 ## Architecture
 
 ### Testing Framework
-- **Selenium WebDriver**: Cross-platform browser automation
+- **Selenium WebDriver 4.35.0**: Cross-platform browser automation with Selenium Manager
 - **Mocha**: JavaScript test framework
 - **Chai**: Assertion library
-- **Chrome/ChromeDriver**: Primary testing browser
+- **Chrome for Testing**: Optimized Chrome build for automation (auto-managed by Selenium Manager)
+- **ChromeDriver**: Auto-managed by Selenium Manager for version compatibility
 
 ### Platform Compatibility
 - ✅ **macOS**: Uses Chrome WebDriver (this implementation)
@@ -90,9 +91,19 @@ Since tauri-driver doesn't support macOS desktop applications, this implementati
 
 ## Configuration
 
+### Chrome for Testing Integration
+
+aiNote's E2E tests are optimized for **Chrome for Testing** (CfT), which provides:
+
+- **Automatic Management**: Selenium Manager handles Chrome and ChromeDriver versions
+- **Testing Optimized**: Purpose-built for automation scenarios
+- **Version Consistency**: Eliminates version mismatch issues
+- **Isolation**: Doesn't interfere with your regular Chrome installation
+- **Performance**: Optimized startup and reduced resource usage
+
 ### WebDriver Configuration
 
-The E2E tests use Chrome WebDriver by default for macOS compatibility:
+The E2E tests use Chrome for Testing by default for optimal compatibility:
 
 ```javascript
 // webdriver.config.js
@@ -231,10 +242,14 @@ DEBUG=true pnpm test:e2e
 
 #### macOS
 ```bash
-# Install ChromeDriver (via Homebrew)
-brew install chromedriver
+# Chrome for Testing is automatically managed by Selenium Manager
+# No manual installation required!
 
-# Or download manually from https://chromedriver.chromium.org/
+# Optional: Set custom Chrome for Testing path
+export CHROME_FOR_TESTING_PATH="/path/to/chrome-for-testing"
+
+# Optional: Use system Chrome instead
+export USE_CHROME_FOR_TESTING=false
 ```
 
 #### Linux (Future)
