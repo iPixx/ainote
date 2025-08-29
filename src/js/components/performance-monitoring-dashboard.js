@@ -55,20 +55,31 @@ class PerformanceMonitoringDashboard {
      * Initialize the performance monitoring dashboard
      */
     async initializeDashboard() {
+        console.log('🔄 Creating dashboard elements...');
         this.createDashboardElements();
+        
+        console.log('🔄 Attaching event listeners...');
         this.attachEventListeners();
+        
+        console.log('🔄 Starting UI responsiveness tracking...');
         this.startUIResponsivenessTracking();
         
         // Check if performance monitoring is already active
         try {
+            console.log('🔄 Checking monitoring status...');
             const status = await invoke('get_monitoring_status');
             if (status.is_active) {
+                console.log('✅ Performance monitoring is already active');
                 this.isMonitoring = true;
                 this.startMetricsCollection();
+            } else {
+                console.log('ℹ️ Performance monitoring is not active');
             }
         } catch (error) {
-            console.warn('Performance monitoring not available:', error);
+            console.warn('⚠️ Performance monitoring not available:', error);
         }
+        
+        console.log('✅ Dashboard initialization complete');
     }
 
     /**
@@ -76,12 +87,18 @@ class PerformanceMonitoringDashboard {
      */
     createDashboardElements() {
         // No longer create floating toggle button - using main UI button instead
+        console.log('📊 Creating dashboard container...');
 
         // Dashboard container
         this.dashboardElement = document.createElement('div');
         this.dashboardElement.className = 'performance-monitoring-dashboard';
+        
+        console.log('📊 Generating dashboard HTML...');
         this.dashboardElement.innerHTML = this.getDashboardHTML();
+        
+        console.log('📊 Appending dashboard to body...');
         document.body.appendChild(this.dashboardElement);
+        console.log('📊 Dashboard element added to DOM');
 
         // Get references to key elements
         this.elements = {

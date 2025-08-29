@@ -885,23 +885,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   console.log('🔍 Tauri core:', !!window.__TAURI__?.core);
   console.log('🔍 Tauri window:', !!window.__TAURI__?.window);
   
-  // Initialize performance monitoring dashboard
-  try {
-    performanceDashboard = new PerformanceMonitoringDashboard();
-    console.log('✅ Performance monitoring dashboard initialized');
-    
-    // Start real-time metrics service
-    await realTimeMetricsService.start();
-    console.log('✅ Real-time metrics service started');
-    
-    // Make dashboard globally accessible
-    window.performanceDashboard = performanceDashboard;
-    window.realTimeMetricsService = realTimeMetricsService;
-    
-  } catch (error) {
-    console.warn('⚠️ Failed to initialize performance monitoring:', error);
-  }
-  
   // Initialize window instance
   try {
     mainWindow = getCurrentWindow();
@@ -1444,6 +1427,36 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Initialize save status
   updateSaveStatus(currentState.unsavedChanges ? 'unsaved' : 'saved');
   
+  // Initialize performance monitoring dashboard (after all DOM elements are ready)
+  setTimeout(async () => {
+    try {
+      console.log('🔄 Initializing performance monitoring dashboard...');
+      performanceDashboard = new PerformanceMonitoringDashboard();
+      console.log('✅ Performance monitoring dashboard initialized');
+      
+      // Start real-time metrics service
+      await realTimeMetricsService.start();
+      console.log('✅ Real-time metrics service started');
+      
+      // Make dashboard globally accessible
+      window.performanceDashboard = performanceDashboard;
+      window.realTimeMetricsService = realTimeMetricsService;
+      
+      console.log('🎉 Performance monitoring system fully initialized');
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize performance monitoring:', error);
+      console.error('Error details:', error);
+      
+      // Provide a fallback
+      window.performanceDashboard = {
+        toggle: () => showNotification('Performance dashboard failed to initialize: ' + error.message, 'error'),
+        show: () => showNotification('Performance dashboard failed to initialize: ' + error.message, 'error'),
+        hide: () => {},
+      };
+    }
+  }, 1000); // Wait 1 second for all DOM elements to be ready
+  
   // Show welcome notification
   setTimeout(() => {
     const welcomeState = appState.getState();
@@ -1530,10 +1543,21 @@ function updateOperationStatus(status) {
  * Toggle performance monitoring dashboard
  */
 function togglePerformanceDashboard() {
-  if (window.performanceDashboard) {
+  if (window.performanceDashboard && typeof window.performanceDashboard.toggle === 'function') {
     window.performanceDashboard.toggle();
   } else {
-    showNotification('Performance dashboard not initialized', 'warning');
+    showNotification('Performance dashboard is still initializing... Please wait a moment.', 'info');
+    
+    // Try again after a short delay
+    setTimeout(() => {
+      if (window.performanceDashboard && typeof window.performanceDashboard.toggle === 'function') {
+        window.performanceDashboard.toggle();
+        showNotification('Performance dashboard is now ready!', 'success');
+      } else {
+        console.error('Performance dashboard initialization failed or is taking too long');
+        showNotification('Performance dashboard failed to initialize. Check console for details.', 'error');
+      }
+    }, 2000);
   }
 }
 
