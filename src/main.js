@@ -7,7 +7,7 @@ import { LayoutManager, MobileNavManager } from './js/layout-manager.js';
 import FileTree from './js/components/file-tree.js';
 import EditorPreviewPanel from './js/components/editor-preview-panel.js';
 import AiStatusPanel from './js/components/ai-status-panel.js';
-import AiPanel from './js/components/ai-panel.js';
+import AiPanelController from './js/components/ai-panel-controller.js';
 
 // Initialize global application state
 const appState = new AppState();
@@ -18,7 +18,7 @@ let mobileNavManager;
 let fileTreeComponent;
 let editorPreviewPanel;
 let aiStatusPanel;
-let aiPanel;
+let aiPanelController;
 
 // Initialize service instances
 let vaultManager;
@@ -1006,32 +1006,54 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.warn('⚠️ AI content container not found');
   }
   
-  // Initialize AI Panel component
+  // Initialize enhanced AI Panel Controller with suggestion system
   const aiPanelElement = document.getElementById('aiPanel');
-  if (aiPanelElement && layoutManager) {
-    aiPanel = new AiPanel(aiPanelElement, layoutManager);
+  if (aiPanelElement && layoutManager && editorPreviewPanel) {
+    aiPanelController = new AiPanelController(
+      aiPanelElement, 
+      editorPreviewPanel.markdownEditor, // Pass the markdown editor
+      appState, 
+      layoutManager
+    );
     
-    // Listen to AI panel events
-    aiPanel.addEventListener(AiPanel.EVENTS.PANEL_ACTIVATED, (event) => {
+    // Listen to enhanced AI panel events
+    aiPanelController.addEventListener(AiPanelController.EVENTS.PANEL_ACTIVATED, (event) => {
       console.log('🚀 AI Panel activated:', event.detail);
-      showNotification('AI Panel activated', 'success');
+      showNotification('AI Assistant ready with suggestions', 'success');
     });
     
-    aiPanel.addEventListener(AiPanel.EVENTS.PANEL_DEACTIVATED, (event) => {
+    aiPanelController.addEventListener(AiPanelController.EVENTS.PANEL_DEACTIVATED, (event) => {
       console.log('🔄 AI Panel deactivated:', event.detail);
-      showNotification('AI Panel deactivated', 'info');
+      showNotification('AI Assistant deactivated', 'info');
     });
     
-    aiPanel.addEventListener(AiPanel.EVENTS.PANEL_READY, (event) => {
-      console.log('✅ AI Panel ready:', event.detail);
+    aiPanelController.addEventListener(AiPanelController.EVENTS.SUGGESTIONS_READY, (event) => {
+      console.log('✅ AI Suggestions ready:', event.detail);
     });
     
-    console.log('🎛️ AI Panel component initialized');
+    aiPanelController.addEventListener(AiPanelController.EVENTS.SUGGESTION_INSERTED, (event) => {
+      console.log('📝 Suggestion inserted:', event.detail);
+      showNotification('Content inserted from AI suggestion', 'success');
+    });
     
-    // Make AI panel globally accessible for debugging
-    window.aiPanel = aiPanel;
+    aiPanelController.addEventListener(AiPanelController.EVENTS.SERVICE_ERROR, (event) => {
+      console.warn('⚠️ AI Service error:', event.detail);
+      showNotification('AI service error: ' + event.detail.message, 'error');
+    });
+    
+    console.log('🎛️ Enhanced AI Panel Controller initialized with suggestion system');
+    
+    // Make AI panel controller globally accessible for debugging
+    window.aiPanelController = aiPanelController;
+    // Keep backward compatibility
+    window.aiPanel = aiPanelController;
   } else {
-    console.warn('⚠️ AI Panel element or layout manager not found');
+    console.warn('⚠️ AI Panel element, layout manager, or editor not found');
+    console.log('Available components:', { 
+      aiPanelElement: !!aiPanelElement, 
+      layoutManager: !!layoutManager, 
+      editorPreviewPanel: !!editorPreviewPanel 
+    });
   }
   
   // Apply saved layout state if available
