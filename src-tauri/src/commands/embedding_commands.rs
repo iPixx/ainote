@@ -634,12 +634,12 @@ pub async fn generate_adaptive_batch_embeddings(
         // Check cache for batch
         let mut cache_misses = Vec::new();
         let mut cache_miss_indices = Vec::new();
-        let mut batch_hit_count = 0;
+        let mut _batch_hit_count = 0;
         
         for (_local_idx, (global_idx, text)) in batch_indices.iter().zip(batch_texts.iter()).enumerate() {
             if let Ok(Some(cached_embedding)) = cache.get(text, &model).await {
                 result_embeddings[*global_idx] = cached_embedding;
-                batch_hit_count += 1;
+                _batch_hit_count += 1;
             } else {
                 cache_misses.push(text.clone());
                 cache_miss_indices.push(*global_idx);

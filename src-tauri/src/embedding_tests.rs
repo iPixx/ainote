@@ -130,6 +130,12 @@ pub fn create_test_ollama_config(base_url: &str) -> OllamaConfig {
         max_retries: 1,
         initial_retry_delay_ms: 100,
         max_retry_delay_ms: 500,
+        enable_http2_pipelining: true,
+        max_concurrent_requests: 6,
+        keep_alive_seconds: 120,
+        enable_request_batching: true,
+        max_batch_size: 10,
+        batch_timeout_ms: 50,
     }
 }
 
