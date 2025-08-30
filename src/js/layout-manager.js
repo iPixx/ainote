@@ -24,10 +24,10 @@ class LayoutManager {
       'ai-panel': { min: 300, max: 500, default: 350 }
     };
     
-    // Panel state
+    // Panel state - AI panel visible by default for Phase 2
     this.panelState = {
       fileTreeCollapsed: false,
-      aiPanelVisible: false
+      aiPanelVisible: true
     };
     
     // Initialize when DOM is ready
@@ -543,7 +543,7 @@ class LayoutManager {
     
     // Apply panel visibility states
     this.panelState.fileTreeCollapsed = state.fileTreeCollapsed || false;
-    this.panelState.aiPanelVisible = state.aiPanelVisible || false;
+    this.panelState.aiPanelVisible = state.aiPanelVisible !== undefined ? state.aiPanelVisible : true;
     
     // Apply DOM states
     const fileTreePanel = this.getElement('file-tree');
@@ -612,7 +612,7 @@ class LayoutManager {
 
     // Apply panel visibility states
     this.panelState.fileTreeCollapsed = !layoutState.file_tree_visible;
-    this.panelState.aiPanelVisible = layoutState.ai_panel_visible || false;
+    this.panelState.aiPanelVisible = layoutState.ai_panel_visible !== undefined ? layoutState.ai_panel_visible : true;
 
     // Apply DOM states
     const fileTreePanel = this.getElement('file-tree');

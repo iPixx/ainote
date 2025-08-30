@@ -148,6 +148,11 @@ pub fn create_test_embedding_config() -> EmbeddingConfig {
         preprocess_text: true,
         max_text_length: 4096,
         batch_size: 5,
+        warmup_connections: false,
+        keep_alive_seconds: 60,
+        tcp_nodelay: true,
+        adaptive_timeout: false,
+        health_check_interval_seconds: 30,
     }
 }
 

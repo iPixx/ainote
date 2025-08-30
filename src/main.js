@@ -7,6 +7,7 @@ import { LayoutManager, MobileNavManager } from './js/layout-manager.js';
 import FileTree from './js/components/file-tree.js';
 import EditorPreviewPanel from './js/components/editor-preview-panel.js';
 import AiStatusPanel from './js/components/ai-status-panel.js';
+import AiPanel from './js/components/ai-panel.js';
 import AiPanelController from './js/components/ai-panel-controller.js';
 import { PerformanceMonitoringDashboard } from './js/components/performance-monitoring-dashboard.js';
 import { realTimeMetricsService } from './js/services/real-time-metrics-service.js';
@@ -20,7 +21,8 @@ let mobileNavManager;
 let fileTreeComponent;
 let editorPreviewPanel;
 let aiStatusPanel;
-let aiPanelController;
+let aiPanel; // Basic AI panel for Phase 2A
+let aiPanelController; // Enhanced AI panel controller for Phase 2B+
 let performanceDashboard;
 
 // Initialize service instances
@@ -1010,49 +1012,78 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.warn('⚠️ AI content container not found');
   }
   
-  // Initialize enhanced AI Panel Controller with suggestion system
+  // Initialize AI Panel - Phase 2A activation
   const aiPanelElement = document.getElementById('aiPanel');
-  if (aiPanelElement && layoutManager && editorPreviewPanel) {
-    aiPanelController = new AiPanelController(
-      aiPanelElement, 
-      editorPreviewPanel.markdownEditor, // Pass the markdown editor
-      appState, 
-      layoutManager
-    );
-    
-    // Listen to enhanced AI panel events
-    aiPanelController.addEventListener(AiPanelController.EVENTS.PANEL_ACTIVATED, (event) => {
-      console.log('🚀 AI Panel activated:', event.detail);
-      showNotification('AI Assistant ready with suggestions', 'success');
-    });
-    
-    aiPanelController.addEventListener(AiPanelController.EVENTS.PANEL_DEACTIVATED, (event) => {
-      console.log('🔄 AI Panel deactivated:', event.detail);
-      showNotification('AI Assistant deactivated', 'info');
-    });
-    
-    aiPanelController.addEventListener(AiPanelController.EVENTS.SUGGESTIONS_READY, (event) => {
-      console.log('✅ AI Suggestions ready:', event.detail);
-    });
-    
-    aiPanelController.addEventListener(AiPanelController.EVENTS.SUGGESTION_INSERTED, (event) => {
-      console.log('📝 Suggestion inserted:', event.detail);
-      showNotification('Content inserted from AI suggestion', 'success');
-    });
-    
-    aiPanelController.addEventListener(AiPanelController.EVENTS.SERVICE_ERROR, (event) => {
-      console.warn('⚠️ AI Service error:', event.detail);
-      showNotification('AI service error: ' + event.detail.message, 'error');
-    });
-    
-    console.log('🎛️ Enhanced AI Panel Controller initialized with suggestion system');
-    
-    // Make AI panel controller globally accessible for debugging
-    window.aiPanelController = aiPanelController;
-    // Keep backward compatibility
-    window.aiPanel = aiPanelController;
+  if (aiPanelElement && layoutManager) {
+    // Try to initialize the enhanced AI Panel Controller first
+    if (editorPreviewPanel && editorPreviewPanel.markdownEditor) {
+      aiPanelController = new AiPanelController(
+        aiPanelElement, 
+        editorPreviewPanel.markdownEditor, // Pass the markdown editor
+        appState, 
+        layoutManager
+      );
+      
+      // Listen to enhanced AI panel events
+      aiPanelController.addEventListener(AiPanelController.EVENTS.PANEL_ACTIVATED, (event) => {
+        console.log('🚀 AI Panel activated:', event.detail);
+        showNotification('AI Assistant ready with suggestions', 'success');
+      });
+      
+      aiPanelController.addEventListener(AiPanelController.EVENTS.PANEL_DEACTIVATED, (event) => {
+        console.log('🔄 AI Panel deactivated:', event.detail);
+        showNotification('AI Assistant deactivated', 'info');
+      });
+      
+      aiPanelController.addEventListener(AiPanelController.EVENTS.SUGGESTIONS_READY, (event) => {
+        console.log('✅ AI Suggestions ready:', event.detail);
+      });
+      
+      aiPanelController.addEventListener(AiPanelController.EVENTS.SUGGESTION_INSERTED, (event) => {
+        console.log('📝 Suggestion inserted:', event.detail);
+        showNotification('Content inserted from AI suggestion', 'success');
+      });
+      
+      aiPanelController.addEventListener(AiPanelController.EVENTS.SERVICE_ERROR, (event) => {
+        console.warn('⚠️ AI Service error:', event.detail);
+        showNotification('AI service error: ' + event.detail.message, 'error');
+      });
+      
+      console.log('🎛️ Enhanced AI Panel Controller initialized with suggestion system');
+      
+      // Make AI panel controller globally accessible
+      window.aiPanelController = aiPanelController;
+      window.aiPanel = aiPanelController;
+      
+    } else {
+      // Fallback: Initialize basic AI Panel for Phase 2A
+      console.log('🤖 Initializing basic AI Panel for Phase 2A...');
+      
+      aiPanel = new AiPanel(aiPanelElement, layoutManager);
+      
+      // Listen to basic AI panel events
+      aiPanel.addEventListener(AiPanel.EVENTS.PANEL_ACTIVATED, (event) => {
+        console.log('🚀 AI Panel activated:', event.detail);
+        showNotification('AI Assistant activated', 'success');
+      });
+      
+      aiPanel.addEventListener(AiPanel.EVENTS.PANEL_DEACTIVATED, (event) => {
+        console.log('🔄 AI Panel deactivated:', event.detail);
+        showNotification('AI Assistant deactivated', 'info');
+      });
+      
+      aiPanel.addEventListener(AiPanel.EVENTS.PANEL_READY, (event) => {
+        console.log('✅ AI Panel ready:', event.detail);
+      });
+      
+      console.log('✅ Basic AI Panel initialized for Phase 2A');
+      
+      // Make AI panel globally accessible
+      window.aiPanel = aiPanel;
+      window.aiPanelController = aiPanel; // Keep compatibility
+    }
   } else {
-    console.warn('⚠️ AI Panel element, layout manager, or editor not found');
+    console.warn('⚠️ AI Panel element or layout manager not found');
     console.log('Available components:', { 
       aiPanelElement: !!aiPanelElement, 
       layoutManager: !!layoutManager, 
