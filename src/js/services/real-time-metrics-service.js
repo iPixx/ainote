@@ -15,7 +15,7 @@
  */
 
 // Use mocked invoke in test environment, actual Tauri invoke in production
-const invoke = window.__TAURI__?.core?.invoke || (async () => {});
+const getInvoke = () => window.__TAURI__?.core?.invoke || (async () => {});
 
 class RealTimeMetricsService {
     constructor() {
@@ -74,6 +74,8 @@ class RealTimeMetricsService {
         }
 
         try {
+            const invoke = getInvoke();
+            
             // Check if backend monitoring is available and start if needed
             const status = await invoke('get_monitoring_status');
             
@@ -176,6 +178,7 @@ class RealTimeMetricsService {
         const startTime = performance.now();
 
         // Collect metrics in parallel to minimize overhead
+        const invoke = getInvoke();
         const [
             currentMetrics,
             resourceUtilization,
@@ -229,7 +232,7 @@ class RealTimeMetricsService {
      */
     async getSearchOperationMetrics() {
         try {
-            return await invoke('get_search_operation_metrics', { limit: 20 });
+            return await getInvoke()('get_search_operation_metrics', { limit: 20 });
         } catch (error) {
             // Enhanced metrics not available, return empty array
             return [];

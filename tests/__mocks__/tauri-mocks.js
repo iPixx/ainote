@@ -77,7 +77,51 @@ export const createVaultManagerMocks = () => {
       overall_health: 'Good',
       recommendations: []
     })),
-    generate_benchmark_report: vi.fn(() => Promise.resolve('Mock benchmark report\nAll systems performing well'))
+    generate_benchmark_report: vi.fn(() => Promise.resolve('Mock benchmark report\nAll systems performing well')),
+    
+    // Real-time performance monitoring commands
+    get_monitoring_status: vi.fn(() => Promise.resolve({ is_active: true })),
+    start_performance_monitoring: vi.fn(() => Promise.resolve({ is_active: true })),
+    stop_performance_monitoring: vi.fn(() => Promise.resolve('Monitoring stopped')),
+    get_current_performance_metrics: vi.fn(() => Promise.resolve({
+      IncrementalUpdate: {
+        operation_type: 'IncrementalUpdate',
+        duration_ms: 150,
+        memory_peak_mb: 45,
+        cpu_usage_percent: 25,
+        processing_rate: 10,
+      }
+    })),
+    get_resource_utilization: vi.fn(() => Promise.resolve({
+      timestamp: new Date().toISOString(),
+      cpu_usage_percent: 30,
+      memory_usage_mb: 67,
+      memory_available_mb: 8125,
+      disk_read_mb_per_sec: 2.5,
+      disk_write_mb_per_sec: 1.8,
+    })),
+    get_active_alerts: vi.fn(() => Promise.resolve([])),
+    get_search_operation_metrics: vi.fn(() => Promise.resolve([
+      {
+        operation_type: 'search',
+        duration_ms: 45,
+        vectors_searched: 1000,
+        results_returned: 10,
+        efficiency_score: 0.85,
+        performance_target_met: true,
+        timestamp: new Date().toISOString(),
+      }
+    ])),
+    generate_performance_report: vi.fn(() => Promise.resolve({
+      generated_at: new Date().toISOString(),
+      period_start: new Date(Date.now() - 3600000).toISOString(),
+      period_end: new Date().toISOString(),
+      total_operations: 50,
+      health_score: 0.85,
+      recommendations: ['Consider optimizing memory usage'],
+    })),
+    is_enhanced_metrics_active: vi.fn(() => Promise.resolve(true)),
+    start_enhanced_metrics_collection: vi.fn(() => Promise.resolve())
   };
 };
 

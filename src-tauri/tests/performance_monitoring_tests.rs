@@ -4,6 +4,15 @@
 //! for Issue #125, ensuring complete integration with index management operations
 //! and meeting all requirements for real-time metrics collection, alerting, and reporting.
 //!
+//! ## Important: Test Execution Notes
+//! 
+//! These tests use global state (static PERFORMANCE_MONITOR) and may have race conditions
+//! when run concurrently. For reliable results, run with:
+//! 
+//! ```
+//! cargo test --test performance_monitoring_tests -- --test-threads=1
+//! ```
+//!
 //! ## Test Coverage
 //!
 //! ### Core Functionality
@@ -42,7 +51,7 @@ use ainote_lib::vector_db::incremental::UpdateStats;
 use ainote_lib::vector_db::maintenance::MaintenanceStats;
 use ainote_lib::vector_db::rebuilding::RebuildMetrics;
 use ainote_lib::commands::monitoring_commands::{
-    StartMonitoringRequest, PerformanceReportRequest,
+    StartMonitoringRequest, PerformanceReportRequest, MonitoringStatusResponse,
     start_performance_monitoring, stop_performance_monitoring, 
     get_monitoring_status, generate_performance_report,
     get_current_performance_metrics, monitor_incremental_operation,
@@ -106,6 +115,50 @@ fn create_test_rebuild_metrics() -> RebuildMetrics {
         avg_io_time_ms: 10.0,
         cpu_usage_percentage: 75.0,
         throughput_eps: 20.0,
+    }
+}
+
+/// Helper function to ensure clean monitoring state before tests
+async fn ensure_clean_monitoring_state() {
+    // Clean up any existing monitor first - multiple attempts with progressive delays
+    for i in 0..3 {
+        let _ = stop_performance_monitoring().await;
+        sleep(Duration::from_millis(100 + (i * 50))).await;
+    }
+}
+
+/// Helper function to start monitoring with retry logic
+async fn start_monitoring_with_retry(config: MonitoringConfig) -> MonitoringStatusResponse {
+    let mut start_attempts = 0;
+    let max_attempts = 5;
+    
+    loop {
+        let start_request = StartMonitoringRequest {
+            config: Some(config.clone())
+        };
+        
+        match start_performance_monitoring(start_request).await {
+            Ok(status) => return status,
+            Err(e) => {
+                start_attempts += 1;
+                if start_attempts >= max_attempts {
+                    panic!("Failed to start monitoring after {} attempts: {}", max_attempts, e);
+                }
+                
+                // If monitoring is already running, stop it and wait longer
+                let _ = stop_performance_monitoring().await;
+                sleep(Duration::from_millis(200 * start_attempts)).await;
+            }
+        }
+    }
+}
+
+/// Helper function to clean up monitoring state after tests
+async fn cleanup_monitoring_state() {
+    // Clean up with multiple attempts and progressive delays
+    for i in 0..3 {
+        let _ = stop_performance_monitoring().await;
+        sleep(Duration::from_millis(50 + (i * 25))).await;
     }
 }
 
@@ -442,27 +495,14 @@ async fn test_stop_monitoring_command() {
 /// Test performance report generation command
 #[tokio::test]
 async fn test_generate_performance_report_command() {
-    // Clean up any existing monitor first
-    let _ = stop_performance_monitoring().await;
-    
-    // Allow time for cleanup
-    sleep(Duration::from_millis(50)).await;
+    // Ensure clean state
+    ensure_clean_monitoring_state().await;
 
-    // Start monitoring
-    let start_request = StartMonitoringRequest {
-        config: Some(create_test_monitoring_config())
-    };
-    let start_result = start_performance_monitoring(start_request).await;
-    if start_result.is_err() {
-        // If monitoring is already running, stop it first
-        let _ = stop_performance_monitoring().await;
-        sleep(Duration::from_millis(50)).await;
-        let start_request = StartMonitoringRequest {
-            config: Some(create_test_monitoring_config())
-        };
-        start_performance_monitoring(start_request).await
-            .expect("Should start monitoring after cleanup");
-    }
+    // Start monitoring with retry logic
+    let _status = start_monitoring_with_retry(create_test_monitoring_config()).await;
+
+    // Allow monitor to fully initialize
+    sleep(Duration::from_millis(100)).await;
 
     // Test generating report
     let report_request = PerformanceReportRequest {
@@ -480,36 +520,20 @@ async fn test_generate_performance_report_command() {
     assert!(!report.recommendations.is_empty(), "Should have recommendations");
 
     // Clean up
-    let _ = stop_performance_monitoring().await;
+    cleanup_monitoring_state().await;
 }
 
 /// Test getting current performance metrics command
 #[tokio::test]
 async fn test_get_current_metrics_command() {
-    // Clean up any existing monitor first
-    let _ = stop_performance_monitoring().await;
-    
-    // Allow time for cleanup
-    sleep(Duration::from_millis(50)).await;
+    // Ensure clean state
+    ensure_clean_monitoring_state().await;
 
-    // Start monitoring
-    let start_request = StartMonitoringRequest {
-        config: Some(create_test_monitoring_config())
-    };
-    let start_result = start_performance_monitoring(start_request).await;
-    if start_result.is_err() {
-        // If monitoring is already running, stop it first
-        let _ = stop_performance_monitoring().await;
-        sleep(Duration::from_millis(50)).await;
-        let start_request = StartMonitoringRequest {
-            config: Some(create_test_monitoring_config())
-        };
-        start_performance_monitoring(start_request).await
-            .expect("Should start monitoring after cleanup");
-    }
+    // Start monitoring with retry logic
+    let _status = start_monitoring_with_retry(create_test_monitoring_config()).await;
     
     // Allow time for monitor to fully initialize
-    sleep(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(200)).await;
 
     // Test getting current metrics
     let metrics_result = get_current_performance_metrics().await;
@@ -520,36 +544,24 @@ async fn test_get_current_metrics_command() {
     assert!(metrics.len() <= 5, "Should not have more operation types than defined");
 
     // Clean up
-    let _ = stop_performance_monitoring().await;
+    cleanup_monitoring_state().await;
 }
 
 /// Test monitoring operations through command interface
 #[tokio::test]
 async fn test_monitor_operation_commands() {
-    // Clean up any existing monitor first
-    let _ = stop_performance_monitoring().await;
-    
-    // Allow time for cleanup
-    sleep(Duration::from_millis(50)).await;
+    // Ensure clean state
+    ensure_clean_monitoring_state().await;
 
-    // Start monitoring
-    let start_request = StartMonitoringRequest {
-        config: Some(create_test_monitoring_config())
-    };
-    let start_result = start_performance_monitoring(start_request).await;
-    if start_result.is_err() {
-        // If monitoring is already running, stop it first
-        let _ = stop_performance_monitoring().await;
-        sleep(Duration::from_millis(50)).await;
-        let start_request = StartMonitoringRequest {
-            config: Some(create_test_monitoring_config())
-        };
-        start_performance_monitoring(start_request).await
-            .expect("Should start monitoring after cleanup");
-    }
+    // Start monitoring with retry logic
+    let _status = start_monitoring_with_retry(create_test_monitoring_config()).await;
     
-    // Allow time for monitor to fully initialize
-    sleep(Duration::from_millis(100)).await;
+    // Allow time for monitor to fully initialize - longer wait
+    sleep(Duration::from_millis(200)).await;
+
+    // Verify monitoring is actually running before testing operations
+    let status = get_monitoring_status().await.unwrap();
+    assert!(status.is_active, "Monitoring should be active before testing operations");
 
     // Test monitoring an incremental operation
     let monitor_request = MonitorOperationRequest {
@@ -575,7 +587,7 @@ async fn test_monitor_operation_commands() {
     assert!(complete_result.is_ok(), "Complete operation should succeed: {:?}", complete_result);
 
     // Clean up
-    let _ = stop_performance_monitoring().await;
+    cleanup_monitoring_state().await;
 }
 
 // =============================================================================

@@ -304,6 +304,8 @@ class AutoSave {
         // Wait before retry
         await new Promise(resolve => setTimeout(resolve, AutoSave.DEFAULTS.RETRY_DELAY));
         
+        // Reset isSaving flag before retry to avoid blocking
+        this.isSaving = false;
         return this.performSave(filePath, content, saveType, attempt + 1);
       }
 

@@ -17,7 +17,7 @@
  */
 
 // Use mocked invoke in test environment, actual Tauri invoke in production
-const invoke = window.__TAURI__?.core?.invoke || (async () => {});
+const getInvoke = () => window.__TAURI__?.core?.invoke || (async () => {});
 
 class PerformanceMonitoringDashboard {
     constructor() {
@@ -67,7 +67,7 @@ class PerformanceMonitoringDashboard {
         // Check if performance monitoring is already active
         try {
             console.log('🔄 Checking monitoring status...');
-            const status = await invoke('get_monitoring_status');
+            const status = await getInvoke()('get_monitoring_status');
             if (status.is_active) {
                 console.log('✅ Performance monitoring is already active');
                 this.isMonitoring = true;
@@ -513,6 +513,8 @@ class PerformanceMonitoringDashboard {
      */
     async collectMetrics() {
         try {
+            const invoke = getInvoke();
+            
             // Get current performance metrics
             const currentMetrics = await invoke('get_current_performance_metrics');
             this.updateCurrentMetrics(currentMetrics);
@@ -751,6 +753,8 @@ class PerformanceMonitoringDashboard {
      */
     async toggleMonitoring() {
         try {
+            const invoke = getInvoke();
+            
             if (this.isMonitoring) {
                 // Stop monitoring
                 await invoke('stop_performance_monitoring');
@@ -791,6 +795,7 @@ class PerformanceMonitoringDashboard {
      */
     async exportReport() {
         try {
+            const invoke = getInvoke();
             const report = await invoke('generate_performance_report', {
                 request: {
                     period_hours: 1,

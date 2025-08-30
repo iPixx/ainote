@@ -75,6 +75,7 @@ class EnhancedSuggestionList extends SuggestionList {
     console.log('✅ Enhanced Suggestion List initialized');
   }
 
+
   /**
    * Render suggestions using SuggestionCard components
    * @private
@@ -88,8 +89,10 @@ class EnhancedSuggestionList extends SuggestionList {
     console.log('🎨 Rendering suggestions with enhanced cards');
     const startTime = performance.now();
 
-    // Clear existing suggestions and cards
+    // Clear existing cards first
     this.clearSuggestionCards();
+    
+    // Clear the container
     this.suggestionsContainer.innerHTML = '';
 
     // Create document fragment for efficient DOM manipulation
@@ -116,6 +119,19 @@ class EnhancedSuggestionList extends SuggestionList {
     this.updateCardPerformanceStats('render', renderTime);
 
     console.log(`✅ Rendered ${this.suggestions.length} suggestion cards in ${renderTime.toFixed(2)}ms`);
+  }
+
+  /**
+   * Override updateSuggestions to handle card cleanup for empty states
+   */
+  updateSuggestions(suggestions = [], isLoading = false) {
+    // Call parent implementation
+    super.updateSuggestions(suggestions, isLoading);
+    
+    // Handle empty suggestions case - parent won't call renderSuggestions when empty
+    if (!isLoading && (this.state === SuggestionList.STATES.EMPTY || suggestions.length === 0)) {
+      this.clearSuggestionCards();
+    }
   }
 
   /**

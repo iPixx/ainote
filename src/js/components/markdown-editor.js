@@ -63,6 +63,8 @@ class MarkdownEditor {
     // Performance tracking
     this.lastKeystroke = 0;
     this.debounceTimeout = null;
+    this.heavyOperationsTimeout = null;
+    this.selectionUpdatePending = false;
     
     // Event listeners for cleanup
     this.eventListeners = new Map();
@@ -246,58 +248,63 @@ class MarkdownEditor {
    * @private
    */
   setupEventListeners() {
-    // Input event for content changes (high performance)
+    // Input event for content changes (optimized for responsiveness)
     const inputHandler = (event) => {
       try {
-        const startTime = performance.now();
-        
+        // Only update essential state immediately for responsiveness
         this.content = this.textarea.value;
-        this.updateCursorPosition();
-        this.debouncedWordCountUpdate();
-        this.checkDocumentSize();
-        this.triggerAutoSave();
         
-        // Emit content change event
+        // Debounce heavy operations to avoid blocking UI
+        this.debounceHeavyOperations();
+        
+        // Emit content change event immediately for real-time feedback
         this.emit(MarkdownEditor.EVENTS.CONTENT_CHANGED, {
           content: this.content,
           timestamp: Date.now()
         });
-
-        // Track performance
-        const duration = performance.now() - startTime;
-        if (duration > 16) {
-          this.handleError('input-performance', 
-            new Error(`Slow input handler: ${duration.toFixed(2)}ms (target: <16ms)`), 
-            'warning');
-        }
       } catch (error) {
         this.handleError('input-handler', error);
       }
     };
 
-    // Selection change for cursor tracking
+    // Selection change for cursor tracking (optimized)
     const selectionHandler = () => {
-      this.updateCursorPosition();
-      this.updateSelectionState();
+      // Use requestAnimationFrame to avoid blocking the main thread
+      if (this.selectionUpdatePending) return;
       
-      this.emit(MarkdownEditor.EVENTS.SELECTION_CHANGED, {
-        start: this.selectionStart,
-        end: this.selectionEnd,
-        cursor: this.cursorPosition
+      this.selectionUpdatePending = true;
+      requestAnimationFrame(() => {
+        this.updateCursorPosition();
+        this.updateSelectionState();
+        
+        this.emit(MarkdownEditor.EVENTS.SELECTION_CHANGED, {
+          start: this.selectionStart,
+          end: this.selectionEnd,
+          cursor: this.cursorPosition
+        });
+        
+        this.selectionUpdatePending = false;
       });
     };
 
-    // Key events for keyboard shortcuts and cursor movement
+    // Key events for keyboard shortcuts and cursor movement (optimized)
     const keyHandler = (event) => {
-      // Track keystroke performance
+      // Fast path for common keys that don't need special handling
+      const isCommonKey = /^[a-zA-Z0-9\s]$/.test(event.key) && 
+                         !event.ctrlKey && !event.metaKey && !event.altKey;
+      
+      if (isCommonKey) {
+        // Allow default behavior for common typing
+        return;
+      }
+      
+      // Track keystroke for performance monitoring
       this.lastKeystroke = performance.now();
       
-      // Handle keyboard shortcuts
+      // Handle keyboard shortcuts first (highest priority)
       const shortcutHandled = this.handleKeyboardShortcut(event);
-      
-      // Handle auto-completion for brackets and quotes
-      if (!shortcutHandled && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        this.handleAutoCompletion(event);
+      if (shortcutHandled) {
+        return; // Shortcut handled, no further processing needed
       }
       
       // Handle tab indentation
@@ -307,7 +314,12 @@ class MarkdownEditor {
         return;
       }
       
-      // Emit cursor moved event
+      // Handle auto-completion for brackets and quotes (lower priority)
+      if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+        this.handleAutoCompletion(event);
+      }
+      
+      // Emit cursor moved event for non-typing keys
       this.emit(MarkdownEditor.EVENTS.CURSOR_MOVED, {
         key: event.key,
         position: this.cursorPosition,
@@ -334,11 +346,10 @@ class MarkdownEditor {
       }
     };
 
-    // Register event listeners
+    // Register event listeners (optimized to avoid conflicts)
     this.addDOMEventListener(this.textarea, 'input', inputHandler);
+    // Use single selection handler to avoid conflicts and improve performance
     this.addDOMEventListener(this.textarea, 'selectionchange', selectionHandler);
-    this.addDOMEventListener(this.textarea, 'select', selectionHandler);
-    this.addDOMEventListener(this.textarea, 'keyup', selectionHandler);
     this.addDOMEventListener(this.textarea, 'mouseup', selectionHandler);
     this.addDOMEventListener(this.textarea, 'keydown', keyHandler);
     this.addDOMEventListener(this.textarea, 'paste', pasteHandler);
@@ -440,6 +451,41 @@ class MarkdownEditor {
     this.debounceTimeout = setTimeout(() => {
       this.updateWordCount();
     }, 300); // 300ms debounce
+  }
+
+  /**
+   * Debounce heavy operations to improve key responsiveness
+   * @private
+   */
+  debounceHeavyOperations() {
+    clearTimeout(this.heavyOperationsTimeout);
+    this.heavyOperationsTimeout = setTimeout(() => {
+      try {
+        const startTime = performance.now();
+        
+        // Update cursor position
+        this.updateCursorPosition();
+        
+        // Update word count
+        this.updateWordCount();
+        
+        // Check document size for performance optimizations
+        this.checkDocumentSize();
+        
+        // Trigger auto-save
+        this.triggerAutoSave();
+        
+        // Track performance
+        const duration = performance.now() - startTime;
+        if (duration > 50) {
+          this.handleError('heavy-operations-performance', 
+            new Error(`Slow heavy operations: ${duration.toFixed(2)}ms (target: <50ms)`), 
+            'warning');
+        }
+      } catch (error) {
+        this.handleError('heavy-operations', error);
+      }
+    }, 100); // 100ms debounce for heavy operations
   }
 
   /**
@@ -919,7 +965,7 @@ class MarkdownEditor {
   }
 
   /**
-   * Handle auto-completion for brackets and quotes
+   * Handle auto-completion for brackets and quotes (optimized for responsiveness)
    * @param {KeyboardEvent} event - The keyboard event
    * @private
    */
@@ -929,11 +975,11 @@ class MarkdownEditor {
     
     if (!closingChar) return;
     
-    // Check if we should auto-complete
+    // Fast path: check if we should skip auto-completion immediately
     const currentChar = this.content[this.selectionStart];
     const selection = this.getSelectedText();
     
-    // If there's a selection, wrap it
+    // If there's a selection, wrap it (highest priority)
     if (selection) {
       event.preventDefault();
       this.saveUndoState();
@@ -944,27 +990,19 @@ class MarkdownEditor {
       // Position cursor after the wrapped text
       const newCursorPos = this.selectionStart;
       this.textarea.setSelectionRange(newCursorPos, newCursorPos);
-      this.updateCursorPosition();
       
       console.log(`🔗 Auto-wrapped selection with ${key}${closingChar}`);
       return;
     }
     
-    // Determine if we should auto-complete based on context
+    // Optimized logic for determining auto-completion
     let shouldAutoComplete = false;
     
-    // Simple logic: auto-complete unless we're about to create a duplicate pair
-    // Exception: don't auto-complete quotes if we're in the middle of a word
     if (key === '"' || key === "'" || key === '`') {
-      // For quotes, be more careful about context
-      const prevChar = this.selectionStart > 0 ? this.content[this.selectionStart - 1] : '';
-      const isInsideWord = /\w/.test(prevChar) && /\w/.test(currentChar || '');
-      const isDuplicate = currentChar === key;
-      
-      shouldAutoComplete = !isInsideWord && !isDuplicate;
+      // Fast check for quotes: don't auto-complete if next char is the same
+      shouldAutoComplete = currentChar !== key;
     } else {
-      // For brackets: (,  [, {
-      // Auto-complete unless the next character is already the closing bracket
+      // Fast check for brackets: don't auto-complete if already closed
       shouldAutoComplete = currentChar !== closingChar;
     }
     
@@ -979,7 +1017,6 @@ class MarkdownEditor {
       // Position cursor between them
       const newCursorPos = this.selectionStart - 1;
       this.textarea.setSelectionRange(newCursorPos, newCursorPos);
-      this.updateCursorPosition();
       
       console.log(`🔧 Auto-completed ${key} with ${closingChar}`);
     }
@@ -2056,6 +2093,7 @@ class MarkdownEditor {
   destroy() {
     // Clear all timeouts
     clearTimeout(this.debounceTimeout);
+    clearTimeout(this.heavyOperationsTimeout);
     clearTimeout(this.autoSaveTimeout);
     
     // Remove all event listeners
