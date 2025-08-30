@@ -736,7 +736,7 @@ impl AiOperationManager {
         
         // Execute based on operation type
         match operation.payload {
-            OperationPayload::NoteSuggestion { file_path, content, cursor_position, context_window } => {
+            OperationPayload::NoteSuggestion { file_path, content: _, cursor_position, context_window: _ } => {
                 // Simulate note suggestion processing
                 sleep(Duration::from_millis(100)).await;
                 
@@ -754,7 +754,7 @@ impl AiOperationManager {
                     resource_usage: [("cpu".to_string(), 0.3)].into(),
                 }
             },
-            OperationPayload::SimilaritySearch { query, max_results, similarity_threshold } => {
+            OperationPayload::SimilaritySearch { query, max_results: _, similarity_threshold: _ } => {
                 // Simulate similarity search
                 sleep(Duration::from_millis(200)).await;
                 

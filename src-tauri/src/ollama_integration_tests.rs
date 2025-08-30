@@ -133,6 +133,12 @@ mod integration_tests {
             max_retries: 3,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = OllamaClient::with_config(config);
@@ -165,6 +171,12 @@ mod integration_tests {
             max_retries: 0, // No retries for this test
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = OllamaClient::with_config(config);
@@ -194,6 +206,12 @@ mod integration_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = OllamaClient::with_config(config);
@@ -224,6 +242,12 @@ mod integration_tests {
             max_retries: 3, // Allow retries
             initial_retry_delay_ms: 100, // 100ms initial delay
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = OllamaClient::with_config(config);
@@ -260,6 +284,12 @@ mod integration_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = OllamaClient::with_config(config);
@@ -288,6 +318,12 @@ mod integration_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = std::sync::Arc::new(OllamaClient::with_config(config));
@@ -336,6 +372,12 @@ mod integration_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let mut client = OllamaClient::with_config(config1);
@@ -351,6 +393,12 @@ mod integration_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         client.update_config(config2).await;
@@ -386,6 +434,12 @@ mod integration_tests {
             max_retries: 3,
             initial_retry_delay_ms: 50, // Shorter delays for faster test
             max_retry_delay_ms: 1000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = OllamaClient::with_config(config);
@@ -426,6 +480,12 @@ mod integration_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = OllamaClient::with_config(config);
@@ -464,6 +524,12 @@ mod integration_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = std::sync::Arc::new(OllamaClient::with_config(config));
@@ -503,6 +569,12 @@ mod integration_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = OllamaClient::with_config(config);
@@ -566,6 +638,12 @@ mod benchmarks {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = OllamaClient::with_config(config);
@@ -609,6 +687,12 @@ mod benchmarks {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = OllamaClient::with_config(config);
@@ -649,6 +733,12 @@ mod benchmarks {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = std::sync::Arc::new(OllamaClient::with_config(config));
@@ -728,6 +818,12 @@ mod cross_platform_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = OllamaClient::with_config(config);
@@ -753,6 +849,12 @@ mod cross_platform_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = std::sync::Arc::new(OllamaClient::with_config(config));
@@ -799,6 +901,12 @@ mod load_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = std::sync::Arc::new(OllamaClient::with_config(config));
@@ -865,6 +973,12 @@ mod load_tests {
             max_retries: 1,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         // Create multiple clients to test connection pooling
@@ -922,6 +1036,12 @@ mod load_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 5000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         };
 
         let client = std::sync::Arc::new(OllamaClient::with_config(config));

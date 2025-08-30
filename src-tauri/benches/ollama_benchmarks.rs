@@ -19,6 +19,12 @@ fn bench_client_creation(c: &mut Criterion) {
         max_retries: 3,
         initial_retry_delay_ms: 1000,
         max_retry_delay_ms: 30000,
+        enable_http2_pipelining: true,
+        max_concurrent_requests: 6,
+        keep_alive_seconds: 120,
+        enable_request_batching: true,
+        max_batch_size: 10,
+        batch_timeout_ms: 50,
     };
 
     group.bench_function("new_with_config", |b| {
@@ -66,6 +72,12 @@ fn bench_config_operations(c: &mut Criterion) {
             max_retries: 3,
             initial_retry_delay_ms: 1000,
             max_retry_delay_ms: 30000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         }),
         ("remote", OllamaConfig {
             base_url: "https://remote.ollama.com:8443".to_string(),
@@ -73,6 +85,12 @@ fn bench_config_operations(c: &mut Criterion) {
             max_retries: 5,
             initial_retry_delay_ms: 2000,
             max_retry_delay_ms: 60000,
+            enable_http2_pipelining: true,
+            max_concurrent_requests: 6,
+            keep_alive_seconds: 120,
+            enable_request_batching: true,
+            max_batch_size: 10,
+            batch_timeout_ms: 50,
         }),
     ];
 

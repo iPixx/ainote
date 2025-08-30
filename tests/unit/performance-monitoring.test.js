@@ -18,7 +18,7 @@ import { setupTauriMocks } from '../__mocks__/tauri-mocks.js';
 
 // Import the classes under test
 import { PerformanceMonitoringDashboard } from '../../src/js/components/performance-monitoring-dashboard.js';
-import { RealTimeMetricsService, realTimeMetricsService } from '../../src/js/services/real-time-metrics-service.js';
+import { RealTimeMetricsService } from '../../src/js/services/real-time-metrics-service.js';
 
 // Mock performance APIs
 global.performance = {
@@ -806,7 +806,7 @@ describe('Performance Monitoring System', () => {
   describe('Performance Requirements Validation', () => {
     it('should meet <1% CPU overhead requirement', async () => {
       const iterations = 100;
-      const interval = 100; // 100ms collection interval
+      const _interval = 100; // 100ms collection interval
       
       const startTime = process.hrtime?.() || [0, 0];
       
