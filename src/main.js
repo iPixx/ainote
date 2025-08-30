@@ -11,6 +11,9 @@ import AiPanel from './js/components/ai-panel.js';
 import AiPanelController from './js/components/ai-panel-controller.js';
 import { PerformanceMonitoringDashboard } from './js/components/performance-monitoring-dashboard.js';
 import { realTimeMetricsService } from './js/services/real-time-metrics-service.js';
+import AiSuggestionService from './js/services/ai-suggestion-service.js';
+import ContentChangeDetector from './js/services/content-change-detector.js';
+import SuggestionCacheManager from './js/services/suggestion-cache-manager.js';
 
 // Initialize global application state
 const appState = new AppState();
@@ -28,6 +31,9 @@ let performanceDashboard;
 // Initialize service instances
 let vaultManager;
 let autoSave;
+
+// AI pipeline initialization state
+let aiPipelineInitialized = false;
 
 // Window instance for state management
 let mainWindow;
@@ -134,6 +140,78 @@ function showNotification(message, type = 'info') {
   setTimeout(() => {
     notification.style.transform = 'translateX(400px)';
   }, 4000);
+}
+
+/**
+ * Initialize AI Panel Controller when editor becomes available
+ * @param {MarkdownEditor} markdownEditor - The markdown editor instance
+ */
+async function initializeAiPanelController(markdownEditor) {
+  if (aiPipelineInitialized || !markdownEditor) {
+    return;
+  }
+  
+  try {
+    console.log('🤖 Initializing AI Panel Controller with suggestion pipeline...');
+    
+    const aiPanelElement = document.getElementById('aiPanel');
+    if (!aiPanelElement || !layoutManager) {
+      console.warn('⚠️ AI Panel element or layout manager not available');
+      return;
+    }
+    
+    // Initialize the enhanced AI Panel Controller with the markdown editor
+    aiPanelController = new AiPanelController(
+      aiPanelElement, 
+      markdownEditor,
+      appState, 
+      layoutManager,
+      fileTreeComponent, // Pass file tree for navigation
+      editorPreviewPanel  // Pass editor panel for navigation
+    );
+    
+    // Listen to enhanced AI panel events
+    aiPanelController.addEventListener(AiPanelController.EVENTS.PANEL_ACTIVATED, (event) => {
+      console.log('🚀 AI Panel activated:', event.detail);
+      showNotification('AI Assistant ready with suggestions', 'success');
+    });
+    
+    aiPanelController.addEventListener(AiPanelController.EVENTS.PANEL_DEACTIVATED, (event) => {
+      console.log('🔄 AI Panel deactivated:', event.detail);
+    });
+    
+    aiPanelController.addEventListener(AiPanelController.EVENTS.SUGGESTIONS_READY, (event) => {
+      console.log('✅ AI Suggestions ready:', event.detail);
+    });
+    
+    aiPanelController.addEventListener(AiPanelController.EVENTS.SUGGESTION_INSERTED, (event) => {
+      console.log('📝 Suggestion inserted:', event.detail);
+      showNotification('Content inserted from AI suggestion', 'success');
+    });
+    
+    aiPanelController.addEventListener(AiPanelController.EVENTS.SERVICE_ERROR, (event) => {
+      console.warn('⚠️ AI Service error:', event.detail);
+      showNotification('AI service error: ' + event.detail.message, 'error');
+    });
+    
+    // Make AI panel controller globally accessible
+    window.aiPanelController = aiPanelController;
+    window.aiPanel = aiPanelController;
+    
+    // Access the initialized services from the controller
+    window.aiSuggestionService = aiPanelController.suggestionService;
+    window.contentChangeDetector = aiPanelController.contentDetector;
+    window.suggestionCacheManager = aiPanelController.cacheManager;
+    
+    aiPipelineInitialized = true;
+    
+    console.log('✅ AI Panel Controller initialized with full suggestion pipeline');
+    showNotification('AI-powered suggestions are now active', 'success');
+    
+  } catch (error) {
+    console.error('❌ Failed to initialize AI Panel Controller:', error);
+    showNotification('Failed to activate AI suggestions', 'error');
+  }
 }
 
 // Vault Operations
@@ -375,6 +453,18 @@ async function openFile(filePath) {
       
       // Initialize the panel
       editorPreviewPanel.init();
+      
+      // Initialize AI Panel Controller with the markdown editor
+      if (editorPreviewPanel.markdownEditor) {
+        await initializeAiPanelController(editorPreviewPanel.markdownEditor);
+      } else {
+        // Wait for editor to be fully initialized
+        setTimeout(async () => {
+          if (editorPreviewPanel.markdownEditor) {
+            await initializeAiPanelController(editorPreviewPanel.markdownEditor);
+          }
+        }, 100);
+      }
       
       // Listen for content changes from the editor component within the panel
       editorPreviewPanel.addEventListener('content_changed', () => {
@@ -1012,84 +1102,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.warn('⚠️ AI content container not found');
   }
   
-  // Initialize AI Panel - Phase 2A activation
-  const aiPanelElement = document.getElementById('aiPanel');
-  if (aiPanelElement && layoutManager) {
-    // Try to initialize the enhanced AI Panel Controller first
-    if (editorPreviewPanel && editorPreviewPanel.markdownEditor) {
-      aiPanelController = new AiPanelController(
-        aiPanelElement, 
-        editorPreviewPanel.markdownEditor, // Pass the markdown editor
-        appState, 
-        layoutManager
-      );
-      
-      // Listen to enhanced AI panel events
-      aiPanelController.addEventListener(AiPanelController.EVENTS.PANEL_ACTIVATED, (event) => {
-        console.log('🚀 AI Panel activated:', event.detail);
-        showNotification('AI Assistant ready with suggestions', 'success');
-      });
-      
-      aiPanelController.addEventListener(AiPanelController.EVENTS.PANEL_DEACTIVATED, (event) => {
-        console.log('🔄 AI Panel deactivated:', event.detail);
-        showNotification('AI Assistant deactivated', 'info');
-      });
-      
-      aiPanelController.addEventListener(AiPanelController.EVENTS.SUGGESTIONS_READY, (event) => {
-        console.log('✅ AI Suggestions ready:', event.detail);
-      });
-      
-      aiPanelController.addEventListener(AiPanelController.EVENTS.SUGGESTION_INSERTED, (event) => {
-        console.log('📝 Suggestion inserted:', event.detail);
-        showNotification('Content inserted from AI suggestion', 'success');
-      });
-      
-      aiPanelController.addEventListener(AiPanelController.EVENTS.SERVICE_ERROR, (event) => {
-        console.warn('⚠️ AI Service error:', event.detail);
-        showNotification('AI service error: ' + event.detail.message, 'error');
-      });
-      
-      console.log('🎛️ Enhanced AI Panel Controller initialized with suggestion system');
-      
-      // Make AI panel controller globally accessible
-      window.aiPanelController = aiPanelController;
-      window.aiPanel = aiPanelController;
-      
-    } else {
-      // Fallback: Initialize basic AI Panel for Phase 2A
-      console.log('🤖 Initializing basic AI Panel for Phase 2A...');
-      
-      aiPanel = new AiPanel(aiPanelElement, layoutManager);
-      
-      // Listen to basic AI panel events
-      aiPanel.addEventListener(AiPanel.EVENTS.PANEL_ACTIVATED, (event) => {
-        console.log('🚀 AI Panel activated:', event.detail);
-        showNotification('AI Assistant activated', 'success');
-      });
-      
-      aiPanel.addEventListener(AiPanel.EVENTS.PANEL_DEACTIVATED, (event) => {
-        console.log('🔄 AI Panel deactivated:', event.detail);
-        showNotification('AI Assistant deactivated', 'info');
-      });
-      
-      aiPanel.addEventListener(AiPanel.EVENTS.PANEL_READY, (event) => {
-        console.log('✅ AI Panel ready:', event.detail);
-      });
-      
-      console.log('✅ Basic AI Panel initialized for Phase 2A');
-      
-      // Make AI panel globally accessible
-      window.aiPanel = aiPanel;
-      window.aiPanelController = aiPanel; // Keep compatibility
-    }
-  } else {
-    console.warn('⚠️ AI Panel element or layout manager not found');
-    console.log('Available components:', { 
-      aiPanelElement: !!aiPanelElement, 
-      layoutManager: !!layoutManager, 
-      editorPreviewPanel: !!editorPreviewPanel 
-    });
-  }
+  // AI Panel Controller will be initialized when editor becomes available
+  // This ensures the suggestion pipeline activates with real-time content detection
   
   // Apply saved layout state if available
   if (savedAppState && savedAppState.layout) {
