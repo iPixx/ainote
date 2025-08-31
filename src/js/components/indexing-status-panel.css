@@ -1,0 +1,401 @@
+/**
+ * Indexing Status Panel Styles
+ * 
+ * Styling for the indexing progress and status display within the AI panel.
+ * Provides clean, modern interface elements for indexing status monitoring.
+ * 
+ * @author aiNote Development Team - Phase 2C Implementation
+ * @version 1.0.0
+ */
+
+.indexing-status-panel {
+    background: var(--color-surface);
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    padding: 16px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* Header Section */
+.indexing-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.indexing-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.indexing-icon {
+    font-size: 18px;
+}
+
+.indexing-controls {
+    display: flex;
+    gap: 4px;
+}
+
+/* Status Indicator Section */
+.indexing-status-section {
+    margin-bottom: 16px;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    background: var(--color-background-alt);
+    border-radius: 6px;
+    border: 1px solid var(--color-border-light);
+}
+
+.status-icon {
+    font-size: 20px;
+    margin-top: 2px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.status-info {
+    flex: 1;
+}
+
+.status-label {
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 4px;
+}
+
+.status-description {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    line-height: 1.3;
+}
+
+/* Progress Section */
+.indexing-progress-section {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: var(--color-background-alt);
+    border-radius: 6px;
+    border: 1px solid var(--color-border-light);
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.progress-title {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.progress-percentage {
+    font-weight: 600;
+    color: var(--color-primary);
+    font-size: 13px;
+}
+
+.progress-bar-container {
+    margin-bottom: 12px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--color-border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-primary-light));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    min-width: 2px;
+}
+
+.progress-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+}
+
+.progress-files,
+.progress-speed,
+.progress-eta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 4px;
+}
+
+.detail-label {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-bottom: 2px;
+}
+
+.detail-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+/* Action Buttons Section */
+.indexing-actions-section {
+    margin-bottom: 16px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.action-buttons .btn-secondary,
+.action-buttons .btn-warning {
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: 4px;
+    min-width: 80px;
+}
+
+.btn-secondary {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+}
+
+.btn-secondary:hover {
+    background: var(--color-background-alt);
+    border-color: var(--color-primary-light);
+}
+
+.btn-warning {
+    background: var(--color-warning);
+    border: 1px solid var(--color-warning-dark);
+    color: white;
+}
+
+.btn-warning:hover {
+    background: var(--color-warning-dark);
+}
+
+/* File Monitoring Section */
+.file-monitoring-section {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: var(--color-background-alt);
+    border-radius: 6px;
+    border: 1px solid var(--color-border-light);
+}
+
+.monitoring-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.monitoring-icon {
+    font-size: 18px;
+    color: var(--color-success);
+}
+
+.monitoring-info {
+    flex: 1;
+}
+
+.monitoring-label {
+    font-weight: 600;
+    color: var(--color-text);
+    font-size: 13px;
+    margin-bottom: 2px;
+}
+
+.monitoring-description {
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.monitoring-toggle {
+    display: flex;
+    align-items: center;
+}
+
+.monitoring-status-text {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-success);
+    padding: 2px 8px;
+    background: var(--color-success-light);
+    border-radius: 12px;
+}
+
+/* Statistics Section */
+.indexing-stats-section {
+    padding: 12px;
+    background: var(--color-background-alt);
+    border-radius: 6px;
+    border: 1px solid var(--color-border-light);
+}
+
+.stats-header {
+    margin-bottom: 8px;
+}
+
+.stats-title {
+    font-weight: 600;
+    color: var(--color-text);
+    font-size: 13px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 8px 4px;
+}
+
+.stat-label {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    margin-bottom: 4px;
+}
+
+.stat-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .indexing-status-panel {
+        padding: 12px;
+        margin-bottom: 12px;
+    }
+    
+    .progress-details {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+    
+    .progress-files,
+    .progress-speed,
+    .progress-eta {
+        flex-direction: row;
+        justify-content: space-between;
+        text-align: left;
+        padding: 2px 0;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .stat-item {
+        flex-direction: row;
+        justify-content: space-between;
+        text-align: left;
+        padding: 4px 0;
+    }
+}
+
+/* Animation Classes */
+.indexing-status-panel .progress-bar .progress-fill {
+    transition: width 0.5s ease-in-out;
+}
+
+.indexing-status-panel .status-icon {
+    transition: transform 0.2s ease;
+}
+
+.indexing-status-panel .status-icon:hover {
+    transform: scale(1.1);
+}
+
+/* Loading Animation for Status Icon */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.indexing-status-panel .status-icon[data-status="Indexing"] {
+    animation: spin 2s linear infinite;
+}
+
+/* Color Theme Variations */
+.indexing-status-panel[data-status="Idle"] .status-indicator {
+    border-left: 3px solid var(--color-text-muted);
+}
+
+.indexing-status-panel[data-status="Indexing"] .status-indicator {
+    border-left: 3px solid var(--color-primary);
+}
+
+.indexing-status-panel[data-status="Completed"] .status-indicator {
+    border-left: 3px solid var(--color-success);
+}
+
+.indexing-status-panel[data-status="Error"] .status-indicator {
+    border-left: 3px solid var(--color-error);
+}
+
+.indexing-status-panel[data-status="Cancelling"] .status-indicator {
+    border-left: 3px solid var(--color-warning);
+}
+
+/* Accessibility Improvements */
+.indexing-status-panel .control-btn:focus,
+.indexing-status-panel .btn-secondary:focus,
+.indexing-status-panel .btn-warning:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* Dark Mode Adjustments */
+@media (prefers-color-scheme: dark) {
+    .indexing-status-panel {
+        background: var(--dark-surface, #2a2a2a);
+        border-color: var(--dark-border, #404040);
+    }
+    
+    .status-indicator,
+    .indexing-progress-section,
+    .file-monitoring-section,
+    .indexing-stats-section {
+        background: var(--dark-background-alt, #353535);
+        border-color: var(--dark-border-light, #505050);
+    }
+    
+    .progress-bar {
+        background: var(--dark-border, #404040);
+    }
+}

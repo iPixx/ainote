@@ -150,6 +150,7 @@ pub fn run() {
             commands::vault_operations::select_vault,
             commands::vault_operations::validate_vault,
             commands::vault_operations::load_vault,
+            commands::vault_operations::load_vault_with_indexing,
             commands::vault_operations::scan_vault_files,
             commands::vault_operations::scan_vault_files_chunked,
             commands::vault_operations::watch_vault,

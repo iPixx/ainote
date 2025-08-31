@@ -80,11 +80,15 @@ class VaultManager {
   }
 
   /**
-   * Load files from the current vault
+   * Load files from the current vault with automatic indexing and monitoring (Phase 2C)
    * @param {string} vaultPath - Path to the vault to load
+   * @param {Object} options - Loading options
+   * @param {boolean} options.autoIndex - Enable automatic indexing (default: true)
+   * @param {boolean} options.autoMonitor - Enable file monitoring (default: true)
+   * @param {boolean} options.useEnhanced - Use enhanced loading with indexing (default: true)
    * @returns {Promise<Array>} Array of file information objects
    */
-  async loadVault(vaultPath) {
+  async loadVault(vaultPath, options = {}) {
     try {
       if (!vaultPath) {
         throw new Error('Vault path is required');
@@ -96,15 +100,85 @@ class VaultManager {
         throw new Error(`Invalid or inaccessible vault: ${vaultPath}`);
       }
 
-      // Load vault files using backend command
-      const files = await window.__TAURI__.core.invoke('load_vault', { vaultPath });
+      const {
+        autoIndex = true,
+        autoMonitor = true,
+        useEnhanced = true
+      } = options;
 
-      if (!Array.isArray(files)) {
-        throw new Error('Invalid vault files response format');
+      let files;
+      let indexingInfo = null;
+
+      if (useEnhanced) {
+        try {
+          // Phase 2C: Use enhanced vault loading with automatic indexing and monitoring
+          console.log('🚀 VaultManager: Using enhanced vault loading with indexing...');
+          
+          const result = await window.__TAURI__.core.invoke('load_vault_with_indexing', { 
+            vaultPath, 
+            autoIndex, 
+            autoMonitor 
+          });
+
+          if (!result || !Array.isArray(result.files)) {
+            throw new Error('Invalid enhanced vault loading response format');
+          }
+
+          files = result.files;
+          indexingInfo = {
+            indexingActive: result.indexing_active,
+            indexingRequestIds: result.indexing_request_ids || [],
+            monitoringActive: result.monitoring_active,
+            indexingError: result.indexing_error,
+            monitoringError: result.monitoring_error
+          };
+
+          console.log('✅ VaultManager: Enhanced vault loading completed', {
+            filesCount: files.length,
+            indexingActive: result.indexing_active,
+            monitoringActive: result.monitoring_active,
+            indexingRequests: result.indexing_request_ids?.length || 0
+          });
+
+          // Log any warnings for indexing or monitoring failures
+          if (result.indexing_error) {
+            console.warn('⚠️ VaultManager: Indexing setup failed:', result.indexing_error);
+          }
+          if (result.monitoring_error) {
+            console.warn('⚠️ VaultManager: File monitoring setup failed:', result.monitoring_error);
+          }
+
+        } catch (enhancedError) {
+          console.warn('⚠️ VaultManager: Enhanced loading failed, falling back to basic loading:', enhancedError);
+          
+          // Fall back to basic vault loading
+          files = await window.__TAURI__.core.invoke('load_vault', { vaultPath });
+          
+          if (!Array.isArray(files)) {
+            throw new Error('Invalid basic vault loading response format');
+          }
+        }
+      } else {
+        // Use basic vault loading
+        console.log('📁 VaultManager: Using basic vault loading...');
+        files = await window.__TAURI__.core.invoke('load_vault', { vaultPath });
+        
+        if (!Array.isArray(files)) {
+          throw new Error('Invalid vault files response format');
+        }
       }
 
       // Update app state with loaded files
       this.appState.setFiles(files);
+
+      // Store indexing information for potential UI updates
+      if (indexingInfo) {
+        // Emit event for any interested components (like AI panel)
+        this.emitVaultEvent('vault_indexing_started', {
+          vaultPath,
+          ...indexingInfo
+        });
+      }
 
       return files;
     } catch (error) {
@@ -395,6 +469,24 @@ class VaultManager {
       appStateVault: this.appState?.currentVault || null,
       filesLoaded: this.appState?.files?.length || 0
     };
+  }
+
+  /**
+   * Emit vault-related events for component integration (Phase 2C)
+   * @param {string} eventType - Type of event to emit
+   * @param {Object} eventData - Data to include with the event
+   */
+  emitVaultEvent(eventType, eventData) {
+    try {
+      const event = new CustomEvent(eventType, { 
+        detail: eventData,
+        bubbles: true 
+      });
+      document.dispatchEvent(event);
+      console.log(`🔔 VaultManager: Emitted event '${eventType}'`, eventData);
+    } catch (error) {
+      console.warn('⚠️ VaultManager: Failed to emit vault event:', error);
+    }
   }
 }
 
