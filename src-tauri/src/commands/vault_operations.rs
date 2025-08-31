@@ -49,6 +49,8 @@
 
 use crate::vault_operations;
 use crate::types::FileInfo;
+use crate::commands::indexing_commands::{index_vault_notes, start_indexing_pipeline};
+use crate::file_monitor::get_file_monitor;
 
 /// Open an interactive folder selection dialog to choose a vault directory
 ///
@@ -173,6 +175,166 @@ pub fn validate_vault(vault_path: String) -> Result<bool, String> {
 pub fn load_vault(vault_path: String) -> Result<Vec<FileInfo>, String> {
     // Enhanced vault loading with validation
     vault_operations::load_vault_internal(&vault_path).map_err(|e| e.into())
+}
+
+/// Load a vault with automatic indexing and file monitoring (Phase 2C Integration)
+///
+/// This enhanced command performs comprehensive vault loading with automatic
+/// AI indexing and real-time file monitoring activation. It integrates seamlessly
+/// with the indexing pipeline to ensure the AI system has up-to-date embeddings
+/// for all notes immediately after vault selection.
+///
+/// # Arguments
+/// * `vault_path` - Absolute path to the vault directory
+/// * `auto_index` - Whether to automatically start indexing (default: true)
+/// * `auto_monitor` - Whether to start file monitoring (default: true)
+///
+/// # Returns
+/// * `Ok(LoadVaultWithIndexingResult)` - Comprehensive result with files and indexing status
+/// * `Err(String)` - Error message if vault loading or setup fails
+///
+/// # Operation Steps (Phase 2C)
+/// 1. Validate vault directory structure
+/// 2. Load and scan all vault files
+/// 3. Initialize indexing pipeline
+/// 4. Start automatic vault indexing in background
+/// 5. Activate real-time file monitoring
+/// 6. Return vault files with indexing status
+///
+/// # Performance Features
+/// - Non-blocking indexing (runs in background)
+/// - Immediate vault access while indexing proceeds
+/// - Real-time progress tracking available via get_indexing_progress
+/// - File monitoring for automatic re-indexing on changes
+///
+/// # Example Usage (from frontend)
+/// ```javascript
+/// const result = await invoke('load_vault_with_indexing', { 
+///     vaultPath: '/path/to/vault',
+///     autoIndex: true,
+///     autoMonitor: true 
+/// });
+/// console.log(`Loaded ${result.files.length} files, indexing ${result.indexing_request_ids.length} files`);
+/// console.log(`File monitoring: ${result.monitoring_active ? 'active' : 'inactive'}`);
+/// 
+/// // Monitor indexing progress
+/// setInterval(async () => {
+///     const progress = await invoke('get_indexing_progress');
+///     console.log(`Indexing progress: ${progress.progress_percent}%`);
+/// }, 1000);
+/// ```
+#[tauri::command]
+pub async fn load_vault_with_indexing(
+    vault_path: String,
+    auto_index: Option<bool>,
+    auto_monitor: Option<bool>
+) -> Result<LoadVaultWithIndexingResult, String> {
+    let vault_path_str = vault_path.clone();
+    
+    log::info!("🚀 Loading vault with automated indexing: {}", vault_path_str);
+    
+    // Step 1: Load vault files using existing logic
+    let files = vault_operations::load_vault_internal(&vault_path).map_err(|e| {
+        log::error!("❌ Failed to load vault: {}", e);
+        format!("Vault loading failed: {}", e)
+    })?;
+    
+    log::info!("✅ Loaded {} files from vault", files.len());
+    
+    let should_index = auto_index.unwrap_or(true);
+    let should_monitor = auto_monitor.unwrap_or(true);
+    
+    let mut indexing_request_ids = Vec::new();
+    let mut indexing_error = None;
+    
+    // Step 2: Initialize and start indexing pipeline if requested
+    if should_index {
+        log::info!("🔧 Initializing indexing pipeline for vault...");
+        
+        match start_indexing_pipeline(None).await {
+            Ok(_) => {
+                log::info!("✅ Indexing pipeline initialized successfully");
+                
+                // Step 3: Start automatic vault indexing
+                match index_vault_notes(
+                    vault_path_str.clone(),
+                    Some("**/*.md".to_string()),
+                    Some("UserTriggered".to_string())
+                ).await {
+                    Ok(request_ids) => {
+                        indexing_request_ids = request_ids;
+                        log::info!("✅ Started automatic vault indexing with {} requests", indexing_request_ids.len());
+                    }
+                    Err(e) => {
+                        indexing_error = Some(format!("Failed to start vault indexing: {}", e));
+                        log::warn!("⚠️ Vault indexing failed: {}", e);
+                    }
+                }
+            }
+            Err(e) => {
+                indexing_error = Some(format!("Failed to initialize indexing pipeline: {}", e));
+                log::warn!("⚠️ Indexing pipeline initialization failed: {}", e);
+            }
+        }
+    } else {
+        log::info!("ℹ️ Automatic indexing disabled for vault loading");
+    }
+    
+    // Step 4: Start file monitoring if requested
+    let mut monitoring_active = false;
+    let mut monitoring_error = None;
+    
+    if should_monitor {
+        log::info!("👁️ Starting file monitoring for vault...");
+        
+        let file_monitor = get_file_monitor();
+        match file_monitor.start_watching(&vault_path_str).await {
+            Ok(_) => {
+                monitoring_active = true;
+                log::info!("✅ File monitoring activated for vault");
+            }
+            Err(e) => {
+                monitoring_error = Some(format!("Failed to start file monitoring: {}", e));
+                log::warn!("⚠️ File monitoring failed: {}", e);
+            }
+        }
+    } else {
+        log::info!("ℹ️ File monitoring disabled for vault loading");
+    }
+    
+    // Step 5: Return comprehensive result
+    let indexing_active = !indexing_request_ids.is_empty();
+    let result = LoadVaultWithIndexingResult {
+        files,
+        indexing_request_ids,
+        indexing_active,
+        indexing_error,
+        monitoring_active,
+        monitoring_error,
+        vault_path: vault_path_str,
+    };
+    
+    log::info!("🎉 Vault loading with indexing completed successfully");
+    Ok(result)
+}
+
+/// Result structure for vault loading with indexing integration
+#[derive(serde::Serialize)]
+pub struct LoadVaultWithIndexingResult {
+    /// List of all files found in the vault
+    pub files: Vec<FileInfo>,
+    /// Request IDs for indexing operations (for tracking progress)
+    pub indexing_request_ids: Vec<u64>,
+    /// Whether indexing is currently active
+    pub indexing_active: bool,
+    /// Error message if indexing failed (indexing failure doesn't prevent vault loading)
+    pub indexing_error: Option<String>,
+    /// Whether file monitoring is active
+    pub monitoring_active: bool,
+    /// Error message if file monitoring failed
+    pub monitoring_error: Option<String>,
+    /// Path to the loaded vault
+    pub vault_path: String,
 }
 
 /// Scan all files in a vault directory
