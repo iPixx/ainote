@@ -290,11 +290,13 @@ class MarkdownEditor {
     // Key events for keyboard shortcuts and cursor movement (optimized)
     const keyHandler = (event) => {
       // Fast path for common keys that don't need special handling
-      const isCommonKey = /^[a-zA-Z0-9\s]$/.test(event.key) && 
+      // Note: Essential keys like Enter, Space, and Arrow keys are handled by the global handler below
+      const isCommonKey = (/^[a-zA-Z0-9\s]$/.test(event.key) || 
+                          ['Enter', 'Backspace', 'Delete', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) && 
                          !event.ctrlKey && !event.metaKey && !event.altKey;
       
       if (isCommonKey) {
-        // Allow default behavior for common typing
+        // Allow default behavior for common typing and essential navigation keys
         return;
       }
       
@@ -313,6 +315,9 @@ class MarkdownEditor {
         this.handleTabIndentation(event.shiftKey);
         return;
       }
+      
+      // Note: Essential keys (Enter, Space, Arrow keys) are handled by the global handler
+      // This section handles other special keys that need processing
       
       // Handle auto-completion for brackets and quotes (lower priority)
       if (!event.ctrlKey && !event.metaKey && !event.altKey) {
@@ -346,12 +351,89 @@ class MarkdownEditor {
       }
     };
 
+    /**
+     * Global document-level handler for essential keyboard input
+     * 
+     * This handler ensures that critical keys (Enter, Space, Arrow keys) work correctly
+     * by intercepting them at the document level before other event handlers can interfere.
+     * 
+     * Background: Some keyboard events were being prevented by other parts of the application,
+     * causing essential keys like Enter and Space to not function properly in the editor.
+     * 
+     * Solution: Use the capture phase (addEventListener with true) to intercept these events
+     * at the highest level and ensure they work as expected.
+     */
+    const globalEssentialKeysHandler = (event) => {
+      // Only handle events when our textarea is focused and no modifier keys are pressed
+      if (event.target === this.textarea && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        
+        // Handle Enter key - insert newline
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          
+          const start = this.textarea.selectionStart;
+          const end = this.textarea.selectionEnd;
+          const currentValue = this.textarea.value;
+          
+          // Insert newline at cursor position
+          const newValue = currentValue.substring(0, start) + '\n' + currentValue.substring(end);
+          this.textarea.value = newValue;
+          this.content = newValue;
+          
+          // Position cursor after the newline
+          this.textarea.setSelectionRange(start + 1, start + 1);
+          this.textarea.focus();
+          
+          // Trigger input event to update other systems (content detection, auto-save, etc.)
+          this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          return;
+        }
+        
+        // Handle Space key - insert space character
+        if (event.key === ' ') {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          
+          const start = this.textarea.selectionStart;
+          const end = this.textarea.selectionEnd;
+          const currentValue = this.textarea.value;
+          
+          // Insert space at cursor position
+          const newValue = currentValue.substring(0, start) + ' ' + currentValue.substring(end);
+          this.textarea.value = newValue;
+          this.content = newValue;
+          
+          // Position cursor after the space
+          this.textarea.setSelectionRange(start + 1, start + 1);
+          this.textarea.focus();
+          
+          // Trigger input event to update other systems
+          this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          return;
+        }
+        
+        // Handle Arrow keys and navigation keys - prevent interference but allow default behavior
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+          // Stop event propagation to prevent other handlers from interfering
+          // but don't preventDefault - let the browser handle cursor movement naturally
+          event.stopImmediatePropagation();
+          return;
+        }
+      }
+    };
+
+    // Add global handler to document (highest priority)
+    this.globalEssentialKeysHandler = globalEssentialKeysHandler.bind(this);
+    document.addEventListener('keydown', this.globalEssentialKeysHandler, true); // Use capture phase
+
     // Register event listeners (optimized to avoid conflicts)
     this.addDOMEventListener(this.textarea, 'input', inputHandler);
     // Use single selection handler to avoid conflicts and improve performance
     this.addDOMEventListener(this.textarea, 'selectionchange', selectionHandler);
     this.addDOMEventListener(this.textarea, 'mouseup', selectionHandler);
     this.addDOMEventListener(this.textarea, 'keydown', keyHandler);
+    // Note: keypress event handler removed - global handler manages essential keys
     this.addDOMEventListener(this.textarea, 'paste', pasteHandler);
 
     // Scroll synchronization (prepare for preview mode)
@@ -1136,7 +1218,7 @@ class MarkdownEditor {
       timestamp: Date.now()
     });
     
-    console.log(`🔍 Opened find/replace in ${mode} mode`);
+    // Find/replace modal opened successfully
   }
 
   /**
@@ -2091,6 +2173,12 @@ class MarkdownEditor {
    * Clean up editor resources
    */
   destroy() {
+    // Remove global essential keys handler
+    if (this.globalEssentialKeysHandler) {
+      document.removeEventListener('keydown', this.globalEssentialKeysHandler, true);
+      this.globalEssentialKeysHandler = null;
+    }
+    
     // Clear all timeouts
     clearTimeout(this.debounceTimeout);
     clearTimeout(this.heavyOperationsTimeout);
