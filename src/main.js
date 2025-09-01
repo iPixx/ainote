@@ -14,6 +14,7 @@ import { realTimeMetricsService } from './js/services/real-time-metrics-service.
 import AiSuggestionService from './js/services/ai-suggestion-service.js';
 import ContentChangeDetector from './js/services/content-change-detector.js';
 import SuggestionCacheManager from './js/services/suggestion-cache-manager.js';
+import OllamaConnectionMonitor from './js/services/ollama-connection-monitor.js';
 
 // Initialize global application state
 const appState = new AppState();
@@ -31,6 +32,7 @@ let performanceDashboard;
 // Initialize service instances
 let vaultManager;
 let autoSave;
+let ollamaConnectionMonitor;
 
 // AI pipeline initialization state
 let aiPipelineInitialized = false;
@@ -202,6 +204,44 @@ async function initializeAiPanelController(markdownEditor) {
     window.aiSuggestionService = aiPanelController.suggestionService;
     window.contentChangeDetector = aiPanelController.contentDetector;
     window.suggestionCacheManager = aiPanelController.cacheManager;
+    
+    // Integrate AI services with connection monitoring
+    if (ollamaConnectionMonitor && aiPanelController.suggestionService) {
+      console.log('🔗 Integrating AI suggestion service with connection monitoring...');
+      
+      // Listen to connection status changes to enable/disable AI features
+      ollamaConnectionMonitor.addEventListener(OllamaConnectionMonitor.EVENTS.STATUS_CHANGED, (data) => {
+        const { currentStatus } = data;
+        const isConnected = currentStatus === OllamaConnectionMonitor.STATUS.CONNECTED;
+        
+        // Enable/disable suggestion service based on connection
+        if (aiPanelController.suggestionService) {
+          aiPanelController.suggestionService.setEnabled(isConnected);
+          
+          if (isConnected) {
+            console.log('✅ AI suggestions enabled - Ollama connected');
+          } else {
+            console.log('⚠️ AI suggestions disabled - Ollama disconnected');
+            aiPanelController.suggestionService.clearSuggestions();
+          }
+        }
+      });
+      
+      // Listen to model status for enhanced functionality
+      ollamaConnectionMonitor.addEventListener(OllamaConnectionMonitor.EVENTS.MODEL_STATUS_UPDATED, (data) => {
+        if (data.modelName === 'nomic-embed-text' && aiPanelController.suggestionService) {
+          const config = {
+            ENABLED: data.isAvailable && data.isCompatible,
+            MODEL_NAME: data.modelName
+          };
+          
+          aiPanelController.suggestionService.updateConfig(config);
+          console.log('📦 AI suggestion service updated for model status:', data);
+        }
+      });
+      
+      console.log('✅ AI services integrated with connection monitoring');
+    }
     
     aiPipelineInitialized = true;
     
@@ -1012,12 +1052,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     vaultManager = new VaultManagerModule.default(appState);
     autoSave = new AutoSave(appState);
     
+    // Initialize Ollama Connection Monitor
+    ollamaConnectionMonitor = new OllamaConnectionMonitor();
+    
     // Make services and class globally accessible
     window.vaultManager = vaultManager;
     window.autoSave = autoSave;
     window.AutoSave = AutoSave; // Make AutoSave class globally accessible
+    window.ollamaConnectionMonitor = ollamaConnectionMonitor;
     
-    console.log('✅ VaultManager and AutoSave services initialized');
+    console.log('✅ VaultManager, AutoSave, and OllamaConnectionMonitor services initialized');
   } catch (error) {
     console.error('❌ Failed to initialize services:', error);
     showNotification('Failed to initialize application services', 'error');
@@ -1098,6 +1142,44 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     // Make AI status panel globally accessible for debugging
     window.aiStatusPanel = aiStatusPanel;
+    
+    // Start Ollama connection monitoring and integrate with AI status panel
+    if (ollamaConnectionMonitor) {
+      console.log('🚀 Starting Ollama connection monitoring...');
+      
+      // Set up event listeners for connection monitoring
+      ollamaConnectionMonitor.addEventListener(OllamaConnectionMonitor.EVENTS.STATUS_CHANGED, (data) => {
+        console.log('📊 Ollama connection status changed:', data);
+        // The AI Status Panel will handle its own status checks, but we can log here
+      });
+      
+      ollamaConnectionMonitor.addEventListener(OllamaConnectionMonitor.EVENTS.MODEL_STATUS_UPDATED, (data) => {
+        console.log('📦 Model status updated:', data);
+        showNotification(`Model ${data.modelName}: ${data.isAvailable ? 'Available' : 'Not Available'}`, 
+                        data.isAvailable ? 'success' : 'warning');
+      });
+      
+      ollamaConnectionMonitor.addEventListener(OllamaConnectionMonitor.EVENTS.ERROR_OCCURRED, (data) => {
+        console.warn('⚠️ Ollama monitor error:', data);
+        if (data.type !== 'health_check_failed') {
+          showNotification(`AI Service Error: ${data.message}`, 'error');
+        }
+      });
+      
+      ollamaConnectionMonitor.addEventListener(OllamaConnectionMonitor.EVENTS.RECONNECTION_ATTEMPT, (data) => {
+        console.log('🔄 Ollama reconnection attempt:', data);
+        showNotification(`Reconnecting to AI service... (${data.attempt}/${data.maxAttempts})`, 'info');
+      });
+      
+      // Start the monitoring service
+      ollamaConnectionMonitor.start().catch(error => {
+        console.error('❌ Failed to start Ollama monitoring:', error);
+        showNotification('Failed to start AI service monitoring', 'warning');
+      });
+      
+      console.log('✅ Ollama connection monitoring started');
+    }
+    
   } else {
     console.warn('⚠️ AI content container not found');
   }
@@ -1148,6 +1230,12 @@ window.addEventListener('DOMContentLoaded', async () => {
         console.log('💾 Window close requested - saving state...');
         
         try {
+          // Stop monitoring services
+          if (ollamaConnectionMonitor) {
+            ollamaConnectionMonitor.stop();
+            console.log('🛑 Ollama monitoring stopped');
+          }
+          
           // Save state without debouncing for immediate persistence
           await forceSaveAllState();
           console.log('✅ State saved successfully before close');
