@@ -52,7 +52,7 @@ mod client_integration_tests {
                 max_retries: 3,
                 initial_retry_delay_ms: 1000,
                 max_retry_delay_ms: 30000,
-                enable_http2_pipelining: true,
+                enable_http2_pipelining: false, // Disabled for stability
                 max_concurrent_requests: 6,
                 keep_alive_seconds: 120,
                 enable_request_batching: true,
@@ -74,7 +74,7 @@ mod client_integration_tests {
             max_retries: 0,
             initial_retry_delay_ms: 100,
             max_retry_delay_ms: 1000,
-            enable_http2_pipelining: true,
+            enable_http2_pipelining: false, // Disabled for stability
             max_concurrent_requests: 6,
             keep_alive_seconds: 120,
             enable_request_batching: true,

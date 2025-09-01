@@ -222,8 +222,8 @@ impl EmbeddingGenerator {
             .tcp_keepalive(Duration::from_secs(embedding_config.keep_alive_seconds))
             .tcp_nodelay(embedding_config.tcp_nodelay);
 
-        // Enable HTTP/2 for better connection reuse
-        client_builder = client_builder.http2_prior_knowledge();
+        // Force HTTP/1.1 only to avoid connection issues with Ollama
+        client_builder = client_builder.http1_only();
 
         let client = client_builder
             .build()
@@ -261,9 +261,11 @@ impl EmbeddingGenerator {
     /// Generate embedding for a single text
     pub async fn generate_embedding(&self, text: String, model: String) -> EmbeddingResult<Vec<f32>> {
         let start_time = Instant::now();
+        log::info!("🤖 EmbeddingGenerator: Received request for {} chars with model '{}'", text.len(), model);
         
         // Validate input
         if text.trim().is_empty() {
+            log::warn!("🤖 EmbeddingGenerator: Empty text provided");
             return Err(EmbeddingError::EmptyText);
         }
         
@@ -292,16 +294,17 @@ impl EmbeddingGenerator {
             match self.generate_single_embedding_request(&processed_text, &model).await {
                 Ok(embedding) => {
                     let duration = start_time.elapsed();
-                    eprintln!("✅ Generated embedding for {} characters in {:?} (attempt {})", 
-                              processed_text.len(), duration, attempt + 1);
+                    log::info!("✅ Generated embedding: {} chars -> {} dims in {:?} (attempt {})", 
+                              processed_text.len(), embedding.len(), duration, attempt + 1);
                     return Ok(embedding);
                 }
                 Err(e) => {
+                    log::warn!("⚠️ Embedding generation failed on attempt {}: {}", attempt + 1, e);
                     last_error = Some(e);
                     if attempt < self.embedding_config.max_retries {
                         // Exponential backoff
                         let delay = Duration::from_millis(1000 * (2_u64.pow(attempt as u32)));
-                        eprintln!("⚠️ Embedding attempt {} failed, retrying in {:?}...", attempt + 1, delay);
+                        log::info!("🔄 Retrying embedding in {:?}...", delay);
                         tokio::time::sleep(delay).await;
                     }
                 }
@@ -389,7 +392,7 @@ impl EmbeddingGenerator {
         }
         
         let duration = start_time.elapsed();
-        eprintln!("✅ Generated {} embeddings in {:?}", all_embeddings.len(), duration);
+        log::info!("✅ Generated {} embeddings in {:?}", all_embeddings.len(), duration);
         
         Ok(all_embeddings)
     }
@@ -573,8 +576,8 @@ impl EmbeddingGenerator {
             .tcp_keepalive(Duration::from_secs(config.keep_alive_seconds))
             .tcp_nodelay(config.tcp_nodelay);
 
-        // Enable HTTP/2 for better connection reuse
-        client_builder = client_builder.http2_prior_knowledge();
+        // Force HTTP/1.1 only to avoid connection issues with Ollama
+        client_builder = client_builder.http1_only();
 
         self.client = client_builder
             .build()
@@ -585,7 +588,7 @@ impl EmbeddingGenerator {
 
     /// Warm up connections to Ollama service for better initial performance
     async fn warmup_connections(&self) {
-        eprintln!("🔥 Warming up connections to Ollama service...");
+        log::debug!("Warming up connections to Ollama service");
         
         // Send a small test request to establish connections
         let test_text = "Connection warmup test";

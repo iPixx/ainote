@@ -19,7 +19,7 @@ fn bench_client_creation(c: &mut Criterion) {
         max_retries: 3,
         initial_retry_delay_ms: 1000,
         max_retry_delay_ms: 30000,
-        enable_http2_pipelining: true,
+        enable_http2_pipelining: false, // Disabled for stability
         max_concurrent_requests: 6,
         keep_alive_seconds: 120,
         enable_request_batching: true,
@@ -72,7 +72,7 @@ fn bench_config_operations(c: &mut Criterion) {
             max_retries: 3,
             initial_retry_delay_ms: 1000,
             max_retry_delay_ms: 30000,
-            enable_http2_pipelining: true,
+            enable_http2_pipelining: false, // Disabled for stability
             max_concurrent_requests: 6,
             keep_alive_seconds: 120,
             enable_request_batching: true,
@@ -85,7 +85,7 @@ fn bench_config_operations(c: &mut Criterion) {
             max_retries: 5,
             initial_retry_delay_ms: 2000,
             max_retry_delay_ms: 60000,
-            enable_http2_pipelining: true,
+            enable_http2_pipelining: false, // Disabled for stability
             max_concurrent_requests: 6,
             keep_alive_seconds: 120,
             enable_request_batching: true,

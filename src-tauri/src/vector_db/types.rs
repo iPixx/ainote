@@ -379,6 +379,28 @@ impl Default for VectorStorageConfig {
     }
 }
 
+impl VectorStorageConfig {
+    /// Create a new configuration for vault-relative storage
+    /// 
+    /// This creates a vector storage configuration that stores vectors inside the vault
+    /// directory, making the vector database portable with the vault.
+    /// 
+    /// # Arguments
+    /// * `vault_path` - Path to the vault directory
+    /// 
+    /// # Returns
+    /// A VectorStorageConfig with storage_dir set to `{vault_path}/.ainote/vectors`
+    pub fn for_vault(vault_path: impl AsRef<std::path::Path>) -> Self {
+        let vault_path = vault_path.as_ref();
+        let storage_dir = vault_path.join(".ainote").join("vectors");
+        
+        Self {
+            storage_dir: storage_dir.to_string_lossy().to_string(),
+            ..Self::default()
+        }
+    }
+}
+
 /// Supported compression algorithms
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CompressionAlgorithm {
@@ -668,5 +690,23 @@ mod tests {
         assert_eq!(metrics.uncompressed_size_bytes, 100000);
         assert_eq!(metrics.compression_ratio, 0.5);
         assert_eq!(metrics.avg_entries_per_file, 200.0);
+    }
+
+    #[test]
+    fn test_vault_specific_config() {
+        let vault_path = "/Users/test/my-vault";
+        let config = VectorStorageConfig::for_vault(vault_path);
+        
+        assert!(config.storage_dir.contains("my-vault"));
+        assert!(config.storage_dir.contains(".ainote"));
+        assert!(config.storage_dir.contains("vectors"));
+        assert!(config.storage_dir.ends_with(".ainote/vectors"));
+        
+        // Test with different path separators
+        let windows_path = r"C:\Users\test\my-vault";
+        let windows_config = VectorStorageConfig::for_vault(windows_path);
+        assert!(windows_config.storage_dir.contains("my-vault"));
+        assert!(windows_config.storage_dir.contains(".ainote"));
+        assert!(windows_config.storage_dir.contains("vectors"));
     }
 }

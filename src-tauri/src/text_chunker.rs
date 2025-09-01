@@ -485,8 +485,8 @@ impl BoundaryDetector {
             return Some(text.len());
         }
         
-        let start = target_pos.saturating_sub(search_range);
-        let end = (target_pos + search_range).min(text.len());
+        let start = self.find_char_boundary_at_or_before(text, target_pos.saturating_sub(search_range));
+        let end = self.find_char_boundary_at_or_after(text, (target_pos + search_range).min(text.len()));
         
         // Quick paragraph boundary check first (most efficient)
         if let Some(para_pos) = self.find_nearest_paragraph_boundary(&text[start..end], target_pos - start) {
@@ -525,6 +525,32 @@ impl BoundaryDetector {
         }
         
         best_pos
+    }
+    
+    /// Find UTF-8 character boundary at or before the given position
+    fn find_char_boundary_at_or_before(&self, text: &str, pos: usize) -> usize {
+        if pos >= text.len() {
+            return text.len();
+        }
+        
+        let mut boundary = pos;
+        while boundary > 0 && !text.is_char_boundary(boundary) {
+            boundary -= 1;
+        }
+        boundary
+    }
+    
+    /// Find UTF-8 character boundary at or after the given position  
+    fn find_char_boundary_at_or_after(&self, text: &str, pos: usize) -> usize {
+        if pos >= text.len() {
+            return text.len();
+        }
+        
+        let mut boundary = pos;
+        while boundary < text.len() && !text.is_char_boundary(boundary) {
+            boundary += 1;
+        }
+        boundary
     }
     
     /// Fast sentence boundary detection
@@ -570,6 +596,7 @@ impl BoundaryDetector {
         // Search forwards for whitespace
         (target..bytes.len()).find(|&i| bytes[i].is_ascii_whitespace())
     }
+    
 }
 
 /// Markdown element detected during parsing
@@ -1182,13 +1209,15 @@ impl ChunkProcessor {
         while position < text_len {
             let chunk_end = (position + max_chunk_size).min(text_len);
             
-            // Use string slice reference instead of copying until final chunk creation
-            let chunk_slice = &text[position..chunk_end];
+            // Use string slice reference with UTF-8 boundary safety
+            let safe_position = self.boundary_detector.find_char_boundary_at_or_after(text, position);
+            let safe_chunk_end = self.boundary_detector.find_char_boundary_at_or_before(text, chunk_end);
+            let chunk_slice = &text[safe_position..safe_chunk_end];
             
             let metadata = self.create_chunk_metadata_optimized(
                 chunk_slice,
-                position, 
-                chunk_end, 
+                safe_position, 
+                safe_chunk_end, 
                 chunks.len(), 
                 !chunks.is_empty(), // has previous overlap
                 chunk_end < text_len // has next overlap
@@ -1197,11 +1226,11 @@ impl ChunkProcessor {
             chunks.push(TextChunk::new(chunk_slice.to_string(), metadata));
             
             // Calculate next position with overlap
-            if chunk_end >= text_len {
+            if safe_chunk_end >= text_len {
                 break;
             }
             
-            position = chunk_end.saturating_sub(overlap_size);
+            position = self.boundary_detector.find_char_boundary_at_or_after(text, safe_chunk_end.saturating_sub(overlap_size));
             
             // Prevent infinite loops by ensuring progress
             if position >= chunk_end {
@@ -1231,11 +1260,13 @@ impl ChunkProcessor {
             
             // If we're at the end or within min_chunk_size, take the rest
             if target_end >= text_len || text_len - position <= min_chunk_size {
-                let chunk_slice = &text[position..text_len];
+                // Ensure final chunk uses safe UTF-8 boundaries
+                let safe_position = self.boundary_detector.find_char_boundary_at_or_after(text, position);
+                let chunk_slice = &text[safe_position..text_len];
                 if !chunk_slice.trim().is_empty() {
                     let metadata = self.create_chunk_metadata_optimized(
                         chunk_slice,
-                        position,
+                        safe_position,
                         text_len,
                         chunks.len(),
                         !chunks.is_empty(),
@@ -1252,21 +1283,24 @@ impl ChunkProcessor {
                 .find_best_boundary_optimized(text, target_end, search_range)
                 .unwrap_or(target_end);
             
-            let chunk_slice = &text[position..actual_end];
+            // Ensure positions are on UTF-8 character boundaries
+            let safe_position = self.boundary_detector.find_char_boundary_at_or_after(text, position);
+            let safe_actual_end = self.boundary_detector.find_char_boundary_at_or_before(text, actual_end);
+            let chunk_slice = &text[safe_position..safe_actual_end];
             if !chunk_slice.trim().is_empty() && chunk_slice.len() >= min_chunk_size {
                 let metadata = self.create_chunk_metadata_optimized(
                     chunk_slice,
-                    position,
-                    actual_end,
+                    safe_position,
+                    safe_actual_end,
                     chunks.len(),
                     !chunks.is_empty(),
-                    actual_end < text_len
+                    safe_actual_end < text_len
                 );
                 chunks.push(TextChunk::new(chunk_slice.to_string(), metadata));
             }
             
-            // Calculate next position with overlap
-            position = actual_end.saturating_sub(overlap_size);
+            // Calculate next position with overlap, ensuring UTF-8 boundary
+            position = self.boundary_detector.find_char_boundary_at_or_after(text, safe_actual_end.saturating_sub(overlap_size));
             
             // Ensure we make progress
             if position >= actual_end {
@@ -1303,12 +1337,15 @@ impl ChunkProcessor {
                 _ => max_end, // Fall back to fixed size if no good boundary found
             };
             
-            let chunk_slice = &text[position..chunk_end];
+            // Ensure chunk boundaries are UTF-8 safe
+            let safe_position = self.boundary_detector.find_char_boundary_at_or_after(text, position);
+            let safe_chunk_end = self.boundary_detector.find_char_boundary_at_or_before(text, chunk_end);
+            let chunk_slice = &text[safe_position..safe_chunk_end];
             if !chunk_slice.trim().is_empty() {
                 let metadata = self.create_chunk_metadata_optimized(
                     chunk_slice,
-                    position,
-                    chunk_end,
+                    safe_position,
+                    safe_chunk_end,
                     chunks.len(),
                     !chunks.is_empty(),
                     chunk_end < text_len
@@ -1631,7 +1668,10 @@ impl ChunkProcessor {
             };
             
             // Process this stream chunk
-            let stream_text = &text[stream_position..actual_stream_end];
+            // Ensure stream boundaries are UTF-8 safe
+            let safe_stream_position = self.boundary_detector.find_char_boundary_at_or_after(text, stream_position);
+            let safe_actual_stream_end = self.boundary_detector.find_char_boundary_at_or_before(text, actual_stream_end);
+            let stream_text = &text[safe_stream_position..safe_actual_stream_end];
             
             // Apply regular chunking to the stream segment
             let strategy_chunks = match self.config.strategy {

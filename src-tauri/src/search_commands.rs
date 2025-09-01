@@ -855,9 +855,17 @@ pub async fn initialize_search_system(storage_dir: String) -> Result<(), String>
     use crate::vector_db::types::VectorStorageConfig;
     
     // Create vector database configuration
-    let config = VectorStorageConfig {
-        storage_dir,
-        ..VectorStorageConfig::default()
+    // If storage_dir looks like a vault path, create vault-specific config
+    let config = if std::path::Path::new(&storage_dir).join("*.md").exists() || 
+                     std::path::Path::new(&storage_dir).is_dir() {
+        // Assume this is a vault path and create vault-specific config
+        VectorStorageConfig::for_vault(&storage_dir)
+    } else {
+        // Use the provided directory directly
+        VectorStorageConfig {
+            storage_dir,
+            ..VectorStorageConfig::default()
+        }
     };
     
     // Create vector database instance

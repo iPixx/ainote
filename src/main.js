@@ -313,6 +313,21 @@ async function refreshVault() {
     const dirCount = result.filter(file => file.is_dir).length;
     
     showNotification(`Refreshed: ${fileCount} files, ${dirCount} folders`, 'success');
+    
+    // Trigger indexing for vector generation
+    console.log('🚀 Starting vault indexing for vector generation...');
+    try {
+      const requestIds = await invoke('index_vault_notes', { 
+        vaultPath: currentVault,
+        filePattern: null, // Use default pattern (**/*.md)
+        priority: 'UserTriggered'
+      });
+      console.log(`✅ Started indexing with ${requestIds.length} files queued for processing`);
+      showNotification(`Indexing started: ${requestIds.length} files queued`, 'info');
+    } catch (indexError) {
+      console.error('❌ Failed to start indexing:', indexError);
+      showNotification(`Indexing failed: ${indexError}`, 'warning');
+    }
   } catch (error) {
     showNotification(`Error scanning vault: ${error}`, 'error');
   }

@@ -57,6 +57,10 @@ pub static INDEXING_PIPELINE: Lazy<Arc<RwLock<Option<Arc<IndexingPipeline>>>>> =
 /// If the pipeline doesn't exist, it creates a new one with default configuration and
 /// connects it to the global embedding generator and vector database.
 ///
+
+
+/// Gets or initializes the global indexing pipeline.
+///
 /// # Returns
 /// 
 /// Returns an `Arc<IndexingPipeline>` instance ready for operations.
@@ -97,6 +101,7 @@ async fn get_indexing_pipeline() -> Result<Arc<IndexingPipeline>, String> {
             
             // Create a minimal vector database for compatibility
             // TODO: Replace with proper shared database integration
+            // Using default config - will be overridden per vault
             let temp_config = crate::vector_db::types::VectorStorageConfig::default();
             let temp_vector_db = Arc::new(
                 crate::vector_db::VectorDatabase::new(temp_config).await.map_err(|e| {
@@ -166,7 +171,7 @@ pub async fn index_vault_notes(
     file_pattern: Option<String>,
     priority: Option<String>,
 ) -> Result<Vec<u64>, String> {
-    log::info!("🚀 Starting vault indexing: {}", vault_path);
+    log::info!("🚀 Starting vault indexing: {} (pattern: {:?}, priority: {:?})", vault_path, file_pattern, priority);
     
     // Parse priority level
     let indexing_priority = match priority.as_deref() {
@@ -179,8 +184,42 @@ pub async fn index_vault_notes(
         }
     };
     
-    // Get or initialize the indexing pipeline
-    let pipeline = get_indexing_pipeline().await?;
+    // Create vault-specific indexing pipeline for this operation
+    // This approach creates a temporary pipeline with vault-specific storage
+    let vault_storage_path = std::path::Path::new(&vault_path)
+        .join(".ainote")
+        .join("vectors")
+        .to_string_lossy()
+        .to_string();
+    
+    // Create vault-specific vector database configuration
+    let vault_config = crate::vector_db::types::VectorStorageConfig {
+        storage_dir: vault_storage_path,
+        ..crate::vector_db::types::VectorStorageConfig::default()
+    };
+    
+    // Initialize dependencies for vault-specific pipeline
+    let embedding_generator = Arc::new(get_embedding_generator().await);
+    let chunk_config = ChunkConfig::default();
+    let chunk_processor = Arc::new(ChunkProcessor::new(chunk_config).map_err(|e| {
+        format!("Failed to create chunk processor: {}", e)
+    })?);
+    
+    // Create vault-specific vector database
+    let vault_vector_db = Arc::new(
+        crate::vector_db::VectorDatabase::new(vault_config).await.map_err(|e| {
+            format!("Failed to create vault vector database: {}", e)
+        })?
+    );
+    
+    // Create temporary pipeline for this vault
+    let config = PipelineConfig::default();
+    let pipeline = Arc::new(IndexingPipeline::new(
+        config,
+        chunk_processor,
+        embedding_generator,
+        vault_vector_db,
+    ));
     
     // Start the pipeline if not already running
     if !pipeline.is_running() {

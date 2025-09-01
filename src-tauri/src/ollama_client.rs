@@ -32,13 +32,13 @@ impl Default for OllamaConfig {
     fn default() -> Self {
         Self {
             base_url: "http://localhost:11434".to_string(),
-            timeout_ms: 100, // <100ms requirement
+            timeout_ms: 30000, // 30s timeout for embedding generation (increased from 100ms)
             max_retries: 4, // 1s, 2s, 4s, 8s backoff sequence
             initial_retry_delay_ms: 1000, // 1s
             max_retry_delay_ms: 30000, // max 30s
-            enable_http2_pipelining: true, // Enable HTTP/2 pipelining by default
-            max_concurrent_requests: 6, // Allow 6 concurrent requests per connection
-            keep_alive_seconds: 120, // Keep connections alive for 2 minutes
+            enable_http2_pipelining: false, // Disable HTTP/2 due to connection issues with Ollama
+            max_concurrent_requests: 2, // Reduced to 2 for better stability
+            keep_alive_seconds: 30, // Reduced to 30 seconds for faster connection refresh
             enable_request_batching: true, // Enable intelligent request batching
             max_batch_size: 10, // Maximum 10 requests per batch
             batch_timeout_ms: 50, // 50ms batch collection timeout
@@ -201,18 +201,20 @@ impl OllamaClient {
             .tcp_keepalive(Duration::from_secs(config.keep_alive_seconds))
             .tcp_nodelay(true); // Enable TCP no-delay for lower latency
 
-        // Enable HTTP/2 pipelining if configured
+        // Force HTTP/1.1 to avoid HTTP/2 connection issues with Ollama
+        client_builder = client_builder.http1_only();
+        
+        // Optional HTTP/2 configuration (currently disabled due to connection issues)
         if config.enable_http2_pipelining {
-            client_builder = client_builder
-                .http2_prior_knowledge()
-                .http2_keep_alive_interval(Some(Duration::from_secs(30)))
-                .http2_keep_alive_timeout(Duration::from_secs(10));
+            // HTTP/2 is disabled by default due to connection stability issues with Ollama
+            log::warn!("HTTP/2 is disabled due to connection issues with Ollama");
         }
 
-        // Configure connection pooling for concurrent requests
+        // Configure conservative connection pooling for stability
         client_builder = client_builder
-            .pool_max_idle_per_host(config.max_concurrent_requests)
-            .connection_verbose(true);
+            .pool_max_idle_per_host(2) // Reduced from config.max_concurrent_requests for stability
+            .pool_idle_timeout(Duration::from_secs(30)) // Shorter idle timeout
+            .connection_verbose(false); // Disable verbose logging to reduce overhead
 
         let client = client_builder
             .build()
@@ -229,10 +231,8 @@ impl OllamaClient {
 
     /// Get current connection state
     pub async fn get_connection_state(&self) -> ConnectionState {
-        eprintln!("📊 [DEBUG RUST] OllamaClient::get_connection_state() called");
         let state = self.state.read().await.clone();
-        eprintln!("📊 [DEBUG RUST] Current connection state: status={:?}, retry_count={}, last_check={:?}", 
-                 state.status, state.retry_count, state.last_check);
+        log::debug!("Connection state: {:?}", state.status);
         state
     }
 
@@ -253,32 +253,28 @@ impl OllamaClient {
 
     /// Perform service discovery and health check
     pub async fn check_health(&self) -> Result<HealthResponse, OllamaClientError> {
-        eprintln!("🏥 [DEBUG RUST] OllamaClient::check_health() started");
         let start_time = Instant::now();
         
         // Update status to connecting
         {
-            eprintln!("🏥 [DEBUG RUST] Updating status to Connecting");
             let mut state = self.state.write().await;
             state.status = ConnectionStatus::Connecting;
             state.last_check = Some(chrono::Utc::now());
-            eprintln!("🏥 [DEBUG RUST] Status updated to: {:?}, last_check updated", state.status);
+            log::debug!("Status updated to: {:?}", state.status);
         }
 
         let health_url = format!("{}/api/tags", self.config.base_url);
-        eprintln!("🏥 [DEBUG RUST] Making HTTP GET request to: {}", health_url);
-        eprintln!("🏥 [DEBUG RUST] Using timeout: {}ms", self.config.timeout_ms);
+        log::debug!("Health check: {} (timeout: {}ms)", health_url, self.config.timeout_ms);
         
         match self.client.get(&health_url).send().await {
             Ok(response) => {
                 let elapsed = start_time.elapsed();
-                eprintln!("🏥 [DEBUG RUST] HTTP response received in {:?}", elapsed);
-                eprintln!("🏥 [DEBUG RUST] Response status: {}", response.status());
+                log::debug!("HTTP response: {} in {:?}", response.status(), elapsed);
                 
                 if response.status().is_success() {
-                    eprintln!("🏥 [DEBUG RUST] Response is successful, parsing JSON");
+                    log::debug!("Parsing successful response");
                     let health_response = if let Ok(json) = response.json::<serde_json::Value>().await {
-                        eprintln!("🏥 [DEBUG RUST] Successfully parsed JSON response: {:?}", json);
+                        log::debug!("Health check successful");
                         HealthResponse {
                             status: "healthy".to_string(),
                             version: json.get("version").and_then(|v| v.as_str()).map(|s| s.to_string()),
@@ -292,7 +288,7 @@ impl OllamaClient {
                             }),
                         }
                     } else {
-                        eprintln!("🏥 [DEBUG RUST] Failed to parse JSON, using default healthy response");
+                        log::debug!("JSON parse failed, using default response");
                         HealthResponse {
                             status: "healthy".to_string(),
                             version: None,
@@ -300,47 +296,48 @@ impl OllamaClient {
                         }
                     };
                     
-                    eprintln!("🏥 [DEBUG RUST] Created health response: {:?}", health_response);
+                    log::debug!("Health response created");
 
                     // Update successful connection state
                     {
-                        eprintln!("🏥 [DEBUG RUST] Updating status to Connected");
+                        log::debug!("Status updated to Connected");
                         let mut state = self.state.write().await;
                         state.status = ConnectionStatus::Connected;
                         state.last_successful_connection = Some(chrono::Utc::now());
                         state.retry_count = 0;
                         state.next_retry_at = None;
                         state.health_info = Some(health_response.clone());
-                        eprintln!("🏥 [DEBUG RUST] Connection state updated successfully");
+                        log::debug!("Connection state updated");
                     }
 
                     // Log performance metrics
                     if elapsed > Duration::from_millis(50) {
                         eprintln!("Warning: Ollama health check took {:?} (target: <100ms)", elapsed);
                     } else {
-                        eprintln!("🏥 [DEBUG RUST] Health check completed within performance target: {:?}", elapsed);
+                        if elapsed > Duration::from_millis(100) {
+                            log::warn!("Health check slow: {:?} (target: <100ms)", elapsed);
+                        }
                     }
 
                     Ok(health_response)
                 } else {
-                    eprintln!("🏥 [DEBUG RUST] HTTP error response: status={}", response.status());
+                    log::warn!("HTTP error: {}", response.status());
                     let error = OllamaClientError::HttpError {
                         status_code: response.status().as_u16(),
                         message: format!("HTTP {}: {}", response.status(), response.status().canonical_reason().unwrap_or("Unknown")),
                     };
-                    eprintln!("🏥 [DEBUG RUST] Created HTTP error: {:?}", error);
+                    log::debug!("HTTP error created");
                     self.handle_connection_failure(error.clone()).await;
                     Err(error)
                 }
             },
             Err(e) => {
-                eprintln!("🏥 [DEBUG RUST] Network error occurred: {:?}", e);
-                eprintln!("🏥 [DEBUG RUST] Is timeout: {}", e.is_timeout());
+                log::warn!("Network error: {} (timeout: {})", e, e.is_timeout());
                 let error = OllamaClientError::NetworkError { 
                     message: format!("Connection failed: {}", e),
                     is_timeout: e.is_timeout(),
                 };
-                eprintln!("🏥 [DEBUG RUST] Created network error: {:?}", error);
+                log::debug!("Network error handled");
                 self.handle_connection_failure(error.clone()).await;
                 Err(error)
             }
@@ -389,15 +386,14 @@ impl OllamaClient {
 
     /// Handle connection failure and update state
     async fn handle_connection_failure(&self, error: OllamaClientError) {
-        eprintln!("❌ [DEBUG RUST] handle_connection_failure() called with error: {:?}", error);
+        log::debug!("Handling connection failure: {:?}", error);
         let mut state = self.state.write().await;
         let previous_status = state.status.clone();
         state.status = ConnectionStatus::Failed {
             error: error.to_string(),
         };
         state.health_info = None;
-        eprintln!("❌ [DEBUG RUST] Status changed from {:?} to {:?}", previous_status, state.status);
-        eprintln!("❌ [DEBUG RUST] Health info cleared");
+        log::debug!("Status: {:?} -> {:?}", previous_status, state.status);
     }
 
     /// Get configuration

@@ -173,6 +173,8 @@ pub struct PipelineConfig {
     pub enable_resume: bool,
     /// Path for saving pipeline state
     pub state_file_path: Option<String>,
+    /// Embedding model name (default: "nomic-embed-text")
+    pub embedding_model: String,
 }
 
 impl Default for PipelineConfig {
@@ -185,6 +187,7 @@ impl Default for PipelineConfig {
             file_timeout_seconds: 30,
             enable_resume: true,
             state_file_path: Some(".ainote/indexing_pipeline_state.json".to_string()),
+            embedding_model: "nomic-embed-text".to_string(),
         }
     }
 }
@@ -467,7 +470,9 @@ impl IndexingPipeline {
     
     /// Start the indexing pipeline
     pub async fn start(&self) -> IndexingResult<()> {
+        log::info!("🚀 Starting indexing pipeline with {} workers", self.config.worker_count);
         if self.is_running.load(Ordering::SeqCst) {
+            log::warn!("⚠️ Pipeline already running");
             return Err(IndexingError::AlreadyRunning);
         }
         
@@ -536,8 +541,9 @@ impl IndexingPipeline {
     
     /// Queue a file for indexing
     pub fn queue_file(&self, file_path: PathBuf, priority: IndexingPriority) -> IndexingResult<u64> {
-        let request = IndexingRequest::new(file_path, priority);
+        let request = IndexingRequest::new(file_path.clone(), priority);
         let request_id = request.id;
+        log::info!("📝 Queuing file for indexing: {:?} (priority: {:?}, id: {})", file_path, priority, request_id);
         
         self.queue.push(request)?;
         
@@ -867,6 +873,7 @@ impl IndexingPipeline {
             let embedding_generator = Arc::clone(&self.embedding_generator);
             let vector_db = Arc::clone(&self.vector_db);
             let timeout = Duration::from_secs(self.config.file_timeout_seconds);
+            let embedding_model = self.config.embedding_model.clone();
             
             let worker = thread::Builder::new()
                 .name(format!("indexing-worker-{}", worker_id))
@@ -887,6 +894,7 @@ impl IndexingPipeline {
                         embedding_generator,
                         vector_db,
                         timeout,
+                        embedding_model,
                     ));
                 })
                 .map_err(|e| IndexingError::WorkerError { 
@@ -909,12 +917,14 @@ impl IndexingPipeline {
         embedding_generator: Arc<EmbeddingGenerator>,
         vector_db: Arc<VectorDatabase>,
         file_timeout: Duration,
+        embedding_model: String,
     ) {
         log::debug!("🔧 Worker {} started", worker_id);
         
+        log::debug!("🔧 Worker {} started and waiting for files", worker_id);
         while !cancellation_token.is_cancelled() {
             if let Some(request) = queue.pop() {
-                log::debug!("🔄 Worker {} processing file: {:?}", worker_id, request.file_path);
+                log::info!("🔄 Worker {} processing file: {:?}", worker_id, request.file_path);
                 
                 let file_path = request.file_path.clone();
                 let request_id = request.id;
@@ -929,6 +939,7 @@ impl IndexingPipeline {
                         &embedding_generator,
                         &vector_db,
                         &cancellation_token,
+                        &embedding_model,
                     ),
                 ).await;
                 
@@ -975,6 +986,7 @@ impl IndexingPipeline {
         embedding_generator: &EmbeddingGenerator,
         vector_db: &VectorDatabase,
         cancellation_token: &CancellationToken,
+        embedding_model: &str,
     ) -> IndexingResult<()> {
         // Check cancellation before starting
         if cancellation_token.is_cancelled() {
@@ -1031,7 +1043,9 @@ impl IndexingPipeline {
                        worker_id, chunk_index, chunk.content.len(), file_path);
             
             // Generate embedding for chunk
-            let embedding = embedding_generator.generate_embedding(chunk.content.clone(), "default".to_string()).await.map_err(|e| {
+            log::info!("🤖 Worker {} requesting embedding for chunk {} using model '{}'", 
+                       worker_id, chunk_index, embedding_model);
+            let embedding = embedding_generator.generate_embedding(chunk.content.clone(), embedding_model.to_string()).await.map_err(|e| {
                 IndexingError::FileProcessingError {
                     path: file_path_str.clone(),
                     reason: format!("Embedding generation failed for chunk {}: {}", chunk_index, e),
@@ -1047,7 +1061,7 @@ impl IndexingPipeline {
                 file_path_str.clone(),
                 chunk_id.clone(),
                 &chunk.content,
-                "default".to_string(), // TODO: Make model name configurable
+                embedding_model.to_string(),
             ).await.map_err(|e| {
                 IndexingError::FileProcessingError {
                     path: file_path_str.clone(),

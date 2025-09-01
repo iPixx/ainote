@@ -105,32 +105,32 @@ use crate::ollama_client::{OllamaClient, OllamaConfig, ConnectionState, HealthRe
 /// ```
 #[tauri::command]
 pub async fn check_ollama_status() -> Result<ConnectionState, String> {
-    eprintln!("🔍 [DEBUG RUST] check_ollama_status command called");
+    log::debug!("Checking Ollama status");
     
     let client = {
         let client_lock = OLLAMA_CLIENT.read().await;
         if let Some(client) = client_lock.as_ref() {
-            eprintln!("🔍 [DEBUG RUST] Using existing Ollama client instance");
+            log::debug!("Using existing client");
             client.clone()
         } else {
-            eprintln!("🔍 [DEBUG RUST] No existing client found, creating new OllamaClient");
+            log::debug!("Creating new client");
             // Initialize client if not exists
             drop(client_lock);
             let mut client_lock = OLLAMA_CLIENT.write().await;
             let new_client = OllamaClient::new();
-            eprintln!("🔍 [DEBUG RUST] Created new client with config: {:?}", new_client.get_config());
+            log::debug!("Created new Ollama client");
             *client_lock = Some(new_client.clone());
             new_client
         }
     };
     
     // Perform actual health check to get current status
-    eprintln!("🔍 [DEBUG RUST] Performing fresh health check");
+    log::debug!("Performing health check");
     let _health_result = client.check_health().await; // This updates the internal state
     
     // Now get the updated connection state
     let state = client.get_connection_state().await;
-    eprintln!("🔍 [DEBUG RUST] Fresh connection state after health check: {:?}", state);
+    log::debug!("Health check result: {:?}", state.status);
     Ok(state)
 }
 
@@ -290,10 +290,10 @@ pub async fn start_ollama_monitoring() -> Result<(), String> {
         // Perform health check with retries in background
         match monitoring_client.check_health_with_retry().await {
             Ok(_) => {
-                eprintln!("Ollama monitoring started successfully");
+                log::info!("Ollama monitoring started");
             }
             Err(e) => {
-                eprintln!("Ollama monitoring failed to connect: {}", e);
+                log::warn!("Ollama monitoring connection failed: {}", e);
             }
         }
     });
