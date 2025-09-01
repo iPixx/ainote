@@ -118,7 +118,7 @@ pub struct CompactEmbeddingMetadata {
     pub text_hash: String,
     
     /// Custom metadata (optional and shortened)
-    #[serde(rename = "cm", skip_serializing_if = "HashMap::is_empty")]
+    #[serde(rename = "cm", skip_serializing_if = "HashMap::is_empty", default)]
     pub custom_metadata: HashMap<String, String>,
 }
 

@@ -685,9 +685,16 @@ struct TaskResult {
 
 impl Drop for AutoCleanupManager {
     fn drop(&mut self) {
-        tokio::runtime::Handle::current().block_on(async {
-            self.stop().await;
-        });
+        // Abort any running background tasks
+        if let Some(cleanup_task) = self.cleanup_task.take() {
+            cleanup_task.abort();
+        }
+        
+        // Abort individual task handles
+        for handle in &self.task_handles {
+            handle.abort();
+        }
+        self.task_handles.clear();
     }
 }
 

@@ -131,6 +131,9 @@ mod atomic_performance_test;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod integration_tests;
+
 use types::{EmbeddingEntry, StorageMetrics, VectorStorageConfig, VectorDbResult, VectorDbError};
 use storage::{VectorStorage, CompactionResult, IntegrityReport};
 use operations::{VectorOperations, BatchOperations, ValidationOperations, CleanupOperations};
