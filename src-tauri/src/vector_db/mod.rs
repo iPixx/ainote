@@ -119,20 +119,6 @@ pub mod metrics_collector;
 pub mod monitored_search;
 pub mod optimization_scheduler;
 
-#[cfg(test)]
-pub mod compression_tests;
-
-#[cfg(test)]
-mod metrics_collector_tests;
-
-#[cfg(test)]
-mod atomic_performance_test;
-
-#[cfg(test)]
-mod tests;
-
-#[cfg(test)]
-mod integration_tests;
 
 use types::{EmbeddingEntry, StorageMetrics, VectorStorageConfig, VectorDbResult, VectorDbError};
 use storage::{VectorStorage, CompactionResult, IntegrityReport};
@@ -1683,7 +1669,4 @@ pub use deduplication::{
 };
 
 
-/// Comprehensive test utilities and additional tests  
-/// located in separate tests.rs module
-#[cfg(test)]
-pub use tests::test_utils;
+// Test utilities are now located in the tests/ directory

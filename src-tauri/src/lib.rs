@@ -67,17 +67,6 @@ pub mod text_processing;        // Legacy: superseded by commands::text_processi
 pub mod search_commands;        // Legacy: contains Tauri commands for basic search
 pub mod similarity_search_commands; // Legacy: contains Tauri commands for advanced search
 
-#[cfg(test)]
-pub mod ollama_integration_tests;
-
-#[cfg(test)]
-pub mod embedding_tests;
-
-#[cfg(test)]
-pub mod memory_integration_test;
-
-#[cfg(test)]
-pub mod resource_integration_test;
 
 
 // Re-exports for commonly used types
@@ -343,7 +332,9 @@ mod tests {
     /// Most tests have been moved to separate integration test files:
     /// - tests/file_operations_tests.rs: File CRUD operations and vault scanning
     /// - tests/ollama_integration_tests.rs: Ollama client and model management
-    /// - Existing integration tests: e2e_ollama_tests.rs, vector_db_integration_tests.rs, etc.
+    /// - tests/vector_db_integration_tests.rs: Vector database operations
+    /// - tests/similarity_search_tests.rs: Search functionality
+    /// - Other integration tests: e2e_ollama_tests.rs, performance_monitoring_tests.rs, etc.
     #[test]
     fn test_module_imports() {
         // Test that all main modules are accessible
