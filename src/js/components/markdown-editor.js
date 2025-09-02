@@ -23,9 +23,6 @@ class MarkdownEditor {
     SHORTCUT_EXECUTED: 'shortcut_executed',
     FORMAT_APPLIED: 'format_applied',
     FIND_REPLACE_OPENED: 'find_replace_opened',
-    AUTO_SAVE_TRIGGERED: 'auto_save_triggered',
-    AUTO_SAVE_COMPLETED: 'auto_save_completed',
-    AUTO_SAVE_ERROR: 'auto_save_error',
     LOADING_STATE_CHANGED: 'loading_state_changed',
     LARGE_DOCUMENT_DETECTED: 'large_document_detected',
     LINE_NUMBERS_TOGGLED: 'line_numbers_toggled'
@@ -35,8 +32,9 @@ class MarkdownEditor {
    * Initialize markdown editor with container and app state
    * @param {HTMLElement} container - Container element for the editor
    * @param {AppState} appState - Application state manager
+   * @param {AutoSave} autoSave - AutoSave service instance (optional)
    */
-  constructor(container, appState) {
+  constructor(container, appState, autoSave = null) {
     if (!(container instanceof HTMLElement)) {
       throw new Error('Container must be a valid HTML element');
     }
@@ -46,6 +44,7 @@ class MarkdownEditor {
 
     this.container = container;
     this.appState = appState;
+    this.autoSave = autoSave;
     
     // Editor elements
     this.textarea = null;
@@ -73,12 +72,7 @@ class MarkdownEditor {
     this.wordCount = 0;
     this.charCount = 0;
     
-    // Auto-save functionality
-    this.autoSaveEnabled = true;
-    this.autoSaveDelay = 2000; // 2 seconds as specified
-    this.autoSaveTimeout = null;
-    this.lastAutoSave = 0;
-    this.saveInProgress = false;
+    // Auto-save is handled by the dedicated AutoSave service
     
     // Performance optimization state
     this.isLargeDocument = false;
@@ -127,6 +121,11 @@ class MarkdownEditor {
     // Initialize editor with error handling
     try {
       this.init();
+      
+      // Set up AutoSave integration if service is provided
+      if (this.autoSave) {
+        this.setupAutoSaveIntegration();
+      }
     } catch (error) {
       this.handleError('Initialization failed', error);
     }
@@ -144,14 +143,13 @@ class MarkdownEditor {
     this.createEditorStructure();
     this.setupEventListeners();
     this.setupKeyboardShortcuts();
-    this.setupAutoSave();
     this.setupPerformanceOptimizations();
     this.enhanceAccessibility();
     this.setupScrollSynchronization();
     this.updateWordCount();
     this.isInitialized = true;
     
-    console.log('✅ MarkdownEditor initialized with auto-save, performance optimizations, and accessibility features');
+    console.log('✅ MarkdownEditor initialized with performance optimizations and accessibility features');
   }
 
   /**
@@ -254,10 +252,18 @@ class MarkdownEditor {
         // Only update essential state immediately for responsiveness
         this.content = this.textarea.value;
         
+        // Trigger AutoSave directly if service is available
+        if (this.autoSave) {
+          console.log(`🔄 [MarkdownEditor] Content changed, triggering AutoSave. Length: ${this.content.length} chars`);
+          this.autoSave.handleContentChange(this.content);
+        } else {
+          console.warn('⚠️ [MarkdownEditor] AutoSave service not available, content change not saved');
+        }
+        
         // Debounce heavy operations to avoid blocking UI
         this.debounceHeavyOperations();
         
-        // Emit content change event immediately for real-time feedback
+        // Emit content change event for other systems that might need it
         this.emit(MarkdownEditor.EVENTS.CONTENT_CHANGED, {
           content: this.content,
           timestamp: Date.now()
@@ -385,7 +391,7 @@ class MarkdownEditor {
           this.textarea.setSelectionRange(start + 1, start + 1);
           this.textarea.focus();
           
-          // Trigger input event to update other systems (content detection, auto-save, etc.)
+          // Trigger input event to update other systems (content detection, etc.)
           this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
           return;
         }
@@ -427,10 +433,22 @@ class MarkdownEditor {
     this.globalEssentialKeysHandler = globalEssentialKeysHandler.bind(this);
     document.addEventListener('keydown', this.globalEssentialKeysHandler, true); // Use capture phase
 
+    // Blur event for save-on-focus-loss
+    const blurHandler = (event) => {
+      // Emit save requested event - this will be handled by EditorPreviewPanel and then main.js
+      this.emit('save_requested', {
+        content: this.content,
+        timestamp: Date.now(),
+        reason: 'focus_lost'
+      });
+    };
+
     // Register event listeners (optimized to avoid conflicts)
     this.addDOMEventListener(this.textarea, 'input', inputHandler);
     // Use single selection handler to avoid conflicts and improve performance
     this.addDOMEventListener(this.textarea, 'selectionchange', selectionHandler);
+    // Add blur handler for save-on-focus-loss
+    this.addDOMEventListener(this.textarea, 'blur', blurHandler);
     this.addDOMEventListener(this.textarea, 'mouseup', selectionHandler);
     this.addDOMEventListener(this.textarea, 'keydown', keyHandler);
     // Note: keypress event handler removed - global handler manages essential keys
@@ -553,9 +571,6 @@ class MarkdownEditor {
         
         // Check document size for performance optimizations
         this.checkDocumentSize();
-        
-        // Trigger auto-save
-        this.triggerAutoSave();
         
         // Track performance
         const duration = performance.now() - startTime;
@@ -1524,17 +1539,32 @@ class MarkdownEditor {
   }
 
   /**
-   * Setup auto-save functionality
+   * Set up AutoSave integration for direct content change handling
    * @private
    */
-  setupAutoSave() {
-    // Auto-save is enabled by default but can be disabled
-    if (!this.autoSaveEnabled) {
-      console.log('📝 Auto-save disabled');
+  setupAutoSaveIntegration() {
+    if (!this.autoSave) {
+      console.warn('⚠️ AutoSave service not available for integration');
       return;
     }
     
-    console.log(`📝 Auto-save enabled with ${this.autoSaveDelay}ms delay`);
+    // Set up content getter for AutoSave service
+    this.autoSave.setContentGetter(() => {
+      return this.getValue();
+    });
+    
+    console.log('✅ AutoSave integration established with MarkdownEditor');
+  }
+
+  /**
+   * Set AutoSave service and establish integration
+   * @param {AutoSave} autoSave - AutoSave service instance
+   */
+  setAutoSave(autoSave) {
+    this.autoSave = autoSave;
+    if (this.autoSave && this.isInitialized) {
+      this.setupAutoSaveIntegration();
+    }
   }
 
   /**
@@ -1555,83 +1585,6 @@ class MarkdownEditor {
     console.log('⚡ Performance optimizations initialized');
   }
 
-  /**
-   * Trigger auto-save with debouncing
-   * Performance target: <50ms
-   * @private
-   */
-  triggerAutoSave() {
-    if (!this.autoSaveEnabled || this.saveInProgress) {
-      return;
-    }
-
-    // Clear existing timeout
-    clearTimeout(this.autoSaveTimeout);
-
-    // Set new timeout for auto-save
-    this.autoSaveTimeout = setTimeout(() => {
-      this.performAutoSave();
-    }, this.autoSaveDelay);
-  }
-
-  /**
-   * Perform the actual auto-save operation
-   * @private
-   */
-  async performAutoSave() {
-    if (this.saveInProgress || !this.autoSaveEnabled) {
-      return;
-    }
-
-    const startTime = performance.now();
-    this.saveInProgress = true;
-
-    try {
-      // Emit auto-save triggered event
-      this.emit(MarkdownEditor.EVENTS.AUTO_SAVE_TRIGGERED, {
-        content: this.content,
-        timestamp: Date.now()
-      });
-
-      // Create custom event for parent application to handle actual saving
-      const autoSaveEvent = new CustomEvent('auto_save_requested', {
-        detail: {
-          content: this.content,
-          timestamp: Date.now(),
-          fileSize: this.content.length
-        },
-        bubbles: true
-      });
-
-      this.container.dispatchEvent(autoSaveEvent);
-      this.lastAutoSave = Date.now();
-
-      // Performance check
-      const duration = performance.now() - startTime;
-      if (duration > 50) {
-        console.warn(`⚠️ Auto-save took ${duration.toFixed(2)}ms (target: <50ms)`);
-      }
-
-      // Emit completion event
-      this.emit(MarkdownEditor.EVENTS.AUTO_SAVE_COMPLETED, {
-        duration,
-        fileSize: this.content.length,
-        timestamp: Date.now()
-      });
-
-      console.log(`💾 Auto-save completed in ${duration.toFixed(2)}ms`);
-
-    } catch (error) {
-      console.error('❌ Auto-save failed:', error);
-      
-      this.emit(MarkdownEditor.EVENTS.AUTO_SAVE_ERROR, {
-        error: error.message,
-        timestamp: Date.now()
-      });
-    } finally {
-      this.saveInProgress = false;
-    }
-  }
 
   /**
    * Check document size and enable optimizations for large files
@@ -1845,41 +1798,6 @@ class MarkdownEditor {
     console.log('🧹 Memory cleanup performed');
   }
 
-  /**
-   * Enable or disable auto-save
-   * @param {boolean} enabled - Whether auto-save should be enabled
-   */
-  setAutoSaveEnabled(enabled) {
-    this.autoSaveEnabled = enabled;
-    
-    if (!enabled) {
-      clearTimeout(this.autoSaveTimeout);
-      console.log('📝 Auto-save disabled');
-    } else {
-      console.log('📝 Auto-save enabled');
-    }
-  }
-
-  /**
-   * Set auto-save delay
-   * @param {number} delay - Delay in milliseconds
-   */
-  setAutoSaveDelay(delay) {
-    if (delay < 1000 || delay > 10000) {
-      throw new Error('Auto-save delay must be between 1000ms and 10000ms');
-    }
-    
-    this.autoSaveDelay = delay;
-    console.log(`📝 Auto-save delay set to ${delay}ms`);
-  }
-
-  /**
-   * Force save without debouncing
-   */
-  forceSave() {
-    clearTimeout(this.autoSaveTimeout);
-    this.performAutoSave();
-  }
 
   /**
    * Get performance statistics
@@ -1896,12 +1814,6 @@ class MarkdownEditor {
         start: this.visibleLineStart,
         end: this.visibleLineEnd
       } : null,
-      autoSave: {
-        enabled: this.autoSaveEnabled,
-        delay: this.autoSaveDelay,
-        lastSave: this.lastAutoSave,
-        inProgress: this.saveInProgress
-      },
       memory: {
         undoStackSize: this.undoStack.length,
         redoStackSize: this.redoStack.length,
@@ -1973,13 +1885,6 @@ class MarkdownEditor {
     });
     
     // Attempt recovery for certain error types
-    if (context.includes('auto-save')) {
-      this.setAutoSaveEnabled(false);
-      setTimeout(() => {
-        this.setAutoSaveEnabled(true);
-        console.log('🔄 Auto-save re-enabled after error recovery');
-      }, 5000);
-    }
     
     if (context.includes('virtual-scrolling')) {
       this.disableVirtualScrolling();
@@ -1999,7 +1904,7 @@ class MarkdownEditor {
     
     // Enhanced ARIA properties
     this.container.setAttribute('role', 'application');
-    this.container.setAttribute('aria-label', 'Markdown editor with auto-save and syntax highlighting');
+    this.container.setAttribute('aria-label', 'Markdown editor with syntax highlighting');
     
     // Loading state accessibility
     if (this.loadingOverlay) {
@@ -2105,11 +2010,6 @@ class MarkdownEditor {
   validatePerformance() {
     const stats = this.getPerformanceStats();
     const validation = {
-      autoSave: {
-        target: 50, // ms
-        actual: stats.autoSave.lastSave ? Date.now() - stats.autoSave.lastSave : 0,
-        passed: true
-      },
       memoryUsage: {
         target: 10485760, // 10MB in bytes
         actual: stats.documentSize,
@@ -2153,7 +2053,6 @@ class MarkdownEditor {
       validation: this.validatePerformance(),
       errors: this.errorHandler.getErrors(),
       features: {
-        autoSave: this.autoSaveEnabled,
         lineNumbers: this.lineNumbersEnabled,
         virtualScrolling: this.virtualScrolling,
         scrollSync: this.scrollSync?.enabled || false
@@ -2182,7 +2081,6 @@ class MarkdownEditor {
     // Clear all timeouts
     clearTimeout(this.debounceTimeout);
     clearTimeout(this.heavyOperationsTimeout);
-    clearTimeout(this.autoSaveTimeout);
     
     // Remove all event listeners
     this.eventListeners.forEach((listeners, element) => {
@@ -2205,9 +2103,6 @@ class MarkdownEditor {
     this.lineNumbersContainer = null;
     this.loadingOverlay = null;
     
-    // Clear auto-save state
-    this.autoSaveEnabled = false;
-    this.saveInProgress = false;
     
     // Clear performance state
     this.virtualScrolling = false;

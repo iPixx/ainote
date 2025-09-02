@@ -30,8 +30,9 @@ class EditorPreviewPanel {
    * Initialize the editor/preview toggle panel
    * @param {HTMLElement} container - Container element for the panel
    * @param {AppState} appState - Application state manager
+   * @param {AutoSave} autoSave - AutoSave service instance (optional)
    */
-  constructor(container, appState) {
+  constructor(container, appState, autoSave = null) {
     if (!(container instanceof HTMLElement)) {
       throw new Error('Container must be a valid HTML element');
     }
@@ -41,6 +42,7 @@ class EditorPreviewPanel {
 
     this.container = container;
     this.appState = appState;
+    this.autoSave = autoSave;
     
     // Panel state
     this.currentMode = 'editor'; // 'editor' | 'preview'
@@ -202,7 +204,7 @@ class EditorPreviewPanel {
     try {
       // Import MarkdownEditor class
       import('./markdown-editor.js').then(({ default: MarkdownEditor }) => {
-        this.markdownEditor = new MarkdownEditor(this.editorContainer, this.appState);
+        this.markdownEditor = new MarkdownEditor(this.editorContainer, this.appState, this.autoSave);
         
         // Apply stored content if we have any
         if (this.content) {
@@ -213,6 +215,16 @@ class EditorPreviewPanel {
         // Listen for content changes
         this.markdownEditor.addEventListener(MarkdownEditor.EVENTS.CONTENT_CHANGED, (event) => {
           this.handleContentChange(event.detail.content);
+        });
+        
+        // Listen for save requests from editor (e.g., on blur/focus loss)
+        this.markdownEditor.addEventListener('save_requested', (event) => {
+          // Re-emit the save request to main.js
+          this.emit('save_requested', {
+            content: event.detail.content || this.getContent(),
+            timestamp: Date.now(),
+            reason: event.detail.reason || 'manual'
+          });
         });
         
         // Listen for scroll events
@@ -994,6 +1006,13 @@ class EditorPreviewPanel {
         this.previewRenderer.render(content);
       }
     }
+    
+    // Emit content changed event for parent application (main.js) to update UI state
+    // Note: AutoSave is now handled directly by MarkdownEditor
+    this.emit('content_changed', {
+      content: content,
+      timestamp: Date.now()
+    });
   }
 
   /**

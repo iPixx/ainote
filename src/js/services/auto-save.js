@@ -34,11 +34,14 @@ class AutoSave {
    * @param {AppState} appState - Application state management instance
    */
   constructor(appState) {
+    console.log('🔧 [AutoSave] Constructor called, initializing service...');
+    
     if (!appState) {
       throw new Error('AppState instance is required for AutoSave');
     }
 
     this.appState = appState;
+    console.log('✅ [AutoSave] AppState connected successfully');
     this.saveDelay = AutoSave.DEFAULTS.AUTO_SAVE_DELAY;
     this.isEnabled = true;
     this.saveTimeoutId = null;
@@ -63,6 +66,8 @@ class AutoSave {
 
     // Setup keyboard shortcut listener for manual save
     this.setupKeyboardShortcuts();
+    
+    console.log(`✅ [AutoSave] Service fully initialized - Delay: ${this.saveDelay}ms, Enabled: ${this.isEnabled}`);
   }
 
   /**
@@ -107,11 +112,22 @@ class AutoSave {
    * @param {Function} getContentFn - Function that returns current editor content
    */
   setContentGetter(getContentFn) {
+    console.log('🔗 [AutoSave] setContentGetter called');
+    
     if (typeof getContentFn !== 'function') {
       throw new Error('Content getter must be a function');
     }
     
     this.getEditorContent = getContentFn;
+    console.log('✅ [AutoSave] Content getter function established successfully');
+    
+    // Test the content getter
+    try {
+      const testContent = this.getEditorContent();
+      console.log(`🧪 [AutoSave] Content getter test - Retrieved: ${testContent?.length || 'null'} chars`);
+    } catch (error) {
+      console.warn('⚠️ [AutoSave] Content getter test failed:', error);
+    }
   }
 
   /**
@@ -121,18 +137,26 @@ class AutoSave {
    */
   handleContentChange(newContent = null) {
     try {
+      console.log(`📝 [AutoSave] handleContentChange called. newContent length: ${newContent?.length || 'null'}`);
+      
       // Get content from getter function or parameter
       const content = newContent || (this.getEditorContent ? this.getEditorContent() : null);
       
       if (content === null) {
-        console.warn('No content provided and no content getter set');
+        console.warn('⚠️ [AutoSave] No content provided and no content getter set');
         return;
       }
 
+      console.log(`📝 [AutoSave] Content retrieved. Length: ${content.length} chars, First 50 chars: "${content.substring(0, 50)}..."`);
+
       // Check if content actually changed
       if (content === this.lastSaveContent) {
+        console.log(`⏭️ [AutoSave] Content unchanged, skipping auto-save`);
         return; // No changes, skip auto-save
       }
+
+      console.log(`🔄 [AutoSave] Content changed, scheduling auto-save in ${this.saveDelay}ms`);
+      console.log(`📊 [AutoSave] Service status - Enabled: ${this.isEnabled}, Current file: ${this.appState.getState().currentFile}`);
 
       // Mark application as dirty
       this.appState.markDirty(true);
@@ -142,13 +166,17 @@ class AutoSave {
 
       // Only schedule auto-save if enabled
       if (this.isEnabled) {
+        console.log(`⏰ [AutoSave] Setting ${this.saveDelay}ms timeout for auto-save`);
         this.saveTimeoutId = setTimeout(() => {
+          console.log(`🚀 [AutoSave] Timeout fired, starting auto-save operation`);
           this.performAutoSave(content);
         }, this.saveDelay);
+      } else {
+        console.warn(`⚠️ [AutoSave] Auto-save disabled, not scheduling save`);
       }
 
     } catch (error) {
-      console.error('Error handling content change:', error);
+      console.error('❌ [AutoSave] Error handling content change:', error);
       this.emit(AutoSave.EVENTS.SAVE_ERROR, { error: error.message });
     }
   }
@@ -167,7 +195,7 @@ class AutoSave {
       }
 
       // Get current file path
-      const currentFile = this.appState.currentFile;
+      const currentFile = this.appState.getState().currentFile;
       if (!currentFile) {
         throw new Error('Cannot save: No file currently open');
       }
@@ -200,26 +228,44 @@ class AutoSave {
    * @returns {Promise<boolean>} True if save was successful
    */
   async performAutoSave(content) {
+    console.log(`🔄 [AutoSave] performAutoSave called. Content length: ${content?.length || 'null'} chars`);
+    console.log(`🔍 [AutoSave] Pre-check - Enabled: ${this.isEnabled}, isSaving: ${this.isSaving}`);
+    
     if (!this.isEnabled || this.isSaving) {
+      console.log(`⚠️ [AutoSave] Aborting auto-save - Enabled: ${this.isEnabled}, isSaving: ${this.isSaving}`);
       return false;
     }
 
     try {
-      const currentFile = this.appState.currentFile;
-      if (!currentFile) {
+      const appStateData = this.appState.getState();
+      const currentFile = appStateData.currentFile;
+      console.log(`📁 [AutoSave] Current file from AppState: ${currentFile || 'null'}`);
+      console.log(`📊 [AutoSave] Full AppState:`, appStateData);
+      
+      if (!currentFile || currentFile.trim() === '') {
+        console.warn(`⚠️ [AutoSave] No file open or empty file path, cannot auto-save`);
+        console.log(`🔍 [AutoSave] AppState details:`, {
+          currentFile: currentFile,
+          hasVault: !!appStateData.currentVault,
+          vault: appStateData.currentVault,
+          isDirty: appStateData.unsavedChanges
+        });
         return false; // No file open, skip auto-save
       }
 
+      console.log(`💾 [AutoSave] Starting save operation for: ${currentFile}`);
       const success = await this.performSave(currentFile, content, 'auto');
+      console.log(`✅ [AutoSave] Save operation completed. Success: ${success}`);
       
       if (success) {
         this.saveStats.totalAutoSaves++;
+        console.log(`📊 [AutoSave] Stats updated - Total auto-saves: ${this.saveStats.totalAutoSaves}`);
       }
       
       return success;
 
     } catch (error) {
-      console.error('Auto-save failed:', error);
+      console.error('❌ [AutoSave] Auto-save failed:', error);
       this.emit(AutoSave.EVENTS.SAVE_ERROR, { 
         error: error.message,
         type: 'auto'
@@ -237,13 +283,18 @@ class AutoSave {
    * @returns {Promise<boolean>} True if save was successful
    */
   async performSave(filePath, content, saveType = 'auto', attempt = 1) {
+    console.log(`💾 [AutoSave] performSave called - File: ${filePath}, Type: ${saveType}, Attempt: ${attempt}`);
+    
     if (this.isSaving) {
-      console.log('Save already in progress, skipping');
+      console.log('⚠️ [AutoSave] Save already in progress, skipping');
       return false;
     }
 
     this.isSaving = true;
     const saveStartTime = performance.now();
+    console.log(`🚀 [AutoSave] Starting save operation at ${new Date().toISOString()}`);
+    console.log(`📝 [AutoSave] Content preview: "${content.substring(0, 100)}..."`);
+    console.log(`📊 [AutoSave] Content stats - Length: ${content.length} chars, Lines: ${content.split('\n').length}`);
 
     try {
       // Emit save started event
@@ -257,10 +308,26 @@ class AutoSave {
       // Use auto_save_file command for auto-saves, write_file for manual saves
       const command = saveType === 'auto' ? 'auto_save_file' : 'write_file';
       
-      await window.__TAURI__.core.invoke(command, {
-        file_path: filePath,
-        content: content
+      // Note: Based on main.js examples, both commands expect camelCase 'filePath'
+      const params = { filePath: filePath, content: content };
+      
+      console.log(`🚀 [AutoSave] Invoking Tauri command: ${command}`);
+      console.log(`📋 [AutoSave] Parameters:`, {
+        command: command,
+        filePath: filePath,
+        content_length: content.length,
+        content_preview: content.substring(0, 100) + (content.length > 100 ? '...' : ''),
+        tauri_available: !!window.__TAURI__?.core?.invoke
       });
+      
+      try {
+        const result = await window.__TAURI__.core.invoke(command, params);
+        console.log(`✅ [AutoSave] Tauri command completed successfully:`, result);
+      } catch (tauriError) {
+        console.error(`❌ [AutoSave] Tauri command failed:`, tauriError);
+        console.error(`❌ [AutoSave] Command details:`, { command, params });
+        throw tauriError;
+      }
 
       // Save successful
       const saveTime = performance.now() - saveStartTime;
@@ -280,11 +347,12 @@ class AutoSave {
         attempt
       });
 
-      console.log(`${saveType} save completed in ${saveTime.toFixed(2)}ms`);
+      console.log(`✅ [AutoSave] ${saveType} save COMPLETED successfully in ${saveTime.toFixed(2)}ms for file: ${filePath}`);
       return true;
 
     } catch (error) {
-      console.error(`${saveType} save failed (attempt ${attempt}):`, error);
+      console.error(`❌ [AutoSave] ${saveType} save FAILED (attempt ${attempt}/${AutoSave.DEFAULTS.MAX_RETRY_ATTEMPTS}):`, error.message);
+      console.error(`❌ [AutoSave] Error details:`, error);
       
       // Check if this is a conflict error
       if (this.isConflictError(error)) {
@@ -439,7 +507,7 @@ class AutoSave {
       saving: this.isSaving,
       pendingSave: this.saveTimeoutId !== null,
       hasContentGetter: this.getEditorContent !== null,
-      currentFile: this.appState.currentFile,
+      currentFile: this.appState.getState().currentFile,
       isDirty: this.appState.unsavedChanges,
       stats: { ...this.saveStats }
     };

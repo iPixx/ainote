@@ -240,7 +240,7 @@ describe('AutoSave', () => {
 
       autoSave.handleContentChange();
 
-      expect(consoleSpy).toHaveBeenCalledWith('No content provided and no content getter set');
+      expect(consoleSpy).toHaveBeenCalledWith('⚠️ [AutoSave] No content provided and no content getter set');
       
       consoleSpy.mockRestore();
     });
@@ -284,7 +284,7 @@ describe('AutoSave', () => {
 
       autoSave.handleContentChange();
 
-      expect(consoleSpy).toHaveBeenCalledWith('Error handling content change:', expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith('❌ [AutoSave] Error handling content change:', expect.any(Error));
       expect(mockCallback).toHaveBeenCalledWith(expect.objectContaining({
         error: 'Getter failed'
       }));

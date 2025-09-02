@@ -71,18 +71,24 @@ global.IntersectionObserver = vi.fn().mockImplementation((callback, options) => 
   _callback: callback
 }));
 
-// Make sure window also has IntersectionObserver
+// Mock ResizeObserver - needed for EditorPreviewPanel
+global.ResizeObserver = vi.fn().mockImplementation((callback) => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+  _callback: callback
+}));
+
+// Make sure window also has IntersectionObserver and ResizeObserver
 Object.defineProperty(window, 'IntersectionObserver', {
   writable: true,
   value: global.IntersectionObserver
 });
 
-// Mock ResizeObserver
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+Object.defineProperty(window, 'ResizeObserver', {
+  writable: true,
+  value: global.ResizeObserver
+});
 
 // Mock performance API
 global.performance = global.performance || {

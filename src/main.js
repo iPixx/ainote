@@ -503,8 +503,10 @@ async function openFile(filePath) {
     const editorContent = document.getElementById('editorContent');
     
     if (!editorPreviewPanel) {
-      // Create new editor/preview panel instance
-      editorPreviewPanel = new EditorPreviewPanel(editorContent, appState);
+      // Create new editor/preview panel instance with AutoSave service
+      console.log(`🔧 [Main] Creating EditorPreviewPanel with AutoSave service. AutoSave available: ${!!autoSave}`);
+      editorPreviewPanel = new EditorPreviewPanel(editorContent, appState, autoSave);
+      console.log('✅ [Main] EditorPreviewPanel created with AutoSave integration');
       
       // Initialize the panel
       editorPreviewPanel.init();
@@ -522,7 +524,7 @@ async function openFile(filePath) {
       }
       
       // Listen for content changes from the editor component within the panel
-      editorPreviewPanel.addEventListener('content_changed', () => {
+      editorPreviewPanel.addEventListener('content_changed', (event) => {
         appState.markDirty(true);
         updateSaveStatus('unsaved');
         
@@ -531,10 +533,7 @@ async function openFile(filePath) {
           updateCurrentFileName(currentFileName, true);
         }
         
-        // Trigger auto-save if initialized
-        if (autoSave) {
-          autoSave.handleContentChange();
-        }
+        // Note: AutoSave is now handled directly by MarkdownEditor
       });
       
       // Listen for save requests from keyboard shortcuts
@@ -542,15 +541,7 @@ async function openFile(filePath) {
         saveFile();
       });
       
-      // Listen for auto-save requests from the editor component
-      editorPreviewPanel.addEventListener('auto_save_requested', async (event) => {
-        // Auto-save is now handled by the AutoSave service
-        // This event is kept for compatibility but delegates to AutoSave
-        if (autoSave) {
-          const content = event.detail?.content || editorPreviewPanel.getContent();
-          autoSave.handleContentChange(content);
-        }
-      });
+      // Note: AutoSave is handled directly by MarkdownEditor via the AutoSave service
       
       // Listen for performance events
       editorPreviewPanel.addEventListener('large_document_detected', (event) => {
@@ -1065,7 +1056,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     const AutoSave = AutoSaveModule.default;
     
     vaultManager = new VaultManagerModule.default(appState);
+    console.log('🔧 [Main] Creating AutoSave service...');
     autoSave = new AutoSave(appState);
+    console.log('✅ [Main] AutoSave service created successfully');
     
     // Initialize Ollama Connection Monitor
     ollamaConnectionMonitor = new OllamaConnectionMonitor();
@@ -1283,58 +1276,34 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.error('❌ Main window instance not available');
   }
   
-  // Setup auto-save integration with editor (delayed until editor is ready)
-  const setupAutoSaveIntegration = () => {
-    if (autoSave && editorPreviewPanel) {
-      // Set up content getter for auto-save
-      autoSave.setContentGetter(() => {
-        return editorPreviewPanel ? editorPreviewPanel.getContent() : null;
-      });
-      
-      // Listen for auto-save events
-      autoSave.addEventListener(AutoSave.EVENTS.SAVE_SUCCESS, (event) => {
-        const { saveType, saveTime } = event;
-        updateSaveStatus('saved');
-        updateOperationStatus('');
-        if (saveType === 'manual') {
-          showNotification(`File saved (${saveTime.toFixed(0)}ms)`, 'success', 2000);
-        }
-      });
-      
-      autoSave.addEventListener(AutoSave.EVENTS.SAVE_ERROR, (event) => {
-        const { error, saveType } = event;
-        updateSaveStatus('error');
-        updateOperationStatus('');
-        showNotification(`Save failed: ${error}`, 'error');
-      });
-      
-      autoSave.addEventListener(AutoSave.EVENTS.SAVE_STARTED, (event) => {
-        const { saveType } = event;
-        updateSaveStatus('saving');
-        if (saveType === 'manual') {
-          updateOperationStatus('Saving file...');
-        }
-      });
-      
-      console.log('✅ Auto-save integration configured');
-      return true;
-    }
-    return false;
-  };
-  
-  // Try to setup auto-save integration now, or retry later
-  if (!setupAutoSaveIntegration()) {
-    // Retry when editor becomes available
-    const retryIntegration = setInterval(() => {
-      if (setupAutoSaveIntegration()) {
-        clearInterval(retryIntegration);
+  // Setup auto-save event listeners for UI updates
+  if (autoSave) {
+    // Listen for auto-save events to update UI
+    autoSave.addEventListener(AutoSave.EVENTS.SAVE_SUCCESS, (event) => {
+      const { saveType, saveTime } = event;
+      updateSaveStatus('saved');
+      updateOperationStatus('');
+      if (saveType === 'manual') {
+        showNotification(`File saved (${saveTime.toFixed(0)}ms)`, 'success', 2000);
       }
-    }, 500);
+    });
     
-    // Give up after 10 seconds
-    setTimeout(() => {
-      clearInterval(retryIntegration);
-    }, 10000);
+    autoSave.addEventListener(AutoSave.EVENTS.SAVE_ERROR, (event) => {
+      const { error, saveType } = event;
+      updateSaveStatus('error');
+      updateOperationStatus('');
+      showNotification(`Save failed: ${error}`, 'error');
+    });
+    
+    autoSave.addEventListener(AutoSave.EVENTS.SAVE_STARTED, (event) => {
+      const { saveType } = event;
+      updateSaveStatus('saving');
+      if (saveType === 'manual') {
+        updateOperationStatus('Saving file...');
+      }
+    });
+    
+    console.log('✅ AutoSave UI event listeners configured');
   }
   
   // Add keyboard shortcut handling for macOS
