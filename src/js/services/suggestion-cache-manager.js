@@ -95,7 +95,6 @@ class SuggestionCacheManager {
       this.startMetricsTracking();
     }
     
-    console.log('✅ SuggestionCacheManager initialized');
   }
 
   /**
@@ -174,7 +173,6 @@ class SuggestionCacheManager {
           context: cacheContext
         });
         
-        console.log(`✅ Suggestion cache HIT: ${suggestions.length} suggestions (${lookupTime.toFixed(1)}ms)`);
         return suggestions;
       } else {
         this.emit(SuggestionCacheManager.EVENTS.CACHE_MISS, {
@@ -229,7 +227,6 @@ class SuggestionCacheManager {
         currentParagraph: cacheContext.currentParagraph
       });
 
-      console.log(`💾 Cached ${suggestions.length} suggestions for model: ${model}`);
       return true;
       
     } catch (error) {
@@ -566,7 +563,6 @@ class SuggestionCacheManager {
    */
   enable() {
     this.isEnabled = true;
-    console.log('✅ SuggestionCacheManager enabled');
   }
 
   /**
@@ -618,7 +614,6 @@ class SuggestionCacheManager {
     this.currentFile = null;
     this.currentVault = null;
     
-    console.log('✅ SuggestionCacheManager destroyed');
   }
 }
 

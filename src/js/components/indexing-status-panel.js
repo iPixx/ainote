@@ -86,7 +86,6 @@ class IndexingStatusPanel {
         this.updateProgress = this.updateProgress.bind(this);
         this.handleStartIndexing = this.handleStartIndexing.bind(this);
         this.handleCancelIndexing = this.handleCancelIndexing.bind(this);
-        this.handleToggleMonitoring = this.handleToggleMonitoring.bind(this);
         this.refreshStatus = this.refreshStatus.bind(this);
         
         // Initialize the UI
@@ -117,7 +116,6 @@ class IndexingStatusPanel {
         // Initial status refresh
         this.refreshStatus();
         
-        console.log('✅ Indexing Status Panel initialized successfully');
     }
 
     /**
@@ -424,7 +422,6 @@ class IndexingStatusPanel {
             const status = await invoke('get_indexing_status');
             const progress = await invoke('get_indexing_progress');
             
-            console.log('🔄 Refreshed indexing status:', status);
             
             // Update progress first
             this.updateProgress(progress);
@@ -446,7 +443,6 @@ class IndexingStatusPanel {
      */
     async handleStartIndexing() {
         try {
-            console.log('🚀 Starting manual vault indexing...');
             
             // For now, we'll just refresh status - actual start is handled by vault loading
             await this.refreshStatus();
@@ -472,7 +468,6 @@ class IndexingStatusPanel {
             
             this.emitEvent(IndexingStatusPanel.EVENTS.INDEXING_CANCELLED);
             
-            console.log('✅ Indexing cancelled successfully');
             
             // Refresh status after a brief delay
             setTimeout(() => {
@@ -524,7 +519,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const aiContent = document.getElementById('aiContent');
         if (aiContent && !indexingStatusPanel) {
             indexingStatusPanel = new IndexingStatusPanel(aiContent);
-            console.log('✅ Global Indexing Status Panel initialized');
         }
     };
     

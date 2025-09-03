@@ -55,21 +55,16 @@ class PerformanceMonitoringDashboard {
      * Initialize the performance monitoring dashboard
      */
     async initializeDashboard() {
-        console.log('🔄 Creating dashboard elements...');
         this.createDashboardElements();
         
-        console.log('🔄 Attaching event listeners...');
         this.attachEventListeners();
         
-        console.log('🔄 Starting UI responsiveness tracking...');
         this.startUIResponsivenessTracking();
         
         // Check if performance monitoring is already active
         try {
-            console.log('🔄 Checking monitoring status...');
             const status = await getInvoke()('get_monitoring_status');
             if (status.is_active) {
-                console.log('✅ Performance monitoring is already active');
                 this.isMonitoring = true;
                 this.startMetricsCollection();
             } else {
@@ -79,7 +74,6 @@ class PerformanceMonitoringDashboard {
             console.warn('⚠️ Performance monitoring not available:', error);
         }
         
-        console.log('✅ Dashboard initialization complete');
     }
 
     /**

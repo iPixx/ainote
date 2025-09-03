@@ -55,7 +55,6 @@ class NavigationService {
       maxQueueSize: 5
     };
     
-    console.log('✅ Navigation Service initialized');
   }
 
   /**
@@ -134,7 +133,6 @@ class NavigationService {
         timestamp: Date.now()
       });
 
-      console.log('✅ Navigation completed successfully');
       return true;
 
     } catch (error) {
@@ -535,7 +533,6 @@ class NavigationService {
     // Reset state
     this.isNavigating = false;
     
-    console.log('✅ Navigation Service destroyed');
   }
 }
 

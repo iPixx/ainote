@@ -72,7 +72,6 @@ class EnhancedSuggestionList extends SuggestionList {
       ...this.enhancedConfig
     };
 
-    console.log('✅ Enhanced Suggestion List initialized');
   }
 
 
@@ -118,7 +117,6 @@ class EnhancedSuggestionList extends SuggestionList {
     const renderTime = performance.now() - startTime;
     this.updateCardPerformanceStats('render', renderTime);
 
-    console.log(`✅ Rendered ${this.suggestions.length} suggestion cards in ${renderTime.toFixed(2)}ms`);
   }
 
   /**
@@ -478,7 +476,6 @@ class EnhancedSuggestionList extends SuggestionList {
    * @private
    */
   emitNavigationSuccess(suggestion) {
-    console.log('✅ Navigation successful for:', suggestion.title);
     
     // Could trigger additional UI updates here
     // For example, briefly highlighting the success
@@ -566,7 +563,6 @@ class EnhancedSuggestionList extends SuggestionList {
     // Call base destroy
     super.destroy();
     
-    console.log('✅ Enhanced suggestion list destroyed');
   }
 }
 

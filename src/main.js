@@ -154,7 +154,6 @@ async function initializeAiPanelController(markdownEditor) {
   }
   
   try {
-    console.log('🤖 Initializing AI Panel Controller with suggestion pipeline...');
     
     const aiPanelElement = document.getElementById('aiPanel');
     if (!aiPanelElement || !layoutManager) {
@@ -174,20 +173,16 @@ async function initializeAiPanelController(markdownEditor) {
     
     // Listen to enhanced AI panel events
     aiPanelController.addEventListener(AiPanelController.EVENTS.PANEL_ACTIVATED, (event) => {
-      console.log('🚀 AI Panel activated:', event.detail);
       showNotification('AI Assistant ready with suggestions', 'success');
     });
     
     aiPanelController.addEventListener(AiPanelController.EVENTS.PANEL_DEACTIVATED, (event) => {
-      console.log('🔄 AI Panel deactivated:', event.detail);
     });
     
     aiPanelController.addEventListener(AiPanelController.EVENTS.SUGGESTIONS_READY, (event) => {
-      console.log('✅ AI Suggestions ready:', event.detail);
     });
     
     aiPanelController.addEventListener(AiPanelController.EVENTS.SUGGESTION_INSERTED, (event) => {
-      console.log('📝 Suggestion inserted:', event.detail);
       showNotification('Content inserted from AI suggestion', 'success');
     });
     
@@ -207,7 +202,6 @@ async function initializeAiPanelController(markdownEditor) {
     
     // Integrate AI services with connection monitoring
     if (ollamaConnectionMonitor && aiPanelController.suggestionService) {
-      console.log('🔗 Integrating AI suggestion service with connection monitoring...');
       
       // Listen to connection status changes to enable/disable AI features
       ollamaConnectionMonitor.addEventListener(OllamaConnectionMonitor.EVENTS.STATUS_CHANGED, (data) => {
@@ -219,9 +213,7 @@ async function initializeAiPanelController(markdownEditor) {
           aiPanelController.suggestionService.setEnabled(isConnected);
           
           if (isConnected) {
-            console.log('✅ AI suggestions enabled - Ollama connected');
           } else {
-            console.log('⚠️ AI suggestions disabled - Ollama disconnected');
             aiPanelController.suggestionService.clearSuggestions();
           }
         }
@@ -236,16 +228,13 @@ async function initializeAiPanelController(markdownEditor) {
           };
           
           aiPanelController.suggestionService.updateConfig(config);
-          console.log('📦 AI suggestion service updated for model status:', data);
         }
       });
       
-      console.log('✅ AI services integrated with connection monitoring');
     }
     
     aiPipelineInitialized = true;
     
-    console.log('✅ AI Panel Controller initialized with full suggestion pipeline');
     showNotification('AI-powered suggestions are now active', 'success');
     
   } catch (error) {
@@ -260,13 +249,10 @@ async function initializeAiPanelController(markdownEditor) {
  * Select vault folder and update UI
  */
 async function selectVault() {
-  console.log('📁 Starting vault selection...');
   try {
     const result = await invoke('select_vault');
-    console.log('📁 Vault selection result:', result);
     
     if (result) {
-      console.log('✅ Vault selected:', result);
       appState.setVault(result);
       updateVaultInfo(result);
       updateVaultStatusBar(result);
@@ -275,7 +261,6 @@ async function selectVault() {
       const vaultDialog = document.getElementById('vaultDialog');
       if (vaultDialog) {
         vaultDialog.style.display = 'none';
-        console.log('📁 Vault dialog closed');
       }
       
       showNotification(`Vault selected: ${result.split('/').pop()}`, 'success');
@@ -283,7 +268,6 @@ async function selectVault() {
       // Automatically scan the vault
       await refreshVault();
     } else {
-      console.log('ℹ️ Vault selection cancelled');
       showNotification('No vault selected', 'info');
     }
   } catch (error) {
@@ -315,14 +299,12 @@ async function refreshVault() {
     showNotification(`Refreshed: ${fileCount} files, ${dirCount} folders`, 'success');
     
     // Trigger indexing for vector generation
-    console.log('🚀 Starting vault indexing for vector generation...');
     try {
       const requestIds = await invoke('index_vault_notes', { 
         vaultPath: currentVault,
         filePattern: null, // Use default pattern (**/*.md)
         priority: 'UserTriggered'
       });
-      console.log(`✅ Started indexing with ${requestIds.length} files queued for processing`);
       showNotification(`Indexing started: ${requestIds.length} files queued`, 'info');
     } catch (indexError) {
       console.error('❌ Failed to start indexing:', indexError);
@@ -483,13 +465,11 @@ function getFullPath(fileName) {
  */
 async function openFile(filePath) {
   if (isFileOpening) {
-    console.log('File opening already in progress, skipping');
     return;
   }
   
   isFileOpening = true;
   try {
-    console.log('Opening file:', filePath);
     const content = await invoke('read_file', { filePath });
     
     // Update state
@@ -504,9 +484,7 @@ async function openFile(filePath) {
     
     if (!editorPreviewPanel) {
       // Create new editor/preview panel instance with AutoSave service
-      console.log(`🔧 [Main] Creating EditorPreviewPanel with AutoSave service. AutoSave available: ${!!autoSave}`);
       editorPreviewPanel = new EditorPreviewPanel(editorContent, appState, autoSave);
-      console.log('✅ [Main] EditorPreviewPanel created with AutoSave integration');
       
       // Initialize the panel
       editorPreviewPanel.init();
@@ -551,11 +529,9 @@ async function openFile(filePath) {
       
       // Listen for mode changes
       editorPreviewPanel.addEventListener(EditorPreviewPanel.EVENTS.MODE_CHANGED, (event) => {
-        console.log(`🔄 Panel mode changed to: ${event.detail.mode}`);
         updateViewModeDisplay();
       });
       
-      console.log('✅ EditorPreviewPanel initialized for file editing');
     }
     
     // Set the content in the panel (handles both editor and preview)
@@ -569,7 +545,6 @@ async function openFile(filePath) {
       showNotification(`Opened: ${fileName}`, 'success');
     }
     
-    console.log('✅ File opened successfully:', fileName);
   } catch (error) {
     console.error('Error opening file:', error);
     showNotification(`Error opening file: ${error}`, 'error');
@@ -734,7 +709,6 @@ function updateViewModeDisplay() {
     toggleBtn.title = currentMode === 'editor' ? 'Switch to preview (Ctrl+Shift+P)' : 'Switch to editor (Ctrl+Shift+P)';
   }
   
-  console.log(`📋 View mode display updated: ${currentMode}`);
 }
 
 /**
@@ -777,7 +751,6 @@ async function loadWindowState() {
     if (mainWindow && appState && appState.window) {
       const { width, height, x, y, maximized } = appState.window;
       
-      console.log('📥 Loading window state:', appState.window);
       
       // Ensure window is not maximized before setting size/position
       if (await mainWindow.isMaximized()) {
@@ -811,9 +784,7 @@ async function loadWindowState() {
         await mainWindow.maximize();
       }
       
-      console.log('✅ Window state restored successfully');
     } else {
-      console.log('📋 No saved window state found, using defaults');
     }
     
     return appState;
@@ -833,19 +804,14 @@ async function saveWindowState() {
       return;
     }
     
-    console.log('🔄 Getting window properties...');
     
     const size = await mainWindow.innerSize();
-    console.log('📐 Window size (physical):', size);
     
     const position = await mainWindow.outerPosition();
-    console.log('📍 Window position (physical):', position);
     
     const isMaximized = await mainWindow.isMaximized();
-    console.log('🔳 Window maximized:', isMaximized);
     
     const scaleFactor = await mainWindow.scaleFactor();
-    console.log('🔍 Scale factor:', scaleFactor);
     
     // Convert physical pixels to logical pixels to match backend coordinate system
     const logicalSize = {
@@ -858,8 +824,6 @@ async function saveWindowState() {
       y: Math.round(position.y / scaleFactor)
     };
     
-    console.log('📐 Window size (logical):', logicalSize);
-    console.log('📍 Window position (logical):', logicalPosition);
     
     const windowState = {
       width: logicalSize.width,
@@ -869,11 +833,9 @@ async function saveWindowState() {
       maximized: isMaximized
     };
     
-    console.log('💾 Saving window state (logical pixels):', windowState);
     
     await invoke('save_window_state', windowState);
     
-    console.log('✅ Window state saved successfully');
   } catch (error) {
     console.error('❌ Failed to save window state:', error);
     console.error('Error details:', error);
@@ -893,7 +855,6 @@ async function saveLayoutState(layoutState) {
       editorMode: layoutState.editorMode
     });
     
-    console.log('💾 Layout state saved:', layoutState);
   } catch (error) {
     console.warn('⚠️ Failed to save layout state:', error);
   }
@@ -911,7 +872,6 @@ const debouncedSaveLayoutState = debounce(saveLayoutState, 300);
  */
 async function forceSaveAllState() {
   try {
-    console.log('🔄 Force saving all application state...');
     
     await saveWindowState();
     
@@ -923,7 +883,6 @@ async function forceSaveAllState() {
       await appState.saveState();
     }
     
-    console.log('✅ All application state saved successfully');
   } catch (error) {
     console.error('❌ Failed to save application state:', error);
   }
@@ -946,17 +905,14 @@ function debounce(func, wait) {
 
 // State management event listeners
 appState.addEventListener(AppState.EVENTS.VAULT_CHANGED, (data) => {
-  console.log('State: Vault changed', data);
   updateVaultInfo(data.vault);
 });
 
 appState.addEventListener(AppState.EVENTS.FILES_UPDATED, (data) => {
-  console.log('State: Files updated', data);
   updateFileTree(data.files);
 });
 
 appState.addEventListener(AppState.EVENTS.FILE_CHANGED, (data) => {
-  console.log('State: Current file changed', data);
   if (data.file) {
     const fileName = data.file.split('/').pop();
     updateCurrentFileName(fileName, false);
@@ -966,7 +922,6 @@ appState.addEventListener(AppState.EVENTS.FILE_CHANGED, (data) => {
 });
 
 appState.addEventListener(AppState.EVENTS.VIEW_MODE_CHANGED, (data) => {
-  console.log('State: View mode changed', data);
   const toggleBtn = document.getElementById('toggleModeBtn');
   if (toggleBtn) {
     toggleBtn.textContent = data.mode === 'editor' ? '👁' : '✏️';
@@ -975,7 +930,6 @@ appState.addEventListener(AppState.EVENTS.VIEW_MODE_CHANGED, (data) => {
 });
 
 appState.addEventListener(AppState.EVENTS.DIRTY_STATE_CHANGED, (data) => {
-  console.log('State: Dirty state changed', data);
   if (data.file) {
     const fileName = data.file.split('/').pop();
     updateCurrentFileName(fileName, data.isDirty);
@@ -1016,18 +970,11 @@ window.runLayoutTest = function() {
 
 // Initialize the application
 window.addEventListener('DOMContentLoaded', async () => {
-  console.log('🚀 aiNote application initializing...');
-  
-  // Test basic Tauri availability
-  console.log('🔍 Tauri available:', !!window.__TAURI__);
-  console.log('🔍 Tauri core:', !!window.__TAURI__?.core);
-  console.log('🔍 Tauri window:', !!window.__TAURI__?.window);
+  // Application initialization
   
   // Initialize window instance
   try {
     mainWindow = getCurrentWindow();
-    console.log('🪟 Main window instance:', mainWindow);
-    console.log('🪟 Main window type:', typeof mainWindow);
   } catch (error) {
     console.error('❌ Failed to get current window:', error);
   }
@@ -1036,7 +983,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   await new Promise(resolve => setTimeout(resolve, 500));
   
   // Load saved window and layout state from unified JSON file
-  console.log('📥 Loading saved application state...');
   const savedAppState = await loadWindowState();
   
   // Additional delay after loading state to ensure changes are applied
@@ -1056,9 +1002,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const AutoSave = AutoSaveModule.default;
     
     vaultManager = new VaultManagerModule.default(appState);
-    console.log('🔧 [Main] Creating AutoSave service...');
     autoSave = new AutoSave(appState);
-    console.log('✅ [Main] AutoSave service created successfully');
     
     // Initialize Ollama Connection Monitor
     ollamaConnectionMonitor = new OllamaConnectionMonitor();
@@ -1069,7 +1013,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     window.AutoSave = AutoSave; // Make AutoSave class globally accessible
     window.ollamaConnectionMonitor = ollamaConnectionMonitor;
     
-    console.log('✅ VaultManager, AutoSave, and OllamaConnectionMonitor services initialized');
   } catch (error) {
     console.error('❌ Failed to initialize services:', error);
     showNotification('Failed to initialize application services', 'error');
@@ -1112,7 +1055,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       // Drag operation completed (success handled by move event)
     });
     
-    console.log('🌳 FileTree component initialized with advanced features');
   } else {
     console.warn('⚠️ FileTree container not found');
   }
@@ -1125,7 +1067,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Listen to AI status panel events
     aiStatusPanel.addEventListener(AiStatusPanel.EVENTS.STATUS_CHANGED, (event) => {
       const { status, connectionState } = event.detail;
-      console.log('🤖 AI Status changed:', status, connectionState);
       
       // Update AI panel header based on connection status
       updateAiPanelHeader(status);
@@ -1136,46 +1077,39 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     aiStatusPanel.addEventListener(AiStatusPanel.EVENTS.CONNECTION_REQUESTED, (event) => {
       const { action } = event.detail;
-      console.log('🔄 AI Connection requested:', action);
       showNotification(`Retrying AI connection...`, 'info');
     });
     
     aiStatusPanel.addEventListener(AiStatusPanel.EVENTS.SETTINGS_CHANGED, (event) => {
       const { baseUrl } = event.detail;
-      console.log('⚙️ AI Settings changed:', baseUrl);
       showNotification(`AI service URL updated: ${baseUrl}`, 'success');
     });
     
-    console.log('🤖 AI Status Panel initialized');
     
     // Make AI status panel globally accessible for debugging
     window.aiStatusPanel = aiStatusPanel;
     
     // Start Ollama connection monitoring and integrate with AI status panel
     if (ollamaConnectionMonitor) {
-      console.log('🚀 Starting Ollama connection monitoring...');
       
       // Set up event listeners for connection monitoring
       ollamaConnectionMonitor.addEventListener(OllamaConnectionMonitor.EVENTS.STATUS_CHANGED, (data) => {
-        console.log('📊 Ollama connection status changed:', data);
         // The AI Status Panel will handle its own status checks, but we can log here
       });
       
       ollamaConnectionMonitor.addEventListener(OllamaConnectionMonitor.EVENTS.MODEL_STATUS_UPDATED, (data) => {
-        console.log('📦 Model status updated:', data);
         showNotification(`Model ${data.modelName}: ${data.isAvailable ? 'Available' : 'Not Available'}`, 
                         data.isAvailable ? 'success' : 'warning');
       });
       
       ollamaConnectionMonitor.addEventListener(OllamaConnectionMonitor.EVENTS.ERROR_OCCURRED, (data) => {
-        console.warn('⚠️ Ollama monitor error:', data);
+        console.warn('Ollama monitor error:', data);
         if (data.type !== 'health_check_failed') {
           showNotification(`AI Service Error: ${data.message}`, 'error');
         }
       });
       
       ollamaConnectionMonitor.addEventListener(OllamaConnectionMonitor.EVENTS.RECONNECTION_ATTEMPT, (data) => {
-        console.log('🔄 Ollama reconnection attempt:', data);
         showNotification(`Reconnecting to AI service... (${data.attempt}/${data.maxAttempts})`, 'info');
       });
       
@@ -1185,11 +1119,10 @@ window.addEventListener('DOMContentLoaded', async () => {
         showNotification('Failed to start AI service monitoring', 'warning');
       });
       
-      console.log('✅ Ollama connection monitoring started');
     }
     
   } else {
-    console.warn('⚠️ AI content container not found');
+    console.warn('AI content container not found');
   }
   
   // AI Panel Controller will be initialized when editor becomes available
@@ -1219,34 +1152,28 @@ window.addEventListener('DOMContentLoaded', async () => {
   
   // Set up window state persistence event listeners
   if (mainWindow) {
-    console.log('🔧 Setting up window event listeners...');
     
     try {
       // Save window state when it changes
       const resizeUnlisten = await mainWindow.listen('tauri://resize', (event) => {
-        console.log('📏 Window resized:', event.payload);
         debouncedSaveWindowState();
       });
       
       const moveUnlisten = await mainWindow.listen('tauri://move', (event) => {
-        console.log('📍 Window moved:', event.payload);
         debouncedSaveWindowState();
       });
       
       // Save state before the window closes
       const closeUnlisten = await mainWindow.listen('tauri://close-requested', async (event) => {
-        console.log('💾 Window close requested - saving state...');
         
         try {
           // Stop monitoring services
           if (ollamaConnectionMonitor) {
             ollamaConnectionMonitor.stop();
-            console.log('🛑 Ollama monitoring stopped');
           }
           
           // Save state without debouncing for immediate persistence
           await forceSaveAllState();
-          console.log('✅ State saved successfully before close');
         } catch (error) {
           console.error('❌ Error saving state before close:', error);
         }
@@ -1254,7 +1181,6 @@ window.addEventListener('DOMContentLoaded', async () => {
         // Don't prevent the close - let Tauri handle it normally
       });
 
-      console.log('✅ Window event listeners set up successfully');
       
       // Store unlisteners for cleanup if needed
       window.windowEventUnlisteners = { resizeUnlisten, moveUnlisten, closeUnlisten };
@@ -1265,7 +1191,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     // Listen for beforeunload to save state when page unloads
     window.addEventListener('beforeunload', async (event) => {
-      console.log('🚪 Page unloading - saving state...');
       try {
         await forceSaveAllState();
       } catch (error) {
@@ -1303,7 +1228,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
     });
     
-    console.log('✅ AutoSave UI event listeners configured');
   }
   
   // Add keyboard shortcut handling for macOS
@@ -1355,11 +1279,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Handle Cmd+Q (quit) on macOS or Ctrl+Q on other platforms
     if ((event.metaKey && event.key === 'q') || (event.ctrlKey && event.key === 'q')) {
       event.preventDefault();
-      console.log('🔄 Quit shortcut detected - saving state...');
       
       try {
         await forceSaveAllState();
-        console.log('✅ State saved, closing application');
         
         // Close the window which will trigger the quit
         if (mainWindow) {
@@ -1377,11 +1299,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Handle Cmd+W (close window) on macOS or Ctrl+W on other platforms
     if ((event.metaKey && event.key === 'w') || (event.ctrlKey && event.key === 'w')) {
       event.preventDefault();
-      console.log('🔄 Close window shortcut detected - saving state...');
       
       try {
         await forceSaveAllState();
-        console.log('✅ State saved, closing window');
         
         // Close the window
         if (mainWindow) {
@@ -1399,14 +1319,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Handle performance dashboard keyboard shortcut (Ctrl+Shift+M or Cmd+Shift+M)
     if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'M') {
       event.preventDefault();
-      console.log('📊 Performance dashboard shortcut detected');
       togglePerformanceDashboard();
     }
     
     // Handle performance testing panel keyboard shortcut (Ctrl+Shift+Alt+P or Cmd+Shift+Alt+P)
     if (((event.metaKey || event.ctrlKey) && event.shiftKey && event.altKey && event.key === 'P')) {
       event.preventDefault();
-      console.log('🔧 Performance testing panel shortcut detected');
       
       if (performanceTestingPanelVisible) {
         hidePerformanceTestingPanel();
@@ -1421,37 +1339,29 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Initialize UI state after services are ready
   const initializeAppState = () => {
     const initialState = appState.getState();
-    console.log('🔍 Initial state loaded:', initialState);
     
     if (initialState.currentVault) {
-      console.log('📁 Found saved vault:', initialState.currentVault);
       
       if (vaultManager) {
         // Verify vault is still valid and load it
-        console.log('🔧 Validating saved vault...');
         vaultManager.validateVault(initialState.currentVault).then(isValid => {
-          console.log('✅ Vault validation result:', isValid);
           
           if (isValid) {
             updateVaultInfo(initialState.currentVault);
             updateVaultStatusBar(initialState.currentVault);
-            console.log('✅ Valid vault restored, refreshing files...');
             
             // Auto-refresh vault on startup
             refreshVault().then(() => {
               // Restore last opened file if available
               if (initialState.currentFile) {
-                console.log('Restoring last opened file:', initialState.currentFile);
                 // Check if the file still exists before trying to open it
                 invoke('read_file', { filePath: initialState.currentFile })
                   .then(() => {
                     // Wait for all components to be fully initialized before restoring file
                     const restoreFile = () => {
                       if (document.getElementById('editorContent')) {
-                        console.log('✅ Editor container ready, restoring file...');
                         openFile(initialState.currentFile);
                       } else {
-                        console.log('⏳ Editor container not ready, retrying...');
                         setTimeout(restoreFile, 200);
                       }
                     };
@@ -1468,7 +1378,6 @@ window.addEventListener('DOMContentLoaded', async () => {
             });
           } else {
             // Vault no longer valid, clear it and show selection dialog
-            console.log('❌ Vault no longer valid, clearing and showing dialog');
             appState.setVault(null);
             setTimeout(() => {
               showVaultDialog();
@@ -1488,7 +1397,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
     } else {
       // Show vault selection dialog on first launch
-      console.log('🚀 No saved vault found, showing selection dialog');
       setTimeout(() => {
         showVaultDialog();
       }, 1000);
@@ -1505,11 +1413,9 @@ window.addEventListener('DOMContentLoaded', async () => {
       
       // If we have a file but no vault manager yet (shouldn't happen but fallback)
       if (!initialState.currentVault && vaultManager) {
-        console.log('Found saved file without vault, attempting to restore file:', initialState.currentFile);
         // Try to open the file directly with proper timing
         const restoreFileWithoutVault = () => {
           if (document.getElementById('editorContent')) {
-            console.log('✅ Editor ready for fallback file restoration');
             invoke('read_file', { filePath: initialState.currentFile })
               .then(() => {
                 openFile(initialState.currentFile);
@@ -1520,7 +1426,6 @@ window.addEventListener('DOMContentLoaded', async () => {
                 updateCurrentFileName(null);
               });
           } else {
-            console.log('⏳ Editor not ready for fallback, retrying...');
             setTimeout(restoreFileWithoutVault, 200);
           }
         };
@@ -1547,19 +1452,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Initialize performance monitoring dashboard (after all DOM elements are ready)
   setTimeout(async () => {
     try {
-      console.log('🔄 Initializing performance monitoring dashboard...');
       performanceDashboard = new PerformanceMonitoringDashboard();
-      console.log('✅ Performance monitoring dashboard initialized');
       
       // Start real-time metrics service
       await realTimeMetricsService.start();
-      console.log('✅ Real-time metrics service started');
       
       // Make dashboard globally accessible
       window.performanceDashboard = performanceDashboard;
       window.realTimeMetricsService = realTimeMetricsService;
       
-      console.log('🎉 Performance monitoring system fully initialized');
       
     } catch (error) {
       console.error('❌ Failed to initialize performance monitoring:', error);
@@ -1835,7 +1736,6 @@ window.hideVaultSwitcher = function() {
 
 // Override selectVault to ensure proper vault dialog closing and status updates
 window.selectVault = async function() {
-  console.log('🔧 Global selectVault called, vaultManager available:', !!window.vaultManager);
   
   if (!window.vaultManager) {
     console.error('❌ VaultManager not available, falling back to direct invoke');
@@ -1845,22 +1745,17 @@ window.selectVault = async function() {
   }
   
   try {
-    console.log('📁 Using VaultManager to select vault...');
     const result = await window.vaultManager.selectVault();
-    console.log('📁 VaultManager selection result:', result);
     
     if (result) {
-      console.log('✅ Attempting to switch to selected vault:', result);
       
       try {
         await window.vaultManager.switchVault(result);
-        console.log('✅ Successfully switched to vault via VaultManager');
       } catch (switchError) {
         console.warn('⚠️ VaultManager switchVault failed, trying direct approach:', switchError);
         
         // Fallback: set vault directly and refresh
         appState.setVault(result);
-        console.log('✅ Vault set directly in AppState');
       }
       
       // Update both vault displays
@@ -1871,7 +1766,6 @@ window.selectVault = async function() {
       const vaultDialog = document.getElementById('vaultDialog');
       if (vaultDialog) {
         vaultDialog.style.display = 'none';
-        console.log('📁 Vault dialog closed');
       }
       
       showNotification(`Vault selected: ${result.split('/').pop() || result.split('\\\\').pop()}`, 'success');
@@ -1879,14 +1773,12 @@ window.selectVault = async function() {
       // Refresh vault
       await refreshVault();
     } else {
-      console.log('ℹ️ Vault selection cancelled');
       showNotification('No vault selected', 'info');
     }
   } catch (error) {
     console.error('❌ VaultManager selection error:', error);
     
     // Try the direct method as final fallback
-    console.log('🔄 Trying direct vault selection as fallback...');
     try {
       await selectVault();
     } catch (fallbackError) {

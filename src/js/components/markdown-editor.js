@@ -149,7 +149,6 @@ class MarkdownEditor {
     this.updateWordCount();
     this.isInitialized = true;
     
-    console.log('✅ MarkdownEditor initialized with performance optimizations and accessibility features');
   }
 
   /**
@@ -254,7 +253,6 @@ class MarkdownEditor {
         
         // Trigger AutoSave directly if service is available
         if (this.autoSave) {
-          console.log(`🔄 [MarkdownEditor] Content changed, triggering AutoSave. Length: ${this.content.length} chars`);
           this.autoSave.handleContentChange(this.content);
         } else {
           console.warn('⚠️ [MarkdownEditor] AutoSave service not available, content change not saved');
@@ -801,7 +799,6 @@ class MarkdownEditor {
     this.addKeyboardShortcut('Ctrl+Shift+D', () => console.log(this.getDiagnostics()), 'Show diagnostics');
     this.addKeyboardShortcut('Cmd+Shift+D', () => console.log(this.getDiagnostics()), 'Show diagnostics');
     
-    console.log(`✅ Keyboard shortcuts configured: ${this.keyboardShortcuts.size} shortcuts`);
   }
 
   /**
@@ -1020,7 +1017,6 @@ class MarkdownEditor {
       this.textarea.setSelectionRange(newCursorPos, newCursorPos);
       this.updateCursorPosition();
       
-      console.log(`📝 Adjusted blockquote level: ${direction > 0 ? 'increased' : 'decreased'}`);
     }
   }
 
@@ -1088,7 +1084,6 @@ class MarkdownEditor {
       const newCursorPos = this.selectionStart;
       this.textarea.setSelectionRange(newCursorPos, newCursorPos);
       
-      console.log(`🔗 Auto-wrapped selection with ${key}${closingChar}`);
       return;
     }
     
@@ -1115,7 +1110,6 @@ class MarkdownEditor {
       const newCursorPos = this.selectionStart - 1;
       this.textarea.setSelectionRange(newCursorPos, newCursorPos);
       
-      console.log(`🔧 Auto-completed ${key} with ${closingChar}`);
     }
   }
 
@@ -1151,7 +1145,6 @@ class MarkdownEditor {
    */
   undo() {
     if (this.undoStack.length === 0) {
-      console.log('📝 Nothing to undo');
       return false;
     }
     
@@ -1181,7 +1174,6 @@ class MarkdownEditor {
    */
   redo() {
     if (this.redoStack.length === 0) {
-      console.log('📝 Nothing to redo');
       return false;
     }
     
@@ -1507,7 +1499,6 @@ class MarkdownEditor {
     });
     
     this.container.dispatchEvent(saveEvent);
-    console.log('💾 Save request emitted');
   }
 
   /**
@@ -1553,7 +1544,6 @@ class MarkdownEditor {
       return this.getValue();
     });
     
-    console.log('✅ AutoSave integration established with MarkdownEditor');
   }
 
   /**
@@ -1888,7 +1878,6 @@ class MarkdownEditor {
     
     if (context.includes('virtual-scrolling')) {
       this.disableVirtualScrolling();
-      console.log('🔄 Virtual scrolling disabled due to error');
     }
   }
 
@@ -1976,7 +1965,6 @@ class MarkdownEditor {
     };
     
     this.addDOMEventListener(this.textarea, 'scroll', scrollHandler);
-    console.log('🔄 Scroll synchronization prepared');
   }
 
   /**
@@ -1991,7 +1979,6 @@ class MarkdownEditor {
     
     this.scrollSync.enabled = true;
     this.scrollSync.previewElement = previewElement;
-    console.log('🔄 Scroll synchronization enabled');
   }
 
   /**
@@ -2000,7 +1987,6 @@ class MarkdownEditor {
   disableScrollSync() {
     this.scrollSync.enabled = false;
     this.scrollSync.previewElement = null;
-    console.log('🔄 Scroll synchronization disabled');
   }
 
   /**
@@ -2108,7 +2094,6 @@ class MarkdownEditor {
     this.virtualScrolling = false;
     this.cleanupScheduled = false;
     
-    console.log('✅ MarkdownEditor destroyed');
   }
 
   /**

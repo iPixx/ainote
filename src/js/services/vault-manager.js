@@ -38,10 +38,8 @@ class VaultManager {
   async selectVault() {
     try {
       const selectedPath = await window.__TAURI__.core.invoke('select_vault');
-      console.log('🔍 VaultManager: Selected path from dialog:', selectedPath);
       
       if (selectedPath) {
-        console.log('✅ VaultManager: Path selected, skipping validation during selection');
         // Skip validation during selection - if user selected it from dialog, it should be valid
         // We'll validate later during actual usage if needed
         return selectedPath;
@@ -62,16 +60,13 @@ class VaultManager {
   async validateVault(vaultPath) {
     try {
       if (!vaultPath || typeof vaultPath !== 'string') {
-        console.log('🔍 VaultManager: Invalid vault path type:', typeof vaultPath, vaultPath);
         return false;
       }
 
-      console.log('🔧 VaultManager: Calling backend validate_vault with path:', vaultPath);
       
       // Use backend validation command
       const isValid = await window.__TAURI__.core.invoke('validate_vault', { vaultPath });
       
-      console.log('✅ VaultManager: Backend validation result:', isValid);
       return isValid === true;
     } catch (error) {
       console.error('❌ VaultManager: Vault validation error:', error);
@@ -112,7 +107,6 @@ class VaultManager {
       if (useEnhanced) {
         try {
           // Phase 2C: Use enhanced vault loading with automatic indexing and monitoring
-          console.log('🚀 VaultManager: Using enhanced vault loading with indexing...');
           
           const result = await window.__TAURI__.core.invoke('load_vault_with_indexing', { 
             vaultPath, 
@@ -133,23 +127,17 @@ class VaultManager {
             monitoringError: result.monitoring_error
           };
 
-          console.log('✅ VaultManager: Enhanced vault loading completed', {
-            filesCount: files.length,
-            indexingActive: result.indexing_active,
-            monitoringActive: result.monitoring_active,
-            indexingRequests: result.indexing_request_ids?.length || 0
-          });
 
           // Log any warnings for indexing or monitoring failures
           if (result.indexing_error) {
-            console.warn('⚠️ VaultManager: Indexing setup failed:', result.indexing_error);
+            console.warn('VaultManager: Indexing setup failed:', result.indexing_error);
           }
           if (result.monitoring_error) {
-            console.warn('⚠️ VaultManager: File monitoring setup failed:', result.monitoring_error);
+            console.warn('VaultManager: File monitoring setup failed:', result.monitoring_error);
           }
 
         } catch (enhancedError) {
-          console.warn('⚠️ VaultManager: Enhanced loading failed, falling back to basic loading:', enhancedError);
+          console.warn('VaultManager: Enhanced loading failed, falling back to basic loading:', enhancedError);
           
           // Fall back to basic vault loading
           files = await window.__TAURI__.core.invoke('load_vault', { vaultPath });
@@ -160,7 +148,6 @@ class VaultManager {
         }
       } else {
         // Use basic vault loading
-        console.log('📁 VaultManager: Using basic vault loading...');
         files = await window.__TAURI__.core.invoke('load_vault', { vaultPath });
         
         if (!Array.isArray(files)) {
@@ -198,14 +185,12 @@ class VaultManager {
         throw new Error('New vault path is required');
       }
 
-      console.log('🔄 VaultManager: Switching to vault:', newVaultPath);
       const previousVault = this.currentVaultPath;
 
       // Try to load the vault - this will validate accessibility
       let files = [];
       try {
         files = await this.loadVault(newVaultPath);
-        console.log('✅ VaultManager: Successfully loaded vault with', files.length, 'items');
       } catch (loadError) {
         console.warn('⚠️ VaultManager: Failed to load vault, but proceeding anyway:', loadError);
         // If loading fails, still proceed but with empty file list
@@ -224,7 +209,6 @@ class VaultManager {
       // Persist vault preference
       this.saveVaultPreference(newVaultPath);
 
-      console.log(`✅ VaultManager: Switched vault from "${previousVault}" to "${newVaultPath}". Loaded ${files.length} items.`);
 
     } catch (error) {
       console.error('❌ VaultManager: Failed to switch vault:', error);
@@ -318,7 +302,6 @@ class VaultManager {
   saveVaultPreference(vaultPath) {
     // Current vault is automatically saved by AppState.setVault()
     // This method is kept for API compatibility
-    console.log(`Vault preference automatically saved via AppState: ${vaultPath}`);
   }
 
   /**
@@ -386,7 +369,6 @@ class VaultManager {
       await this.appState.setVault(null);
       this.appState.setFiles([]);
       
-      console.log('All vault data cleared');
     } catch (error) {
       console.error('Failed to clear vault data:', error);
       throw new Error(`Failed to clear vault data: ${error.message}`);
@@ -436,12 +418,10 @@ class VaultManager {
         throw new Error('No vault currently loaded');
       }
 
-      console.log(`Refreshing vault: ${this.currentVaultPath}`);
       
       // Re-load the vault to get updated file list
       const files = await this.loadVault(this.currentVaultPath);
       
-      console.log(`Vault refreshed. Found ${files.length} items.`);
       return files;
     } catch (error) {
       console.error('Failed to refresh vault:', error);
@@ -483,7 +463,6 @@ class VaultManager {
         bubbles: true 
       });
       document.dispatchEvent(event);
-      console.log(`🔔 VaultManager: Emitted event '${eventType}'`, eventData);
     } catch (error) {
       console.warn('⚠️ VaultManager: Failed to emit vault event:', error);
     }

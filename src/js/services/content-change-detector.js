@@ -119,7 +119,6 @@ class ContentChangeDetector {
     this.setupEditorEventListeners();
     this.initializeContentState();
     
-    console.log('✅ ContentChangeDetector initialized with 500ms debouncing');
   }
 
   /**
@@ -353,7 +352,6 @@ class ContentChangeDetector {
    */
   async performContentExtraction(content, timestamp) {
     if (this.isExtracting) {
-      console.log('Extraction already in progress, skipping');
       return;
     }
 
@@ -407,7 +405,6 @@ class ContentChangeDetector {
         changeId: `${timestamp}-${this.simpleHash(extractionResult.currentParagraph)}`
       });
 
-      console.log(`📝 Content extraction completed in ${duration.toFixed(2)}ms`);
 
     } catch (error) {
       console.error('Content extraction failed:', error);
@@ -624,7 +621,6 @@ class ContentChangeDetector {
   clearContentHistory() {
     this.contentHistory.snapshots = [];
     this.contentHistory.currentIndex = 0;
-    console.log('📝 Content history cleared for memory optimization');
   }
 
   /**
@@ -635,7 +631,6 @@ class ContentChangeDetector {
     
     this.isEnabled = true;
     this.initializeContentState();
-    console.log('📝 ContentChangeDetector enabled');
   }
 
   /**
@@ -646,7 +641,6 @@ class ContentChangeDetector {
     
     this.isEnabled = false;
     this.cancelPendingExtraction();
-    console.log('📝 ContentChangeDetector disabled');
   }
 
   /**
@@ -659,7 +653,6 @@ class ContentChangeDetector {
     }
     
     this.debounceDelay = delay;
-    console.log(`📝 ContentChangeDetector debounce delay set to ${delay}ms`);
   }
 
   /**
@@ -672,7 +665,6 @@ class ContentChangeDetector {
     }
     
     this.minChangeThreshold = threshold;
-    console.log(`📝 ContentChangeDetector change threshold set to ${threshold} characters`);
   }
 
   /**
@@ -804,7 +796,6 @@ class ContentChangeDetector {
     this.editor = null;
     this.appState = null;
     
-    console.log('✅ ContentChangeDetector destroyed');
   }
 }
 

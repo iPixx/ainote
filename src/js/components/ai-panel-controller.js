@@ -93,7 +93,6 @@ class AiPanelController {
     }
 
     try {
-      console.log('🤖 Initializing AI Panel Controller...');
       
       // Initialize base AI panel
       this.aiPanel = new AiPanel(this.panelElement, this.layoutManager);
@@ -116,7 +115,6 @@ class AiPanelController {
       // Mark as initialized
       this.isInitialized = true;
       
-      console.log('✅ AI Panel Controller initialized successfully');
       
       // Emit ready event
       this.emit(AiPanelController.EVENTS.SUGGESTIONS_READY, {
@@ -202,7 +200,6 @@ class AiPanelController {
     mainLayout.appendChild(this.errorContainer);
     this.contentContainer.appendChild(mainLayout);
     
-    console.log('✅ AI Panel UI structure setup complete');
   }
 
   /**
@@ -224,7 +221,6 @@ class AiPanelController {
           this.fileTree,
           this.editorPanel
         );
-        console.log('✅ Navigation service initialized');
       } else {
         console.warn('⚠️ Navigation service not initialized - FileTree or EditorPanel not available');
       }
@@ -237,7 +233,6 @@ class AiPanelController {
         this.cacheManager
       );
       
-      console.log('✅ AI services initialized');
       
     } catch (error) {
       console.error('❌ Failed to initialize AI services:', error);
@@ -253,7 +248,6 @@ class AiPanelController {
     try {
       // Use enhanced suggestion list if navigation service is available
       if (this.navigationService) {
-        console.log('🚀 Initializing enhanced suggestion list with navigation');
         this.suggestionList = new EnhancedSuggestionList(
           this.suggestionContainer,
           this.editor,
@@ -267,7 +261,6 @@ class AiPanelController {
           }
         );
       } else {
-        console.log('📝 Using basic suggestion list (no navigation service)');
         this.suggestionList = new SuggestionList(
           this.suggestionContainer,
           this.editor,
@@ -280,7 +273,6 @@ class AiPanelController {
         this.suggestionList.enableKeyboardNavigation();
       }
       
-      console.log('✅ Suggestion components initialized');
       
     } catch (error) {
       console.error('❌ Failed to initialize suggestion components:', error);
@@ -346,7 +338,6 @@ class AiPanelController {
       () => this.reloadSuggestions()
     );
     
-    console.log('✅ Event integration setup complete');
   }
 
   /**
@@ -749,7 +740,6 @@ class AiPanelController {
    * Cleanup controller and all components
    */
   destroy() {
-    console.log('🤖 Destroying AI Panel Controller...');
     
     // Cleanup components
     if (this.suggestionList) {
@@ -790,7 +780,6 @@ class AiPanelController {
     this.currentLoadingState = false;
     this.lastError = null;
     
-    console.log('✅ AI Panel Controller destroyed');
   }
 }
 

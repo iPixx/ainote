@@ -106,7 +106,6 @@ class PreviewRenderer {
     this.loadTheme();
     this.initializeMemoryMonitoring();
     
-    console.log('✅ PreviewRenderer initialized successfully');
   }
 
   /**
@@ -640,7 +639,6 @@ class PreviewRenderer {
    * @param {string} href - Internal link path
    */
   handleInternalLink(href) {
-    console.log('🔗 Internal link clicked:', href);
     
     // Emit event for app state (future file navigation)
     if (this.appState && this.appState.emit) {
@@ -1164,7 +1162,6 @@ th {
       this.setupScrollSynchronization();
     }
     
-    console.log('✅ Real-time preview updates enabled');
   }
   
   /**
@@ -1287,7 +1284,6 @@ th {
     this.renderStats.incrementalUpdates++;
     
     const updateTime = performance.now() - startTime;
-    console.log(`🔄 Incremental update completed in ${updateTime.toFixed(2)}ms (${changedSections.length} sections)`);
   }
   
   /**
@@ -1377,7 +1373,6 @@ th {
       this.debounce(() => this.handlePreviewScroll(), 50)
     );
     
-    console.log('🔗 Scroll synchronization enabled');
   }
   
   /**
@@ -1518,7 +1513,6 @@ th {
       this.memoryMonitor.baselineMemory = performance.memory.usedJSHeapSize;
     }
     
-    console.log('✅ Memory cleanup completed');
   }
   
   /**

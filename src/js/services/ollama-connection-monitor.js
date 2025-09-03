@@ -63,7 +63,6 @@ class OllamaConnectionMonitor {
      * Initialize the Ollama Connection Monitor
      */
     constructor() {
-        console.log('🤖 Initializing Ollama Connection Monitor...');
         
         // Service state
         this.isRunning = false;
@@ -103,7 +102,6 @@ class OllamaConnectionMonitor {
         // Event listeners
         this.eventListeners = new Map();
         
-        console.log('✅ Ollama Connection Monitor initialized');
     }
 
     /**
@@ -115,7 +113,6 @@ class OllamaConnectionMonitor {
             return;
         }
 
-        console.log('🚀 Starting Ollama Connection Monitor...');
         
         this.isRunning = true;
         this.performanceMetrics.startTime = Date.now();
@@ -134,7 +131,6 @@ class OllamaConnectionMonitor {
             // Perform initial status check
             await this.performHealthCheck();
             
-            console.log('✅ Ollama Connection Monitor started successfully');
             
         } catch (error) {
             console.error('❌ Failed to start Ollama Connection Monitor:', error);
@@ -170,7 +166,6 @@ class OllamaConnectionMonitor {
             this.reconnectTimeout = null;
         }
         
-        console.log('✅ Ollama Connection Monitor stopped');
     }
 
     /**
@@ -180,7 +175,6 @@ class OllamaConnectionMonitor {
     async initializeBackendMonitoring() {
         try {
             await invoke('start_ollama_monitoring');
-            console.log('✅ Backend monitoring initialized');
         } catch (error) {
             console.warn('⚠️ Backend monitoring initialization failed (may work in limited mode):', error);
             // Don't fail completely - frontend monitoring can still work
@@ -192,7 +186,6 @@ class OllamaConnectionMonitor {
      * @private
      */
     startHealthChecks() {
-        console.log(`🔄 Starting health checks every ${this.config.HEALTH_CHECK_INTERVAL}ms`);
         
         this.healthCheckInterval = setInterval(async () => {
             if (this.isRunning) {
@@ -206,7 +199,6 @@ class OllamaConnectionMonitor {
      * @private
      */
     startModelMonitoring() {
-        console.log(`🔄 Starting model monitoring every ${this.config.MODEL_CHECK_INTERVAL}ms`);
         
         this.modelCheckInterval = setInterval(async () => {
             if (this.isRunning && this.currentStatus === OllamaConnectionMonitor.STATUS.CONNECTED) {
@@ -350,7 +342,6 @@ class OllamaConnectionMonitor {
         this.reconnectAttempts++;
         this.nextReconnectTime = Date.now() + delay;
         
-        console.log(`🔄 Scheduling reconnection attempt ${this.reconnectAttempts} in ${delay}ms`);
         
         // Clear existing timeout
         if (this.reconnectTimeout) {
@@ -360,7 +351,6 @@ class OllamaConnectionMonitor {
         // Schedule reconnection
         this.reconnectTimeout = setTimeout(async () => {
             if (this.isRunning) {
-                console.log(`🔄 Attempting reconnection #${this.reconnectAttempts}...`);
                 
                 this.emit(OllamaConnectionMonitor.EVENTS.RECONNECTION_ATTEMPT, {
                     attempt: this.reconnectAttempts,
@@ -380,7 +370,6 @@ class OllamaConnectionMonitor {
      */
     async checkModelStatus() {
         try {
-            console.log('📦 Checking model status...');
             
             const modelVerification = await invoke('verify_model', { 
                 modelName: this.config.REQUIRED_MODEL 
@@ -397,7 +386,6 @@ class OllamaConnectionMonitor {
                 info: modelVerification.info
             };
             
-            console.log('📦 Model status updated:', this.modelStatus);
             
             // Emit model status update if changed
             if (wasAvailable !== this.modelStatus.isAvailable) {
@@ -508,7 +496,6 @@ class OllamaConnectionMonitor {
      * Force reconnection attempt
      */
     async forceReconnect() {
-        console.log('🔄 Forced reconnection requested');
         
         // Cancel any pending reconnection
         if (this.reconnectTimeout) {
@@ -617,7 +604,6 @@ class OllamaConnectionMonitor {
         this.stop();
         this.eventListeners.clear();
         
-        console.log('✅ Ollama Connection Monitor destroyed');
     }
 }
 

@@ -48,7 +48,6 @@ class LayoutManager {
     this.updateLayout();
     this.updateExpandButton();
     
-    console.log('✅ LayoutManager initialized successfully');
   }
 
   setupEventListeners() {
@@ -89,7 +88,6 @@ class LayoutManager {
       }
     });
     
-    console.log('🔧 Resize handles setup complete');
   }
 
   handleMouseDown(e) {
@@ -264,7 +262,6 @@ class LayoutManager {
     document.documentElement.style.setProperty(cssVar, `${width}px`);
     this.updateLayout(); // Ensure layout is updated after width change
     
-    console.log(`📏 Set ${panel} width to: ${width}px`);
   }
 
   getCurrentPanelWidth(panel) {
@@ -330,12 +327,10 @@ class LayoutManager {
       window.showNotification(`AI Panel ${isVisible ? 'shown' : 'hidden'} (Ctrl/Cmd+2)`, 'info');
     }
     
-    console.log(`🤖 AI panel ${isVisible ? 'shown' : 'hidden'}`);
   }
 
   handleWindowResize() {
     // Validate and adjust panel widths on window resize
-    console.log('🔄 Window resized - validating panel widths');
     
     // Check file tree width
     const fileTreeWidth = this.getCurrentPanelWidth('file-tree');
@@ -497,7 +492,6 @@ class LayoutManager {
       }
     }
     
-    console.log(`📍 Toggle buttons updated: ${this.panelState.fileTreeCollapsed ? '➡️ (expand)' : '⬅️ (collapse)'}`);
   }
 
   async saveState() {
@@ -512,7 +506,6 @@ class LayoutManager {
         editorMode: layoutState.editorMode
       });
       
-      console.log('💾 Layout state saved successfully');
     } catch (error) {
       console.error('❌ Failed to save layout state:', error);
     }
@@ -640,7 +633,6 @@ class LayoutManager {
     this.updateLayout();
     this.updateExpandButton();
     
-    console.log('✅ Layout state applied from persistence');
   }
 
   // Layout reliability test

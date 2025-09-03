@@ -95,7 +95,6 @@ class RealTimeMetricsService {
                 };
                 
                 await invoke('start_performance_monitoring', { request: { config } });
-                console.log('✅ Backend performance monitoring started');
             }
 
             // Start enhanced metrics collection if available
@@ -118,7 +117,6 @@ class RealTimeMetricsService {
                             storage_dir: storagePath
                         }
                     });
-                    console.log('✅ Enhanced metrics collection started');
                 }
             } catch (error) {
                 console.warn('Enhanced metrics not available:', error.message);
@@ -128,7 +126,6 @@ class RealTimeMetricsService {
             this.isActive = true;
             this.startMetricsLoop();
             
-            console.log('✅ Real-time metrics service started successfully');
             
         } catch (error) {
             console.error('Failed to start real-time metrics service:', error);
@@ -150,7 +147,6 @@ class RealTimeMetricsService {
         // Notify subscribers
         this.notifySubscribers('service_stopped', {});
         
-        console.log('✅ Real-time metrics service stopped');
     }
 
     /**

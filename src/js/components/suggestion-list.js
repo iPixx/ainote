@@ -99,7 +99,6 @@ class SuggestionList {
     this.setupKeyboardNavigation();
     this.render();
     
-    console.log('✅ SuggestionList initialized');
   }
 
   /**
@@ -621,7 +620,6 @@ class SuggestionList {
         contentLength: suggestion.content.length
       });
       
-      console.log(`📝 Inserted suggestion: ${suggestion.title}`);
       
     } catch (error) {
       console.error('Failed to insert suggestion:', error);
@@ -653,7 +651,6 @@ class SuggestionList {
         insertedAt: cursorPosition
       });
       
-      console.log(`🔗 Referenced suggestion: ${suggestion.title}`);
       
     } catch (error) {
       console.error('Failed to reference suggestion:', error);
@@ -875,7 +872,6 @@ class SuggestionList {
     this.isLoading = false;
     this.error = null;
     
-    console.log('✅ SuggestionList destroyed');
   }
 }
 

@@ -105,7 +105,6 @@ class AiStatusPanel {
         this.attachEventListeners();
         this.startStatusMonitoring();
         
-        console.log('✅ AI Status Panel initialized');
     }
 
     /**
@@ -372,7 +371,6 @@ class AiStatusPanel {
             verifyModelBtn.addEventListener('click', this.handleVerifyModel);
         }
         
-        console.log('🔗 AI Status Panel event listeners attached');
     }
 
     /**
@@ -419,7 +417,6 @@ class AiStatusPanel {
     async startOllamaMonitoring() {
         try {
             await invoke('start_ollama_monitoring');
-            console.log('🤖 Ollama background monitoring started');
         } catch (error) {
             console.warn('⚠️ Failed to start Ollama monitoring:', error);
         }
@@ -734,32 +731,26 @@ class AiStatusPanel {
      * Handle retry connection button click
      */
     async handleRetryConnection() {
-        console.log('🔄 [DEBUG] Retry Connection button clicked');
         
         // Disable retry button temporarily
         const retryBtn = document.getElementById('aiRetryBtn');
         if (retryBtn) {
-            console.log('🔄 [DEBUG] Disabling retry button temporarily');
             retryBtn.disabled = true;
             retryBtn.textContent = 'Retrying...';
         }
         
-        console.log('🔄 [DEBUG] Emitting CONNECTION_REQUESTED event with retry action');
         this.emitEvent(AiStatusPanel.EVENTS.CONNECTION_REQUESTED, {
             action: 'retry'
         });
         
-        console.log('🔄 [DEBUG] Starting status check after retry button click');
         await this.handleStatusCheck();
         
         // Re-enable retry button
         if (retryBtn) {
-            console.log('🔄 [DEBUG] Re-enabling retry button after status check');
             retryBtn.disabled = false;
             retryBtn.textContent = 'Retry Connection';
         }
         
-        console.log('🔄 [DEBUG] Retry Connection process completed');
     }
 
     /**
@@ -828,7 +819,6 @@ class AiStatusPanel {
                 baseUrl: newUrl
             });
             
-            console.log('✅ AI service configuration updated:', newUrl);
             
         } catch (error) {
             console.error('❌ Failed to update AI configuration:', error);
@@ -1083,7 +1073,6 @@ class AiStatusPanel {
      * Handle model refresh button click
      */
     async handleModelRefresh() {
-        console.log('🔄 Model refresh requested');
         
         const refreshBtn = document.getElementById('modelRefreshBtn');
         if (refreshBtn) {
@@ -1134,7 +1123,6 @@ class AiStatusPanel {
         
         try {
             await invoke('cancel_download', { modelName: this.currentModelName });
-            console.log('✅ Download cancelled');
             
             // Update UI
             this.updateModelIndicator('missing', 'Download cancelled');
@@ -1152,7 +1140,6 @@ class AiStatusPanel {
      * Handle verify model button click
      */
     async handleVerifyModel() {
-        console.log('✅ Verify model requested:', this.currentModelName);
         
         const verifyBtn = document.getElementById('verifyModelBtn');
         if (verifyBtn) {
@@ -1274,7 +1261,6 @@ class AiStatusPanel {
      * @param {Object} progress - Final progress information
      */
     async handleDownloadComplete(progress) {
-        console.log('✅ Download completed:', progress);
         
         this.stopProgressMonitoring();
         this.showDownloadProgress(false);

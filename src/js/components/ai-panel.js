@@ -60,7 +60,6 @@ class AiPanel {
             return;
         }
         
-        console.log('🤖 Initializing AI Panel...');
         
         // Ensure panel element exists
         if (!this.panel) {
@@ -83,7 +82,6 @@ class AiPanel {
         }
         
         this.isInitialized = true;
-        console.log('✅ AI Panel initialized successfully');
         
         // Emit ready event
         this.emitEvent(AiPanel.EVENTS.PANEL_READY, {
@@ -121,13 +119,11 @@ class AiPanel {
         // Listen for layout changes that might affect the AI panel
         if (this.layoutManager) {
             // We'll integrate with layout manager events if available
-            console.log('🔗 AI Panel event listeners setup with layout manager');
         }
         
         // Listen for window resize to handle responsive behavior
         window.addEventListener('resize', this.handleVisibilityChange);
         
-        console.log('🔗 AI Panel event listeners attached');
     }
 
     /**
@@ -139,7 +135,6 @@ class AiPanel {
             return;
         }
         
-        console.log('🚀 Activating AI Panel...');
         
         // Mark as activated
         this.isActivated = true;
@@ -157,7 +152,6 @@ class AiPanel {
             timestamp: new Date().toISOString()
         });
         
-        console.log('✅ AI Panel activated successfully');
     }
 
     /**
@@ -169,7 +163,6 @@ class AiPanel {
             return;
         }
         
-        console.log('🔄 Deactivating AI Panel...');
         
         // Mark as deactivated
         this.isActivated = false;
@@ -187,7 +180,6 @@ class AiPanel {
             timestamp: new Date().toISOString()
         });
         
-        console.log('✅ AI Panel deactivated successfully');
     }
 
     /**
@@ -218,7 +210,6 @@ class AiPanel {
         if (this.layoutManager && typeof this.layoutManager.toggleAiPanel === 'function') {
             // Only toggle if the layout manager state doesn't match
             if (!this.layoutManager.panelState?.aiPanelVisible) {
-                console.log('🔄 Synchronizing with layout manager...');
                 this.layoutManager.toggleAiPanel();
             }
         }
@@ -226,7 +217,6 @@ class AiPanel {
         // Save state
         this.saveVisibilityState(true);
         
-        console.log('✅ AI Panel shown');
     }
 
     /**
@@ -246,7 +236,6 @@ class AiPanel {
         if (this.layoutManager && typeof this.layoutManager.toggleAiPanel === 'function') {
             // Only toggle if the layout manager state doesn't match
             if (this.layoutManager.panelState?.aiPanelVisible) {
-                console.log('🔄 Synchronizing with layout manager...');
                 this.layoutManager.toggleAiPanel();
             }
         }
@@ -254,7 +243,6 @@ class AiPanel {
         // Save state
         this.saveVisibilityState(false);
         
-        console.log('✅ AI Panel hidden');
     }
 
     /**
@@ -316,7 +304,6 @@ class AiPanel {
         try {
             // Save to localStorage as fallback
             localStorage.setItem('aiPanel.visible', JSON.stringify(isVisible));
-            console.log('💾 AI Panel visibility state saved:', isVisible);
         } catch (error) {
             console.warn('⚠️ Failed to save AI panel state:', error);
         }
@@ -382,14 +369,12 @@ class AiPanel {
      * Refresh panel content (delegate to child components)
      */
     refresh() {
-        console.log('🔄 Refreshing AI Panel content...');
         
         // Emit refresh event for child components to handle
         this.emitEvent('ai_panel_refresh', {
             timestamp: new Date().toISOString()
         });
         
-        console.log('✅ AI Panel refresh completed');
     }
 
     /**
@@ -413,7 +398,6 @@ class AiPanel {
             'ai-panel-hidden'
         );
         
-        console.log('✅ AI Panel destroyed');
     }
 }
 

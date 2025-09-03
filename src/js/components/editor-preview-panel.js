@@ -142,7 +142,6 @@ class EditorPreviewPanel {
     // Mark as initialized
     this.isInitialized = true;
     
-    console.log('✅ EditorPreviewPanel initialized successfully');
     
     // Emit initialization event
     this.emit(EditorPreviewPanel.EVENTS.MODE_CHANGED, {
@@ -208,7 +207,6 @@ class EditorPreviewPanel {
         
         // Apply stored content if we have any
         if (this.content) {
-          console.log('🔄 Setting stored content in editor:', this.content.length, 'characters');
           this.markdownEditor.setValue(this.content);
         }
         
@@ -237,7 +235,6 @@ class EditorPreviewPanel {
         // Initialize ContentChangeDetector for AI suggestions
         this.initializeContentChangeDetector();
         
-        console.log('✅ MarkdownEditor initialized in panel');
       }).catch(error => {
         this.handleError('editor-initialization', error);
       });
@@ -278,7 +275,6 @@ class EditorPreviewPanel {
             this.emit('paragraph_extracted', event);
           });
           
-          console.log('✅ ContentChangeDetector initialized for AI suggestions');
         } else {
           console.warn('⚠️ Cannot initialize ContentChangeDetector - missing editor or appState');
         }
@@ -319,7 +315,7 @@ class EditorPreviewPanel {
       
       // Debug logging for development
       if (process.env.NODE_ENV === 'development') {
-        console.log('🤖 AI content change detected:', {
+        console.log('Content extraction:', {
           paragraphLength: currentParagraph.length,
           contextCount: contextParagraphs ? contextParagraphs.length : 0,
           extractionTime: extractionTime.toFixed(2) + 'ms',
@@ -345,7 +341,6 @@ class EditorPreviewPanel {
         
         // Apply stored content if we have any
         if (this.content) {
-          console.log('🔄 Setting stored content in preview renderer:', this.content.length, 'characters');
           this.previewRenderer.render(this.content);
         }
         
@@ -356,7 +351,6 @@ class EditorPreviewPanel {
           }
         });
         
-        console.log('✅ PreviewRenderer initialized in panel');
       }).catch(error => {
         this.handleError('preview-initialization', error);
       });
@@ -521,7 +515,6 @@ class EditorPreviewPanel {
     const startTime = performance.now();
     this.isTransitioning = true;
 
-    console.log(`🔄 Switching to ${mode} mode`);
 
     // Save current scroll position
     this.saveScrollPosition();
@@ -566,7 +559,6 @@ class EditorPreviewPanel {
         timestamp: Date.now()
       });
 
-      console.log(`✅ Mode switched to ${mode} in ${switchTime.toFixed(2)}ms`);
     }).catch(error => {
       this.isTransitioning = false;
       this.handleError('mode-switch', error);
@@ -1079,7 +1071,6 @@ class EditorPreviewPanel {
    */
   setScrollSyncEnabled(enabled) {
     this.scrollSync.enabled = enabled;
-    console.log(`🔄 Scroll synchronization ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   /**

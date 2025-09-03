@@ -119,7 +119,6 @@ class AiSuggestionService {
    */
   async init() {
     try {
-      console.log('🤖 Initializing AI Suggestion Service...');
       
       // Set up content change detection
       this.setupContentChangeListeners();
@@ -133,7 +132,6 @@ class AiSuggestionService {
       // Mark as ready
       this.setStatus(AiSuggestionService.STATUS.READY);
       
-      console.log('✅ AI Suggestion Service initialized successfully');
       
     } catch (error) {
       console.error('❌ Failed to initialize AI Suggestion Service:', error);
@@ -197,7 +195,6 @@ class AiSuggestionService {
         similarityThreshold: 0.9
       });
       
-      console.log('✅ Backend services available');
       
     } catch (error) {
       console.warn('⚠️ Backend services may be limited:', error.message);
@@ -582,7 +579,6 @@ class AiSuggestionService {
       timestamp: Date.now()
     });
     
-    console.log(`✅ Generated ${suggestions.length} suggestions in ${duration.toFixed(1)}ms ${fromCache ? '(cached)' : '(fresh)'}`);
     
     return sortedSuggestions;
   }
@@ -643,7 +639,6 @@ class AiSuggestionService {
       timestamp: Date.now()
     });
     
-    console.log(`🤖 AI Suggestion Service status: ${oldStatus} → ${newStatus}`);
   }
 
   /**
@@ -741,7 +736,6 @@ class AiSuggestionService {
       this.setStatus(AiSuggestionService.STATUS.READY);
     }
     
-    console.log(`🤖 AI Suggestion Service ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   /**
@@ -750,7 +744,6 @@ class AiSuggestionService {
    */
   updateConfig(config) {
     this.config = { ...this.config, ...config };
-    console.log('🤖 AI Suggestion Service configuration updated:', this.config);
   }
 
   /**
@@ -819,7 +812,6 @@ class AiSuggestionService {
    * Cleanup service resources
    */
   destroy() {
-    console.log('🤖 Destroying AI Suggestion Service...');
     
     // Cancel any ongoing generation
     this.cancelCurrentGeneration();
@@ -834,7 +826,6 @@ class AiSuggestionService {
     this.status = AiSuggestionService.STATUS.DISABLED;
     this.generationInProgress = false;
     
-    console.log('✅ AI Suggestion Service destroyed');
   }
 }
 
